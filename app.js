@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "1.6-sprint2-v1";
+  const BUILD_VERSION = "1.6-sprint2-v2";
   const OLD_KEYS = ["pokemonTypeLearner.v0.6.1", "pokemonTypeLearner.v0.5", "pokemonTypeLearner.v0.4", "pokemonTypeLearner.v0.3", "pokemonTypeLearner.v0.2", "pokemonTypeLearner.v0.1"];
 
   const view = document.getElementById("view");
@@ -2597,7 +2597,7 @@
       const parsed = JSON.parse(await file.text());
       const incoming = parsed.state || parsed;
       const ver = String(incoming.version || parsed.exportVersion || "");
-      const currentVersions = [BUILD_VERSION,"1.6-sprint1-v1","1.5-sprint2-v1","1.5-sprint1-v1-fix1","1.5-sprint1-v1","1.4-sprint3-v2","1.4-sprint3-v1","1.4-sprint2-v6","1.4-sprint2-v5","1.4-sprint2-v3","1.4-sprint2-v2","1.4-sprint2-v1","1.4-sprint1-v2","1.4-sprint1-v1","1.3-sprint3-v3","1.3-sprint2-v2","1.3-sprint1-v1","1.2-sprint2-v2","1.2-sprint2-v1","1.2-sprint1-v2","1.2-sprint1-v1","1.0-sprint3-v1","1.0-sprint2-v2","1.0-sprint2","1.0-sprint1","1.0"];
+      const currentVersions = [BUILD_VERSION,"1.6-sprint2-v1","1.6-sprint1-v1","1.5-sprint2-v1","1.5-sprint1-v1-fix1","1.5-sprint1-v1","1.4-sprint3-v2","1.4-sprint3-v1","1.4-sprint2-v6","1.4-sprint2-v5","1.4-sprint2-v3","1.4-sprint2-v2","1.4-sprint2-v1","1.4-sprint1-v2","1.4-sprint1-v1","1.3-sprint3-v3","1.3-sprint2-v2","1.3-sprint1-v1","1.2-sprint2-v2","1.2-sprint2-v1","1.2-sprint1-v2","1.2-sprint1-v1","1.0-sprint3-v1","1.0-sprint2-v2","1.0-sprint2","1.0-sprint1","1.0"];
       const alphaVersions = ["0.6.1","0.6"];
       const legacyVersions = ["0.5","0.4","0.3"];
       if (![...currentVersions,...alphaVersions,...legacyVersions].includes(ver)) throw new Error("version");

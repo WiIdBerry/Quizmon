@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "quizmon-beta-1-0";
-const BUILD = "1-6-sprint2-v1-github-clean";
+const BUILD = "1-6-sprint2-v2-github-clean";
 const SHELL_CACHE = `${CACHE_PREFIX}-${BUILD}-shell`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}-${BUILD}-runtime`;
 const SHELL = [
@@ -122,6 +122,7 @@ const SHELL = [
   "./assets/cosmetics/banners/type-matrix.svg",
   "./assets/cosmetics/banners/verdant-bloom.svg",
   "./assets/cosmetics/banners/victory-stamp.svg",
+  "./assets/favicon-32.png",
   "./assets/icon-180.png",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
