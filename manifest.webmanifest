@@ -1,13 +1,13 @@
 {
-  "name": "PokémonTypLearner",
-  "short_name": "TypeLearner",
-  "description": "Learn Pokémon types and matchups in short training sessions.",
+  "name": "Quizmon",
+  "short_name": "Quizmon",
+  "description": "Die Pokémon-Quiz- und Lernplattform für Typen und Wechselwirkungen.",
   "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f1fb",
-  "theme_color": "#6841c6",
-  "orientation": "portrait-primary",
+  "background_color": "#f4f6f8",
+  "theme_color": "#315f72",
+  "orientation": "any",
   "lang": "de",
   "icons": [
     {
@@ -44,5 +44,8 @@
     "education",
     "games"
   ],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }

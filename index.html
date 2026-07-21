@@ -3,14 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#6841c6">
+  <meta name="theme-color" content="#f4f6f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#10191e" media="(prefers-color-scheme: dark)">
+  <meta name="application-name" content="Quizmon">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="TypeLearner">
+  <meta name="apple-mobile-web-app-title" content="Quizmon">
   <meta name="description" content="Lerne Pokémon-Typen und ihre Wechselwirkungen in kurzen Quiz-Einheiten.">
-  <title>PokémonTypLearner</title>
+  <title>Quizmon</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
   <link rel="stylesheet" href="styles.css">
@@ -21,15 +24,20 @@
 
   <div class="app-shell">
     <header class="topbar">
-      <button id="backButton" class="icon-button hidden" aria-label="Zurück">
-        <span aria-hidden="true">‹</span>
-      </button>
+      <div class="topbar-left">
+        <button id="backButton" class="icon-button hidden" aria-label="Zurück" title="Zurück">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.75 5.5 8.25 12l6.5 6.5"/></svg>
+        </button>
+        <button id="homeButton" class="icon-button hidden" aria-label="Startseite" title="Startseite">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 10.5 7.5-6 7.5 6v8a1 1 0 0 1-1 1h-4.25v-5h-4.5v5H5.5a1 1 0 0 1-1-1z"/></svg>
+        </button>
+      </div>
 
       <button id="brandButton" class="brand" aria-label="Startseite">
-        <span class="brand-mark"><span>PT</span></span>
+        <span class="brand-mark"><span>Q</span></span>
         <span class="brand-copy">
-          <strong>PokémonTypLearner</strong>
-          <small>v0.6.1 · Alpha</small>
+          <strong>Quizmon</strong>
+          <small>Beta 1.0</small>
         </span>
       </button>
 
@@ -39,13 +47,14 @@
       </button>
     </header>
 
-    <main id="view" class="view" aria-live="polite"></main>
+    <main id="view" class="view" aria-live="polite" tabindex="-1"></main>
 
     <nav class="bottom-nav" aria-label="Hauptnavigation">
-      <button class="nav-item active" data-route="home"><span class="nav-icon">⌂</span><small data-nav-label="home">Start</small></button>
-      <button class="nav-item" data-route="learn"><span class="nav-icon">◇</span><small data-nav-label="learn">Lernen</small></button>
-      <button class="nav-item" data-route="stats"><span class="nav-icon">▥</span><small data-nav-label="stats">Statistik</small></button>
-      <button class="nav-item" data-route="settings"><span class="nav-icon">⚙</span><small data-nav-label="settings">Optionen</small></button>
+      <button class="nav-item active" data-route="home"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 4l8.5 6.5"></path><path d="M5.5 9.5V20h13V9.5"></path></svg></span><small data-nav-label="home">Start</small></button>
+      <button class="nav-item" data-route="train"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v4"></path><path d="M18 16v4"></path><path d="M4 6h4"></path><path d="M16 18h4"></path><path d="m8 8 8 8"></path><path d="m16 8-2-2"></path><path d="m8 16 2 2"></path></svg></span><small data-nav-label="train">Training</small></button>
+      <button class="nav-item" data-route="learn"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v17H7.5A2.5 2.5 0 0 0 5 22z"></path><path d="M5 5.5v14"></path><path d="M9 7h6"></path><path d="M9 11h6"></path></svg></span><small data-nav-label="learn">Lernen</small></button>
+      <button class="nav-item" data-route="stats"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"></path><path d="M7 16v-4"></path><path d="M12 16V8"></path><path d="M17 16v-7"></path></svg></span><small data-nav-label="stats">Fortschritt</small></button>
+      <button class="nav-item" data-route="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 0 1 0 2.8 2 2 0 0 1-2.8 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 0 1-4 0v-.2a1 1 0 0 0-.7-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 0 1 0-4h.2a1 1 0 0 0 .9-.7 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a2 2 0 0 1 4 0v.2a1 1 0 0 0 .7.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a2 2 0 0 1 0 4h-.2a1 1 0 0 0-.9.7z"></path></svg></span><small data-nav-label="settings">Optionen</small></button>
     </nav>
   </div>
 
@@ -53,6 +62,7 @@
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
   <script src="data.js"></script>
+  <script src="cosmetics.js"></script>
   <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>

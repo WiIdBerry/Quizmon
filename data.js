@@ -130,15 +130,56 @@ const FALLBACK_POKEMON = [
   { id: 998, names: { de: "Espinodon", en: "Baxcalibur" }, types: ["dragon", "ice"], generation: 9 }
 ];
 
-const LEVELS = [
-  { level: 1, key: "level.beginner", xp: 0 },
-  { level: 2, key: "level.student", xp: 120 },
-  { level: 3, key: "level.learner", xp: 320 },
-  { level: 4, key: "level.strategist", xp: 650 },
-  { level: 5, key: "level.expert", xp: 1100 },
-  { level: 6, key: "level.master", xp: 1750 },
-  { level: 7, key: "level.champion", xp: 2600 }
+/*
+ * Curated local catalogue for the trainer profile favorite-Pokémon picker.
+ * It spans every generation and remains searchable without an API request.
+ */
+const FAVORITE_POKEMON_EXTRAS = [
+  { id: 7, names: { de: "Schiggy", en: "Squirtle" }, types: ["water"], generation: 1 },
+  { id: 131, names: { de: "Lapras", en: "Lapras" }, types: ["water", "ice"], generation: 1 },
+  { id: 133, names: { de: "Evoli", en: "Eevee" }, types: ["normal"], generation: 1 },
+  { id: 151, names: { de: "Mew", en: "Mew" }, types: ["psychic"], generation: 1 },
+  { id: 257, names: { de: "Lohgock", en: "Blaziken" }, types: ["fire", "fighting"], generation: 3 },
+  { id: 384, names: { de: "Rayquaza", en: "Rayquaza" }, types: ["dragon", "flying"], generation: 3 },
+  { id: 658, names: { de: "Quajutsu", en: "Greninja" }, types: ["water", "dark"], generation: 6 }
 ];
+
+const FAVORITE_POKEMON_CATALOG = [...FALLBACK_POKEMON, ...FAVORITE_POKEMON_EXTRAS]
+  .filter((pokemon, index, collection) => collection.findIndex(item => item.id === pokemon.id) === index)
+  .sort((a, b) => a.id - b.id);
+
+
+const LEVEL_RANKS = [
+  { minLevel: 1, key: "level.beginner" },
+  { minLevel: 5, key: "level.student" },
+  { minLevel: 10, key: "level.learner" },
+  { minLevel: 20, key: "level.strategist" },
+  { minLevel: 35, key: "level.expert" },
+  { minLevel: 55, key: "level.master" },
+  { minLevel: 80, key: "level.champion" }
+];
+
+/*
+ * Level 1–100 progression.
+ * Early levels are intentionally short and rewarding. The XP required for
+ * every following level rises continuously, creating long-term progression
+ * without changing or resetting XP that players have already earned.
+ */
+const LEVELS = (() => {
+  let totalXp = 0;
+  return Array.from({ length: 100 }, (_, index) => {
+    const level = index + 1;
+    if (level > 1) {
+      const step = level - 2;
+      const xpForThisLevel = Math.round((100 + 15 * step + 0.45 * Math.pow(step, 1.6)) / 10) * 10;
+      totalXp += xpForThisLevel;
+    }
+    const rank = [...LEVEL_RANKS].reverse().find(entry => level >= entry.minLevel) || LEVEL_RANKS[0];
+    return { level, key: rank.key, xp: totalXp };
+  });
+})();
+
+/* Trainer profile cosmetics are defined in cosmetics.js. */
 
 const ACHIEVEMENTS = [
   { id: "first_answer", icon: "🌱", titleKey: "achievement.first.title", descriptionKey: "achievement.first.desc" },
