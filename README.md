@@ -1,7 +1,9 @@
-# Quizmon Beta 1.0
+# Quizmon Beta 1.0 – Patch B v1
 
-Statische Quizmon-Web-App für GitHub Pages.
+Technischer Stabilisierungspatch auf Grundlage von Patch A v1.
 
-Die App startet über `index.html`. Die Dateien in `.github/workflows` veröffentlichen den Inhalt des Repositorys automatisch auf GitHub Pages.
+## Entwicklung
 
-Finaler Beta-1.0-Build mit neuem Quizmon-App-Icon (1.6 Sprint 2 v2).
+- `npm test` prüft Typenlogik, Dualtypen, Cache-Bereinigung, Backups und lokale Dateiverweise.
+- `npm run check` ergänzt Syntaxprüfungen aller zentralen JavaScript-Dateien.
+- GitHub Pages wird erst veröffentlicht, wenn diese Prüfungen erfolgreich waren.
