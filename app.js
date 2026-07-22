@@ -2,13 +2,11 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "beta-1.0-patch-c-v1";
-  const { clone, unique, finiteNonNegative, shuffle, randomItem, percent, formatMultiplier } = QuizmonCore;
+  const BUILD_VERSION = "1.6-sprint2-v2";
   const OLD_KEYS = ["pokemonTypeLearner.v0.6.1", "pokemonTypeLearner.v0.5", "pokemonTypeLearner.v0.4", "pokemonTypeLearner.v0.3", "pokemonTypeLearner.v0.2", "pokemonTypeLearner.v0.1"];
 
   const view = document.getElementById("view");
   const modalRoot = document.getElementById("modalRoot");
-  const routeAnnouncer = document.getElementById("routeAnnouncer");
   const toastRoot = document.getElementById("toastRoot");
   const backButton = document.getElementById("backButton");
   const homeButton = document.getElementById("homeButton");
@@ -77,11 +75,6 @@
   };
 
   let state = loadState();
-  const shortcutRoute = new URLSearchParams(location.search).get("route");
-  if (["train", "learn", "stats"].includes(shortcutRoute)) {
-    state.route = shortcutRoute;
-    history.replaceState(null, "", `${location.pathname}${location.search.includes("source=pwa") ? "?source=pwa" : ""}`);
-  }
   let session = null;
   let learnType = null;
   let onboardingOpen = false;
@@ -105,6 +98,8 @@
     selection: 5, move: 8, success: [12,28,18], error: [26,32,26],
     level: [14,34,14,34,34], unlock: [10,24,10]
   });
+
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
 
   function deepMerge(base, saved) {
     const output = { ...clone(base), ...(saved || {}) };
@@ -321,12 +316,40 @@
     return `<span class="type-chip ${extraClass}" data-type="${type}" style="--type-color:${meta.color}"><span class="type-symbol" aria-hidden="true">${meta.icon}</span><span>${escapeHtml(typeLabel(type))}</span></span>`;
   }
 
+  function shuffle(items, random = Math.random) {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+  function randomItem(items, random = Math.random) { return items[Math.floor(random() * items.length)]; }
+  function unique(items) { return [...new Set(items.filter(Boolean))]; }
+  function finiteNonNegative(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : fallback;
+  }
   function validRoute(route) {
     return ["home","train","learn","learn-detail","stats","settings","profile","session","summary"].includes(route)
       || /^setup-(effectiveness|multiplier|impact|pokemon)$/.test(route || "");
   }
-  function sanitizePokemonCache(cache) { return QuizmonCore.sanitizePokemonCache(cache, TYPES); }
-  function effectiveness(attackingType, defendingTypes) { return QuizmonCore.effectiveness(TYPE_CHART, attackingType, defendingTypes); }
+  function sanitizePokemonCache(cache) {
+    if (!cache || typeof cache !== "object" || Array.isArray(cache)) return {};
+    const entries = Object.entries(cache).slice(-160).filter(([, item]) => {
+      if (!item || typeof item !== "object") return false;
+      const id = Number(item.id);
+      return Number.isInteger(id) && id > 0 && typeof item.name === "string"
+        && Array.isArray(item.types) && item.types.length > 0 && item.types.every(type => TYPES.includes(type))
+        && typeof item.image === "string";
+    });
+    return Object.fromEntries(entries);
+  }
+  function effectiveness(attackingType, defendingTypes) {
+    return defendingTypes.reduce((value, defendingType) => value * (TYPE_CHART[attackingType]?.[defendingType] ?? 1), 1);
+  }
+  function percent(correct, total) { return total ? Math.round((correct / total) * 100) : 0; }
+  function formatMultiplier(value) { return value === .25 ? "¼×" : value === .5 ? "½×" : `${value}×`; }
   function formatDuration(seconds) {
     const safe = Math.max(0, Math.round(seconds || 0));
     const minutes = Math.floor(safe / 60);
@@ -343,12 +366,7 @@
   }
   function trainerName() { return state.profile?.name || t("profile.defaultName"); }
   function profileChoice(collection, id, fallbackId) { return collection.find(item => item.id === id) || collection.find(item => item.id === fallbackId) || collection[0]; }
-  function cosmeticName(item) {
-    if (!item) return "";
-    if (item.nameKey) return t(item.nameKey);
-    if (state.language === "en" && item.nameEn) return item.nameEn;
-    return item.name || "";
-  }
+  function cosmeticName(item) { return item?.nameKey ? t(item.nameKey) : (item?.name || ""); }
   function cosmeticDescription(item) { return item?.description?.[state.language] || item?.description?.de || ""; }
   function cosmeticCategoryLabel(kind, category) { return t(`profile.category.${kind}.${category}`); }
   function selectedAvatar() { return profileChoice(PROFILE_AVATARS, state.profile?.avatarId, "pokeball"); }
@@ -441,10 +459,7 @@
     document.documentElement.dataset.theme = actualTheme();
     document.documentElement.dataset.animations = state.animations ? "on" : "off";
     document.documentElement.lang = state.language;
-    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-      meta.setAttribute("content", actualTheme() === "dark" ? "#10171b" : "#f4f6f8");
-      meta.removeAttribute("media");
-    });
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", actualTheme() === "dark" ? "#10171b" : "#f4f6f8");
     document.querySelectorAll("[data-nav-label]").forEach(item => item.textContent = t(`nav.${item.dataset.navLabel}`));
     backButton.setAttribute("aria-label", t("common.back"));
     backButton.setAttribute("title", t("common.back"));
@@ -747,12 +762,6 @@
 
   function modeName(mode) { return t(`mode.${mode}`); }
 
-  function scrollAppTop(behavior = "auto") {
-    const run = () => window.scrollTo({ top: 0, left: 0, behavior });
-    run();
-    requestAnimationFrame(() => { run(); requestAnimationFrame(run); });
-  }
-
   function setRoute(route, options = {}) {
     const fromRoute = state.route;
     const changed = fromRoute !== route;
@@ -762,12 +771,12 @@
     render();
 
     if (!changed) {
-      scrollAppTop(motionEnabled() ? "smooth" : "auto");
+      window.scrollTo({ top: 0, behavior: motionEnabled() ? "smooth" : "auto" });
       return;
     }
 
     if (!options.preserveScroll) {
-      scrollAppTop("auto");
+      window.scrollTo({ top: 0, behavior: "auto" });
     }
     requestAnimationFrame(() => view.focus({ preventScroll: true }));
   }
@@ -809,23 +818,8 @@
     document.querySelector(".bottom-nav").classList.toggle("hidden-nav", ["session", "summary"].includes(state.route));
   }
 
-  function currentRouteLabel() {
-    if (state.route === "train" || state.route.startsWith("setup-") || ["session", "summary"].includes(state.route)) return t("nav.train");
-    if (["learn", "learn-detail"].includes(state.route)) return t("nav.learn");
-    if (state.route === "stats") return t("nav.stats");
-    if (state.route === "settings") return t("nav.settings");
-    if (state.route === "profile") return t("profile.title");
-    return t("nav.home");
-  }
-
-  function announceRoute() {
-    if (!routeAnnouncer) return;
-    routeAnnouncer.textContent = "";
-    requestAnimationFrame(() => { routeAnnouncer.textContent = currentRouteLabel(); });
-  }
-
   function updateDocumentTitle() {
-    let label = currentRouteLabel();
+    let label = t("nav.home");
     if (state.route === "train" || state.route.startsWith("setup-") || ["session", "summary"].includes(state.route)) label = t("nav.train");
     else if (["learn", "learn-detail"].includes(state.route)) label = t("nav.learn");
     else if (state.route === "stats") label = t("nav.stats");
@@ -865,7 +859,6 @@
       else if (state.route === "summary") renderSummary();
       else { state.route = "home"; renderHome(); }
 
-      announceRoute();
       if (!state.onboardingComplete && !onboardingOpen) openOnboarding(0);
     } catch (error) {
       renderRecoveryState(error);
@@ -1226,7 +1219,7 @@
     const bannerPreview = PROFILE_BANNERS.find(item => item.id === set.bannerIds[0]);
     return `<button type="button" class="profile-set-card ${status.complete ? "" : "locked"}" data-profile-set="${set.id}" aria-disabled="${!status.complete}" ${status.complete ? "" : "disabled"}>
       <span class="profile-set-banner profile-banner profile-banner-${bannerPreview?.id || "neon-grid"}"><i></i></span>
-      <span class="profile-set-body">${avatarPreview ? profileAvatarMarkup(avatarPreview.id,"profile-set-avatar") : `<span class="profile-set-avatar-missing">?</span>`}<span><strong>${escapeHtml(cosmeticName(set))}</strong><small>${escapeHtml(titlePreview ? cosmeticName(titlePreview) : t("profile.setMissing"))}</small><em>${status.complete ? t("profile.setReady") : escapeHtml(status.unlockStatus.label)}</em></span></span>
+      <span class="profile-set-body">${avatarPreview ? profileAvatarMarkup(avatarPreview.id,"profile-set-avatar") : `<span class="profile-set-avatar-missing">?</span>`}<span><strong>${escapeHtml(set.name)}</strong><small>${escapeHtml(titlePreview ? cosmeticName(titlePreview) : t("profile.setMissing"))}</small><em>${status.complete ? t("profile.setReady") : escapeHtml(status.unlockStatus.label)}</em></span></span>
       <span class="profile-set-lock" aria-hidden="true">${status.complete ? "" : profileLockIconMarkup()}</span>
     </button>`;
   }
@@ -1625,7 +1618,7 @@
     const fallbacks = shuffle(FALLBACK_POKEMON, random).slice(0, 3);
     fallbacks.forEach(p => sequence.push({ kind:"pokemon", pokemon: formatFallbackPokemon(p), display:"both", focusTypes:[...p.types] }));
     session = newSession("daily", { length:10 }, shuffle(sequence, random));
-    prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); scrollAppTop("auto"); renderQuestion();
+    prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); renderQuestion();
   }
 
   function startWeakSession() {
@@ -1651,13 +1644,13 @@
       }
     }
     session = newSession("weak", { length:10 }, shuffle(sequence));
-    prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); scrollAppTop("auto"); renderQuestion();
+    prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); renderQuestion();
   }
 
   function startReviewSession(specs) {
     if (!specs?.length) return;
     session = newSession("review", { length: specs.length }, specs);
-    prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); scrollAppTop("auto"); renderQuestion();
+    prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); renderQuestion();
   }
 
   function generateEffectivenessSpec(options = {}) {
@@ -1677,10 +1670,9 @@
       correctPool = [options.focusType, ...correctPool.filter(t => t !== options.focusType)];
     } else correctPool = shuffle(correctPool, random);
 
-    const optionCount = difficulty === "easy" ? 4 : difficulty === "hard" ? 8 : 6;
-    const minAnswers = difficulty === "hard" ? Math.min(2, correctPool.length) : 1;
-    const maxAnswers = difficulty === "easy" ? 1 : Math.min(difficulty === "hard" ? 4 : 2, correctPool.length);
-    const answerCount = minAnswers + Math.floor(random() * Math.max(1, maxAnswers - minAnswers + 1));
+    const optionCount = difficulty === "easy" ? 4 : 6;
+    const maxAnswers = difficulty === "easy" ? 1 : Math.min(3, correctPool.length);
+    const answerCount = difficulty === "easy" ? 1 : 1 + Math.floor(random() * maxAnswers);
     const correctTargets = correctPool.slice(0, answerCount);
     const distractors = shuffle(TYPES.filter(t => !correctPool.includes(t)), random).slice(0, optionCount - answerCount);
     return { kind:"effectiveness", questionKind, attackingType, options:shuffle([...correctTargets,...distractors],random), correctTargets, focusTypes:[attackingType] };
@@ -1689,11 +1681,7 @@
   function generateMultiplierSpec(options = {}) {
     const random = options.random || Math.random;
     let defense = options.defense || "mixed";
-    if (defense === "mixed") {
-      if (options.difficulty === "easy") defense = "single";
-      else if (options.difficulty === "hard") defense = "dual";
-      else defense = random() < .52 ? "single" : "dual";
-    }
+    if (defense === "mixed") defense = random() < .52 ? "single" : "dual";
     let defendingTypes;
     if (options.focusType && random() < .72) {
       defendingTypes = defense === "single" ? [options.focusType] : [options.focusType, randomItem(TYPES.filter(t => t !== options.focusType),random)];
@@ -1704,11 +1692,7 @@
   function generateImpactSpec(options = {}) {
     const random = options.random || Math.random;
     let defense = options.defense || "mixed";
-    if (defense === "mixed") {
-      if (options.difficulty === "easy") defense = "single";
-      else if (options.difficulty === "hard") defense = "dual";
-      else defense = random() < .48 ? "single" : "dual";
-    }
+    if (defense === "mixed") defense = random() < .48 ? "single" : "dual";
     const attackingType = options.focusType && random() < .55 ? options.focusType : randomItem(TYPES, random);
     let defendingTypes;
     if (options.focusType && attackingType !== options.focusType && random() < .7) {
@@ -1718,7 +1702,7 @@
     }
     const correctMultiplier = effectiveness(attackingType, defendingTypes);
     const all = [0, .25, .5, 1, 2, 4];
-    const optionCount = options.difficulty === "easy" ? 4 : options.difficulty === "hard" ? 6 : 5;
+    const optionCount = options.difficulty === "easy" ? 4 : 6;
     const nearby = shuffle(all.filter(value => value !== correctMultiplier), random).slice(0, optionCount - 1);
     return {
       kind: "impact", attackingType, defendingTypes,
@@ -1729,10 +1713,7 @@
 
   async function generatePokemonSpec(config = {}, excludedIds = []) {
     const pokemon = await loadRandomPokemon(config.generation, excludedIds);
-    const difficulty = config.difficulty || "medium";
-    const optionCount = difficulty === "easy" ? 6 : difficulty === "hard" ? TYPES.length : 12;
-    const distractors = shuffle(TYPES.filter(type => !pokemon.types.includes(type))).slice(0, Math.max(0, optionCount - pokemon.types.length));
-    return { kind:"pokemon", pokemon, display:config.display || "both", options:shuffle([...pokemon.types, ...distractors]), focusTypes:[...pokemon.types] };
+    return { kind:"pokemon", pokemon, display:config.display || "both", focusTypes:[...pokemon.types] };
   }
 
   async function generateFreshSpec() {
@@ -1758,7 +1739,6 @@
   }
 
   async function renderQuestion() {
-    scrollAppTop("auto");
     if (!session) { setRoute("home"); return; }
     if (session.index >= session.length || (session.sequence && session.index >= session.sequence.length)) { finishSession(); return; }
     session.answered = false;
@@ -1777,7 +1757,6 @@
     else if (spec.kind === "multiplier") renderMultiplierQuestion(spec);
     else if (spec.kind === "impact") renderImpactQuestion(spec);
     else renderPokemonQuestion(spec);
-    scrollAppTop("auto");
   }
 
   function sessionHeader() {
@@ -1833,7 +1812,7 @@
     const selected=[...spec.selected];
     const correct=selected.length===spec.correctTargets.length&&selected.every(type=>spec.correctTargets.includes(type));
     const errorTypes=unique([...selected.filter(t=>!spec.correctTargets.includes(t)),...spec.correctTargets.filter(t=>!spec.selected.has(t))]);
-    document.querySelectorAll("[data-answer]").forEach(button=>{const type=button.dataset.answer;button.classList.add("is-locked");button.setAttribute("aria-disabled","true");button.disabled=true;if(spec.correctTargets.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
+    document.querySelectorAll("[data-answer]").forEach(button=>{const type=button.dataset.answer;button.classList.add("is-locked");button.setAttribute("aria-disabled","true");if(spec.correctTargets.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
     recordQuestion(correct,unique([spec.attackingType,...errorTypes]),selected);
     const details=spec.correctTargets.map(type=>`${typeChip(type,"small")} ${formatMultiplier(effectiveness(spec.attackingType,[type]))}`).join(" ");
     showFeedback(correct?"success":"error",correct?`${t("session.right")} ${typeChip(spec.attackingType,"small")}`:`${t("session.notQuite")} ${t("session.correctTypes",{types:details})}<div class="explanation">${effectivenessExplanation(spec)}</div>`);
@@ -2046,7 +2025,7 @@
     const correct=spec.selectedMultiplier===spec.correctMultiplier;
     document.querySelectorAll("[data-impact-value]").forEach(button=>{
       const value=Number(button.dataset.impactValue);
-      button.classList.add("is-locked");button.setAttribute("aria-disabled","true");button.disabled=true;
+      button.classList.add("is-locked");button.setAttribute("aria-disabled","true");
       if(value===spec.correctMultiplier)button.classList.add("correct");
       else if(value===spec.selectedMultiplier)button.classList.add("incorrect");
     });
@@ -2066,7 +2045,7 @@
         <div class="quiz-head"><p class="quiz-kicker">${t("session.identifyType")}</p><h1>${t("session.pokemonQuestion")}</h1><p>${t("session.chooseOneTwo")}</p></div>
         ${showImage?`<div class="pokemon-frame"><img class="pokemon-art" src="${escapeHtml(spec.pokemon.image)}" alt="${escapeHtml(spec.pokemon.name)}"><span class="pokemon-placeholder" hidden>?</span></div>`:""}
         ${(showName||imageOnly)?`<h2 class="pokemon-name${imageOnly?" pokemon-name-fallback":""}"${showName?"":" hidden"}>${escapeHtml(spec.pokemon.name)}</h2>`:""}
-        <div class="type-picker">${(spec.options || TYPES).map(type=>`<button class="type-option" data-pokemon-type="${type}" aria-pressed="false">${typeChip(type)}</button>`).join("")}</div>
+        <div class="type-picker">${TYPES.map(type=>`<button class="type-option" data-pokemon-type="${type}" aria-pressed="false">${typeChip(type)}</button>`).join("")}</div>
       </div>${sessionFooter()}</section>`;
     const image=document.querySelector(".pokemon-art");
     if(image)image.addEventListener("error",()=>{
@@ -2088,7 +2067,7 @@
     session.answered=true;
     const expected=spec.pokemon.types; const selected=[...spec.selected];
     const correct=selected.length===expected.length&&selected.every(type=>expected.includes(type));
-    document.querySelectorAll("[data-pokemon-type]").forEach(button=>{const type=button.dataset.pokemonType;button.classList.add("is-locked");button.setAttribute("aria-disabled","true");button.disabled=true;if(expected.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
+    document.querySelectorAll("[data-pokemon-type]").forEach(button=>{const type=button.dataset.pokemonType;button.classList.add("is-locked");button.setAttribute("aria-disabled","true");if(expected.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
     recordQuestion(correct,expected,selected);
     showFeedback(correct?"success":"error",correct?`${t("session.right")} ${escapeHtml(spec.pokemon.name)}`:`${t("session.correctTypes",{types:expected.map(type=>typeChip(type)).join(" ")})}`);
     haptic(correct?"success":"error"); activateNextButton();
@@ -2598,10 +2577,10 @@
     document.getElementById("importFile").addEventListener("change",importProgress);
     document.getElementById("exportFeedback").addEventListener("click",exportFeedback);
     document.getElementById("exportDiagnostics").addEventListener("click",exportDiagnostics);
-    document.getElementById("resetProgress").addEventListener("click",()=>showConfirmDialog({ title:t("settings.resetTitle"), message:t("settings.resetConfirm"), confirmLabel:t("settings.resetAction"), cancelLabel:t("common.cancel"), kind:"danger", icon:"×", onConfirm:()=>{ QuizmonStorage.clearQuizmonData(localStorage, STORAGE_KEY, OLD_KEYS); state=clone(defaults); state.language=defaultLanguage; saveState(); renderSettings(); enqueueToast("✓",t("settings.resetDone"),t("settings.resetDoneHint"),"success"); } }));
+    document.getElementById("resetProgress").addEventListener("click",()=>showConfirmDialog({ title:t("settings.resetTitle"), message:t("settings.resetConfirm"), confirmLabel:t("settings.resetAction"), cancelLabel:t("common.cancel"), kind:"danger", icon:"×", onConfirm:()=>{ OLD_KEYS.concat(STORAGE_KEY).forEach(key=>localStorage.removeItem(key)); state=clone(defaults); state.language=defaultLanguage; saveState(); renderSettings(); enqueueToast("✓",t("settings.resetDone"),t("settings.resetDoneHint"),"success"); } }));
   }
 
-  function settingSelectRow(id,icon,title,description,options){const labelId=`${id}Label`;const descriptionId=`${id}Description`;return `<div class="modern-setting-row"><span class="modern-setting-icon" aria-hidden="true">${icon}</span><div class="modern-setting-copy"><h3 id="${labelId}">${title}</h3><p id="${descriptionId}">${description}</p></div><select id="${id}" class="select-control" aria-labelledby="${labelId}" aria-describedby="${descriptionId}">${options}</select></div>`;}
+  function settingSelectRow(id,icon,title,description,options){return `<div class="modern-setting-row"><span class="modern-setting-icon">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><select id="${id}" class="select-control">${options}</select></div>`;}
   function settingToggleRow(id,icon,title,description,on){return `<div class="modern-setting-row"><span class="modern-setting-icon">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><button id="${id}" class="switch ${on?"on":""}" aria-label="${title}" aria-pressed="${on}"></button></div>`;}
   function settingActionRow(id,icon,title,description,label,danger=false){return `<div class="modern-setting-row"><span class="modern-setting-icon ${danger?"danger":""}">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><button id="${id}" class="${danger?"danger-button":"secondary-button"}">${label}</button></div>`;}
 
@@ -2623,7 +2602,7 @@
       const legacyVersions = ["0.5","0.4","0.3"];
       if (![...currentVersions,...alphaVersions,...legacyVersions].includes(ver)) throw new Error("version");
       const backup = clone(state);
-      QuizmonStorage.createBackup(localStorage, STORAGE_KEY, backup);
+      localStorage.setItem(`${STORAGE_KEY}.backup.${Date.now()}`,JSON.stringify(backup));
       state = [...currentVersions,...alphaVersions].includes(ver) ? repairState(incoming) : repairState(migrateLegacy(incoming));
       state.version = BUILD_VERSION;
       state.route = "settings";
@@ -2654,7 +2633,7 @@
     const skipButton = modalRoot.querySelector("#skipOnboarding");
 
     let content="";
-    if(onboardingPage===0)content=`<div class="onboarding-visual">Q</div><h2>${t("onboarding.welcomeTitle")}</h2><p>${t("onboarding.welcomeText")}</p><div class="language-picks"><button class="language-pick ${state.language==="de"?"active":""}" data-language="de">🇩🇪 Deutsch</button><button class="language-pick ${state.language==="en"?"active":""}" data-language="en">🇬🇧 English</button></div>`;
+    if(onboardingPage===0)content=`<div class="onboarding-visual">PT</div><h2>${t("onboarding.welcomeTitle")}</h2><p>${t("onboarding.welcomeText")}</p><div class="language-picks"><button class="language-pick ${state.language==="de"?"active":""}" data-language="de">🇩🇪 Deutsch</button><button class="language-pick ${state.language==="en"?"active":""}" data-language="en">🇬🇧 English</button></div>`;
     else if(onboardingPage===1)content=`<div class="onboarding-visual">×</div><h2>${t("onboarding.basicsTitle")}</h2><p>${t("onboarding.basicsText")}</p><div class="multiplier-guide"><div><strong>0×</strong><small>${t("onboarding.none")}</small></div><div><strong>½×</strong><small>${t("onboarding.half")}</small></div><div><strong>1×</strong><small>${t("onboarding.normal")}</small></div><div><strong>2×</strong><small>${t("onboarding.double")}</small></div><div><strong>4×</strong><small>${t("onboarding.quad")}</small></div></div><div class="formula">${typeChip("fire","small")} 2× × ${typeChip("steel","small")} 2× = 4×</div>`;
     else if(onboardingPage===2)content=`<div class="onboarding-visual">⚔</div><h2>${t("onboarding.effectTitle")}</h2><p>${t("onboarding.effectText")}</p><div class="demo-question"><div class="type-prompt">${typeChip("fire","large")}</div><div class="demo-options">${["water","grass","dragon","fire"].map(type=>`<button class="demo-option" data-demo-effect="${type}">${typeChip(type)}</button>`).join("")}</div><div id="demoMessage" class="demo-message"></div></div>`;
     else if(onboardingPage===3)content=`<div class="onboarding-visual">×4</div><h2>${t("onboarding.sortTitle")}</h2><p>${t("onboarding.sortText")}</p><div class="demo-sort"><button class="demo-option" id="demoWater">${typeChip("water")}</button><div class="demo-buckets">${[.5,1,2].map(value=>`<button class="demo-bucket" data-demo-bucket="${value}">${formatMultiplier(value)}</button>`).join("")}</div><div id="demoMessage" class="demo-message"></div></div>`;
@@ -2816,15 +2795,10 @@
       try{
         const registration=await navigator.serviceWorker.register("./service-worker.js");
         registration.update().catch(()=>{});
-        let refreshing=false;
-        navigator.serviceWorker.addEventListener("controllerchange",()=>{if(refreshing)return;refreshing=true;location.reload();});
         registration.addEventListener("updatefound",()=>{
           const worker=registration.installing;
           worker?.addEventListener("statechange",()=>{
-            if(worker.state==="installed"&&navigator.serviceWorker.controller){
-              enqueueToast("↻",t("toast.updated"),t("toast.updatedDesc"));
-              worker.postMessage({type:"SKIP_WAITING"});
-            }
+            if(worker.state==="installed"&&navigator.serviceWorker.controller)enqueueToast("↻",t("toast.updated"),t("toast.updatedDesc"));
           });
         });
       }catch(error){console.warn("Service worker registration failed",error);}
