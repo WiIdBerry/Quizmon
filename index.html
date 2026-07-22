@@ -20,8 +20,6 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#view">Zum Inhalt springen</a>
-  <div id="routeAnnouncer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
@@ -50,7 +48,7 @@
       </button>
     </header>
 
-    <main id="view" class="view" tabindex="-1"></main>
+    <main id="view" class="view" aria-live="polite" tabindex="-1"></main>
 
     <nav class="bottom-nav" aria-label="Hauptnavigation">
       <button class="nav-item active" data-route="home"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 4l8.5 6.5"></path><path d="M5.5 9.5V20h13V9.5"></path></svg></span><small data-nav-label="home">Start</small></button>
@@ -64,11 +62,31 @@
   <div id="modalRoot"></div>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
+  <script>
+    (() => {
+      if (!("serviceWorker" in navigator) || !location.protocol.startsWith("http")) return;
+
+      const hotfixWorkerUrl = "./service-worker.js?build=1-6-sprint2-v2-hotfix1";
+      const hadController = Boolean(navigator.serviceWorker.controller);
+      let reloadStarted = false;
+
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!hadController || reloadStarted) return;
+        reloadStarted = true;
+        location.reload();
+      });
+
+      navigator.serviceWorker.register(hotfixWorkerUrl, { updateViaCache: "none" })
+        .then(registration => {
+          if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          registration.update().catch(() => {});
+        })
+        .catch(error => console.warn("Quizmon hotfix worker registration failed", error));
+    })();
+  </script>
   <script src="data.js"></script>
   <script src="cosmetics.js"></script>
   <script src="i18n.js"></script>
-  <script src="core-utils.js"></script>
-  <script src="storage.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
