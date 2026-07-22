@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "1.6-sprint2-v2-hotfix1";
+  const BUILD_VERSION = "1.6-sprint2-v2-hotfix2";
   const OLD_KEYS = ["pokemonTypeLearner.v0.6.1", "pokemonTypeLearner.v0.5", "pokemonTypeLearner.v0.4", "pokemonTypeLearner.v0.3", "pokemonTypeLearner.v0.2", "pokemonTypeLearner.v0.1"];
 
   const view = document.getElementById("view");
@@ -366,7 +366,7 @@
   }
   function trainerName() { return state.profile?.name || t("profile.defaultName"); }
   function profileChoice(collection, id, fallbackId) { return collection.find(item => item.id === id) || collection.find(item => item.id === fallbackId) || collection[0]; }
-  function cosmeticName(item) { return item?.nameKey ? t(item.nameKey) : (item?.name || ""); }
+  function cosmeticName(item) { return item?.nameKey ? t(item.nameKey) : (item?.names?.[state.language] || item?.names?.en || item?.name || ""); }
   function cosmeticDescription(item) { return item?.description?.[state.language] || item?.description?.de || ""; }
   function cosmeticCategoryLabel(kind, category) { return t(`profile.category.${kind}.${category}`); }
   function selectedAvatar() { return profileChoice(PROFILE_AVATARS, state.profile?.avatarId, "pokeball"); }
@@ -1219,7 +1219,7 @@
     const bannerPreview = PROFILE_BANNERS.find(item => item.id === set.bannerIds[0]);
     return `<button type="button" class="profile-set-card ${status.complete ? "" : "locked"}" data-profile-set="${set.id}" aria-disabled="${!status.complete}" ${status.complete ? "" : "disabled"}>
       <span class="profile-set-banner profile-banner profile-banner-${bannerPreview?.id || "neon-grid"}"><i></i></span>
-      <span class="profile-set-body">${avatarPreview ? profileAvatarMarkup(avatarPreview.id,"profile-set-avatar") : `<span class="profile-set-avatar-missing">?</span>`}<span><strong>${escapeHtml(set.name)}</strong><small>${escapeHtml(titlePreview ? cosmeticName(titlePreview) : t("profile.setMissing"))}</small><em>${status.complete ? t("profile.setReady") : escapeHtml(status.unlockStatus.label)}</em></span></span>
+      <span class="profile-set-body">${avatarPreview ? profileAvatarMarkup(avatarPreview.id,"profile-set-avatar") : `<span class="profile-set-avatar-missing">?</span>`}<span><strong>${escapeHtml(cosmeticName(set))}</strong><small>${escapeHtml(titlePreview ? cosmeticName(titlePreview) : t("profile.setMissing"))}</small><em>${status.complete ? t("profile.setReady") : escapeHtml(status.unlockStatus.label)}</em></span></span>
       <span class="profile-set-lock" aria-hidden="true">${status.complete ? "" : profileLockIconMarkup()}</span>
     </button>`;
   }
@@ -1266,7 +1266,7 @@
     const collection = profileCustomizerCollection();
     const query = profileCustomizerQuery.trim().toLocaleLowerCase(state.language === "de" ? "de-DE" : "en-GB");
     const filtered = collection.filter(item => {
-      const name = (item.name || cosmeticName(item)).toLocaleLowerCase(state.language === "de" ? "de-DE" : "en-GB");
+      const name = [cosmeticName(item), ...Object.values(item.names || {})].join(" ").toLocaleLowerCase(state.language === "de" ? "de-DE" : "en-GB");
       const matchesQuery = !query || name.includes(query);
       const matchesCategory = profileCustomizerCategory === "all" || item.category === profileCustomizerCategory;
       return matchesQuery && matchesCategory;
@@ -2799,7 +2799,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=1-6-sprint2-v2-hotfix1",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=1-6-sprint2-v2-hotfix2",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{

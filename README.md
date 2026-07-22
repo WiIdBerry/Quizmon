@@ -1,9 +1,5 @@
-# Quizmon Beta 1.0
+# Quizmon Beta 1.0 – Hotfix 2
 
-Statische Quizmon-Web-App für GitHub Pages.
+Bereinigte GitHub-Pages-Version.
 
-Die App startet über `index.html`. Die Dateien in `.github/workflows` veröffentlichen den Inhalt des Repositorys automatisch auf GitHub Pages.
-
-Finaler Beta-1.0-Build mit neuem Quizmon-App-Icon und Service-Worker-Hotfix (1.6 Sprint 2 v2 Hotfix 1).
-
-Der Hotfix entfernt automatisch alte Quizmon/PokémonTypLearner-Dateien aus Browser-Caches und verhindert gemischte App-Versionen.
+Hotfix 2 ergänzt vollständige englische Bezeichnungen für alle 60 Profilbilder, 90 Trainertitel und 20 kosmetischen Sets. Suche und Profilanzeige wechseln nun korrekt mit der Sprache. Enthält weiterhin den Service-Worker-Cache-Hotfix.
