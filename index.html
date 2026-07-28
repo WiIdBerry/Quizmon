@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Quizmon">
-  <meta name="description" content="Lerne Pokémon-Typen und ihre Wechselwirkungen in kurzen Quiz-Einheiten.">
+  <meta name="description" content="Lerne Pokémon-Typen adaptiv und entdecke eine wachsende Pokémon-Wissensplattform.">
   <title>Quizmon</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
@@ -20,6 +20,9 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#view">Zum Hauptinhalt springen</a>
+  <div id="routeAnnouncer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
@@ -38,7 +41,7 @@
         <span class="brand-mark"><span>Q</span></span>
         <span class="brand-copy">
           <strong>Quizmon</strong>
-          <small>Beta 1.0</small>
+          <small>Beta 1.2</small>
         </span>
       </button>
 
@@ -48,7 +51,7 @@
       </button>
     </header>
 
-    <main id="view" class="view" aria-live="polite" tabindex="-1"></main>
+    <main id="view" class="view" tabindex="-1"></main>
 
     <nav class="bottom-nav" aria-label="Hauptnavigation">
       <button class="nav-item active" data-route="home"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 4l8.5 6.5"></path><path d="M5.5 9.5V20h13V9.5"></path></svg></span><small data-nav-label="home">Start</small></button>
@@ -62,31 +65,35 @@
   <div id="modalRoot"></div>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
-  <script>
-    (() => {
-      if (!("serviceWorker" in navigator) || !location.protocol.startsWith("http")) return;
-
-      const hotfixWorkerUrl = "./service-worker.js?build=1-6-sprint2-v2-hotfix2";
-      const hadController = Boolean(navigator.serviceWorker.controller);
-      let reloadStarted = false;
-
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (!hadController || reloadStarted) return;
-        reloadStarted = true;
-        location.reload();
-      });
-
-      navigator.serviceWorker.register(hotfixWorkerUrl, { updateViaCache: "none" })
-        .then(registration => {
-          if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
-          registration.update().catch(() => {});
-        })
-        .catch(error => console.warn("Quizmon hotfix worker registration failed", error));
-    })();
-  </script>
   <script src="data.js"></script>
   <script src="cosmetics.js"></script>
   <script src="i18n.js"></script>
+  <script src="core-utils.js"></script>
+  <script src="quiz-engine.js"></script>
+  <script src="progress.js"></script>
+  <script src="storage.js"></script>
+  <script src="import-guard.js"></script>
+  <script src="phase3-state.js"></script>
+  <script src="i18n-utils.js"></script>
+  <script src="router.js"></script>
+  <script src="network.js"></script>
+  <script src="motivation.js"></script>
+  <script src="difficulty-engine.js"></script>
+  <script src="learning-engine.js"></script>
+  <script src="error-analysis.js"></script>
+  <script src="learning-path.js"></script>
+  <script src="knowledge-data.js"></script>
+  <script src="knowledge-content-data.js"></script>
+  <script src="knowledge-learnset-meta.js"></script>
+  <script src="knowledge-learnset-loader.js"></script>
+  <script src="knowledge-world-data.js"></script>
+  <script src="knowledge-engine.js"></script>
+  <script src="knowledge-filter.js"></script>
+  <script src="knowledge-search.js"></script>
+  <script src="favorites.js"></script>
+  <script src="training-lists.js"></script>
+  <script src="flashcards.js"></script>
+  <script src="image-fallback.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

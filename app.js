@@ -2,15 +2,61 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "1.6-sprint2-v2-hotfix2";
+  const BUILD_VERSION = "phase3-cleanup-v1";
+  const PUBLIC_VERSION = "Beta 1.2";
+  const DATA_SCHEMA = 17;
+  const LEARNING_EVENT_LIMIT = 800;
+  const ERROR_EVENT_LIMIT = 600;
+  const HISTORY_LIMIT = 30;
+  const MISTAKE_LIMIT = 300;
+  const POKEMON_CACHE_LIMIT = 160;
+  const IMPORT_BACKUP_LIMIT = 3;
+  const MAX_IMPORT_BYTES = 12 * 1024 * 1024;
+  const PLAYABLE_MODES = Object.freeze(["effectiveness", "multiplier", "impact", "pokemon"]);
+  const LEARNING_EVENT_MODES = Object.freeze([...PLAYABLE_MODES, "weak", "daily", "review", "problem", "path"]);
+  const ADAPTIVE_SESSION_MODES = Object.freeze(["weak", "problem"]);
+  const SUPPORTED_CURRENT_VERSIONS = Object.freeze([
+    "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
+    "2.5-sprint3-v1", "2.5-sprint2-v1", "2.5-sprint1-v1", "2.4-sprint2-v1", "2.4-sprint1-v1",
+    "2.3-sprint2-v3", "2.3-sprint2-v2", "2.3-sprint2-v1", "2.3-sprint1-v1",
+    "2.2-sprint2-v1", "2.2-sprint1-v1", "2.1-sprint3-v1", "2.1-sprint2-v5",
+    "2.1-sprint2-v4", "2.1-sprint2-v3", "2.1-sprint2-v2", "2.1-sprint2-v1", "2.1-sprint1-v1",
+    "1.5b-sprint3-v1", "1.5b-sprint2-v1", "1.5b-sprint1-v1", "1.5a-sprint3-v2",
+    "1.5a-sprint3-v1", "1.5a-sprint2-v1", "1.5a-sprint1-v1", "1.6-sprint2-v2-hotfix2",
+    "1.6-sprint2-v2", "1.6-sprint2-v1", "1.6-sprint1-v1", "1.5-sprint2-v1",
+    "1.5-sprint1-v1-fix1", "1.5-sprint1-v1", "1.4-sprint3-v2", "1.4-sprint3-v1",
+    "1.4-sprint2-v6", "1.4-sprint2-v5", "1.4-sprint2-v3", "1.4-sprint2-v2",
+    "1.4-sprint2-v1", "1.4-sprint1-v2", "1.4-sprint1-v1", "1.3-sprint3-v3",
+    "1.3-sprint2-v2", "1.3-sprint1-v1", "1.2-sprint2-v2", "1.2-sprint2-v1",
+    "1.2-sprint1-v2", "1.2-sprint1-v1", "1.0-sprint3-v1", "1.0-sprint2-v2",
+    "1.0-sprint2", "1.0-sprint1", "1.0"
+  ]);
+  const SUPPORTED_ALPHA_VERSIONS = Object.freeze(["0.6.1", "0.6"]);
+  const SUPPORTED_LEGACY_VERSIONS = Object.freeze(["0.5", "0.4", "0.3"]);
+  const ERROR_RULE_CODES = Object.freeze([
+    "direction-reversal", "immunity-overlooked", "immunity-assumed",
+    "quarter-half-confusion", "double-quad-confusion", "dual-neutralization",
+    "dual-multiplication", "pokemon-missing-secondary", "pokemon-extra-type",
+    "pokemon-wrong-type"
+  ]);
+  const LEARNING_PATH_VERSION = 3;
+  const LEARNING_PATH_MODULE_IDS = Object.freeze([
+    "basics-direction", "basics-factors", "types-elements", "types-energy",
+    "types-earth", "types-mind", "types-material", "types-myth",
+    "dual-combine", "dual-neutralize", "dual-immunity", "dual-mastery",
+    "pokemon-single", "pokemon-dual", "pokemon-apply",
+    "exam-basics", "exam-types", "exam-dual", "exam-pokemon", "exam-final"
+  ]);
   const OLD_KEYS = ["pokemonTypeLearner.v0.6.1", "pokemonTypeLearner.v0.5", "pokemonTypeLearner.v0.4", "pokemonTypeLearner.v0.3", "pokemonTypeLearner.v0.2", "pokemonTypeLearner.v0.1"];
 
   const view = document.getElementById("view");
+  const routeAnnouncer = document.getElementById("routeAnnouncer");
   const modalRoot = document.getElementById("modalRoot");
   const toastRoot = document.getElementById("toastRoot");
   const backButton = document.getElementById("backButton");
   const homeButton = document.getElementById("homeButton");
   const brandButton = document.getElementById("brandButton");
+  const brandVersion = brandButton?.querySelector("small");
   const levelButton = document.getElementById("levelButton");
   const levelNumber = document.getElementById("levelNumber");
   const headerStreak = document.getElementById("headerStreak");
@@ -24,8 +70,8 @@
   const defaultLanguage = navigator.language?.toLowerCase().startsWith("de") ? "de" : "en";
   const defaults = {
     version: BUILD_VERSION,
-    dataSchema: 6,
-    diagnostics: { errors: [], repairs: [], lastBackup: null },
+    dataSchema: DATA_SCHEMA,
+    diagnostics: { errors: [], repairs: [], lastBackup: null, maintenance: { lastRun: null, lastSaveBytes: 0, lastCompaction: null, quotaRecoveries: 0 } },
     route: "home",
     language: defaultLanguage,
     theme: "system",
@@ -42,9 +88,12 @@
       favoriteType: null,
       unlocked: { avatars: [...STARTER_COSMETICS.avatars], banners: [...STARTER_COSMETICS.banners], titles: [...STARTER_COSMETICS.titles], sets: [...STARTER_COSMETICS.sets] }
     },
+    favorites: { pokemon: [], types: [], sortPokemon: "recent", sortTypes: "recent" },
+    trainingLists: { lists: [] },
+    flashcards: { review: [], history: [] },
     seenHints: { effectiveness: false, multiplier: false, impact: false, pokemon: false },
     statsTab: "overview",
-    learnTab: "lexicon",
+    learnTab: "path",
     lastMode: null,
     lastConfig: null,
     config: {
@@ -63,25 +112,87 @@
       xp: 0,
       modes: {
         effectiveness: blankModeStats(), multiplier: blankModeStats(), impact: blankModeStats(), pokemon: blankModeStats(),
-        weak: blankModeStats(), daily: blankModeStats(), review: blankModeStats()
+        weak: blankModeStats(), daily: blankModeStats(), review: blankModeStats(), problem: blankModeStats(), path: blankModeStats()
       },
       types: blankTypeStats(),
       history: [],
       achievements: {},
-      mistakes: []
+      mistakes: [],
+      learning: { events: [] },
+      errorAnalysis: { events: [] }
     },
-    daily: { date: null, completed: false, result: null, streak: 0, lastCompletedDate: null },
+    learningPath: {
+      version: LEARNING_PATH_VERSION,
+      placement: { assessedAt: null, source: "new", validatedModules: [] },
+      modules: {},
+      completion: { completedAt: null, finalRate: 0, attempts: 0, areaRates: {} }
+    },
+    daily: {
+      date: null,
+      completed: false,
+      result: null,
+      streak: 0,
+      bestStreak: 0,
+      lastCompletedDate: null,
+      goalTarget: 10,
+      goalProgress: 0,
+      goalCompleted: false,
+      goalRewardClaimed: false,
+      history: {}
+    },
     pokemonCache: {}
   };
 
   let state = loadState();
+  const requestedRoute = new URLSearchParams(location.search).get("route");
+  if (["home", "play", "train", "learn", "knowledge", "stats", "settings", "support", "profile"].includes(requestedRoute)) state.route = requestedRoute;
   let session = null;
   let learnType = null;
+  let knowledgeView = "home";
+  let knowledgePokemonId = null;
+  let knowledgePokemonPage = 0;
+  let knowledgePokemonDetailTab = "overview";
+  let knowledgeContentKind = null;
+  let knowledgeContentId = null;
+  let knowledgeContentPage = 0;
+  let knowledgeSearchQuery = "";
+  let knowledgeSearchIndex = null;
+  let knowledgeSearchFilter = "all";
+  let knowledgeSearchVisibleCount = 24;
+  let knowledgeSearchOrigin = null;
+  let knowledgeSearchOpenedResult = false;
+  let knowledgeSearchResultScrollY = 0;
+  let knowledgeSearchFocusPending = false;
+  let knowledgeEvolutionFamiliesCache = null;
+  const KNOWLEDGE_SEARCH_PAGE_SIZE = 24;
+  const KNOWLEDGE_GENERATION_FILTER_KEY = "quizmon.knowledge.generationFilter";
+  let knowledgeGenerationFilter = (() => {
+    try { return QuizmonKnowledgeFilter.normalizeGeneration(localStorage.getItem(KNOWLEDGE_GENERATION_FILTER_KEY)) || "all"; }
+    catch { return "all"; }
+  })();
+  const KNOWLEDGE_VERSION_SESSION_KEY = "quizmon.knowledge.versionGroup";
+  let knowledgeVersionGroupId = (() => {
+    try { return Number(sessionStorage.getItem(KNOWLEDGE_VERSION_SESSION_KEY)) || QuizmonKnowledgeLearnsets.DEFAULT_VERSION_GROUP_ID; }
+    catch { return QuizmonKnowledgeLearnsets.DEFAULT_VERSION_GROUP_ID; }
+  })();
+  let knowledgeLearnsetLoadStatus = QuizmonKnowledgeLearnsetLoader.isLoaded() ? "ready" : "idle";
   let onboardingOpen = false;
   let onboardingPage = 0;
+  let onboardingDemoAnswer = null;
   let profileCustomizerDraft = null;
   let profileFavoritesDraft = null;
   let favoritePokemonQuery = "";
+  let trainingListDraft = null;
+  let trainingListDraftOriginal = null;
+  let trainingListPokemonQuery = "";
+  let trainingListLaunchDraft = null;
+  let flashcardSetupKind = "pokemon";
+  let flashcardSetupSource = "all";
+  let flashcardSetupGeneration = knowledgeGenerationFilter;
+  let flashcardSetupCount = 10;
+  let flashcardSession = null;
+  let flashcardSwipeStartX = null;
+  let flashcardSwipeHandled = false;
   let profileCustomizerTab = "avatar";
   let profileCustomizerQuery = "";
   let profileCustomizerCategory = "all";
@@ -94,12 +205,125 @@
   let motionFrame = 0;
   let lastActiveNavRoute = null;
   let routeMotionDirection = "replace";
+  let browserHistoryIndex = 0;
+  let applyingBrowserHistory = false;
+  let pendingHistorySnapshot = null;
   const HAPTIC_PATTERNS = Object.freeze({
     selection: 5, move: 8, success: [12,28,18], error: [26,32,26],
-    level: [14,34,14,34,34], unlock: [10,24,10]
+    combo: [8,18,10,18,24], goal: [12,22,12,22,32], level: [14,34,14,34,34], unlock: [10,24,10]
   });
 
-  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function clone(value) { return QuizmonCore.clone(value); }
+
+  function dedupeFirstBy(items, keyFor) { return QuizmonCore.dedupeFirstBy(items, keyFor); }
+
+  function dedupeLatestBy(items, keyFor) { return QuizmonCore.dedupeLatestBy(items, keyFor); }
+
+  function byteLength(value) { return QuizmonCore.byteLength(value); }
+
+  function clampScore(value) { return QuizmonCore.clampScore(value); }
+
+  function validLearningKey(key) {
+    const [role, value] = String(key || "").split(":");
+    if (["attack", "defense", "pokemon", "type"].includes(role)) return TYPES.includes(value);
+    if (role === "skill") return ["effectiveness", "multiplier", "impact", "pokemon", "dual"].includes(value);
+    return false;
+  }
+
+  function sanitizeLearningEvent(event) {
+    if (!event || typeof event !== "object") return null;
+    const date = new Date(event.at || "");
+    if (Number.isNaN(date.getTime())) return null;
+    const observations = Array.isArray(event.observations)
+      ? event.observations.map(item => {
+          if (!item || typeof item !== "object" || !validLearningKey(item.key)) return null;
+          return { key: String(item.key), score: Math.round(clampScore(item.score) * 1000) / 1000 };
+        }).filter(Boolean)
+      : [];
+    if (!observations.length) return null;
+    const uniqueObservations = new Map();
+    observations.forEach(item => uniqueObservations.set(item.key, item));
+    const kind = PLAYABLE_MODES.includes(event.kind) ? event.kind : "effectiveness";
+    return {
+      id: typeof event.id === "string" ? event.id.slice(0, 80) : `learn-${date.getTime()}`,
+      at: date.toISOString(),
+      mode: LEARNING_EVENT_MODES.includes(event.mode) ? event.mode : kind,
+      kind,
+      difficulty: ["easy", "medium", "hard"].includes(event.difficulty) ? event.difficulty : null,
+      correct: Boolean(event.correct),
+      duration: Math.min(600000, Math.max(0, Number(event.duration) || 0)),
+      review: Boolean(event.review),
+      dual: Boolean(event.dual),
+      focusTypes: unique(Array.isArray(event.focusTypes) ? event.focusTypes.filter(type => TYPES.includes(type)) : []).slice(0, 8),
+      wrongTypes: unique(Array.isArray(event.wrongTypes) ? event.wrongTypes.filter(type => TYPES.includes(type)) : []).slice(0, 18),
+      observations: [...uniqueObservations.values()]
+    };
+  }
+
+  function sanitizeLearningEvents(events) {
+    const cleaned = (Array.isArray(events) ? events : []).map(sanitizeLearningEvent).filter(Boolean);
+    return dedupeLatestBy(cleaned, item => item.id).slice(-LEARNING_EVENT_LIMIT);
+  }
+
+  function sanitizeErrorPatternKey(value) {
+    const key = typeof value === "string" ? value.slice(0, 180) : "";
+    if (key.startsWith("rule:") && ERROR_RULE_CODES.includes(key.slice(5))) return key;
+    if (key.startsWith("matchup:")) {
+      const [, attackingType, defendersRaw] = key.split(":");
+      const defenders = errorSortedTypes(String(defendersRaw || "").split("+").filter(type => TYPES.includes(type)));
+      if (TYPES.includes(attackingType) && defenders.length && defenders.length <= 2) return `matchup:${attackingType}:${defenders.join("+")}`;
+    }
+    if (key.startsWith("pokemon:")) {
+      const id = Number(key.slice(8));
+      if (Number.isInteger(id) && id > 0 && id <= 10000) return `pokemon:${id}`;
+    }
+    return null;
+  }
+
+  function sanitizeErrorIssue(issue) {
+    if (!issue || typeof issue !== "object") return null;
+    const patternKey = sanitizeErrorPatternKey(issue.patternKey);
+    if (!patternKey) return null;
+    const code = patternKey.startsWith("rule:") ? patternKey.slice(5) : patternKey.startsWith("matchup:") ? "matchup" : "pokemon-specific";
+    const expected = issue.expectedMultiplier == null ? NaN : Number(issue.expectedMultiplier);
+    const actual = issue.actualMultiplier == null ? NaN : Number(issue.actualMultiplier);
+    return {
+      patternKey,
+      code,
+      attackingType: TYPES.includes(issue.attackingType) ? issue.attackingType : null,
+      defendingTypes: unique(Array.isArray(issue.defendingTypes) ? issue.defendingTypes.filter(type => TYPES.includes(type)) : []).slice(0, 2),
+      pokemonId: issue.pokemonId == null ? null : (Number.isFinite(Number(issue.pokemonId)) ? Number(issue.pokemonId) : null),
+      pokemonName: typeof issue.pokemonName === "string" ? issue.pokemonName.slice(0, 80) : "",
+      expectedMultiplier: Number.isFinite(expected) ? expected : null,
+      actualMultiplier: Number.isFinite(actual) ? actual : null
+    };
+  }
+
+  function sanitizeErrorEvent(event) {
+    if (!event || typeof event !== "object") return null;
+    const date = new Date(event.at || "");
+    if (Number.isNaN(date.getTime())) return null;
+    const opportunities = unique((Array.isArray(event.opportunities) ? event.opportunities : []).map(sanitizeErrorPatternKey).filter(Boolean)).slice(0, 50);
+    const issueMap = new Map();
+    (Array.isArray(event.issues) ? event.issues : []).map(sanitizeErrorIssue).filter(Boolean).forEach(issue => issueMap.set(issue.patternKey, issue));
+    if (!opportunities.length) return null;
+    return {
+      id: typeof event.id === "string" ? event.id.slice(0, 80) : `error-${date.getTime()}`,
+      at: date.toISOString(),
+      sessionId: typeof event.sessionId === "string" ? event.sessionId.slice(0, 80) : "legacy",
+      mode: LEARNING_EVENT_MODES.includes(event.mode) ? event.mode : "effectiveness",
+      kind: PLAYABLE_MODES.includes(event.kind) ? event.kind : "effectiveness",
+      signature: typeof event.signature === "string" ? event.signature.slice(0, 240) : "",
+      correct: Boolean(event.correct),
+      opportunities,
+      issues: [...issueMap.values()].slice(0, 40)
+    };
+  }
+
+  function sanitizeErrorEvents(events) {
+    const cleaned = (Array.isArray(events) ? events : []).map(sanitizeErrorEvent).filter(Boolean);
+    return dedupeLatestBy(cleaned, item => item.id).slice(-ERROR_EVENT_LIMIT);
+  }
 
   function deepMerge(base, saved) {
     const output = { ...clone(base), ...(saved || {}) };
@@ -128,11 +352,27 @@
     output.stats.history = Array.isArray(output.stats.history) ? output.stats.history : [];
     output.stats.mistakes = Array.isArray(output.stats.mistakes) ? output.stats.mistakes : [];
     output.stats.achievements = output.stats.achievements || {};
+    output.stats.learning = { events: [], ...((((saved || {}).stats || {}).learning) || {}), ...(output.stats.learning || {}) };
+    output.stats.learning.events = sanitizeLearningEvents(output.stats.learning.events);
+    output.stats.errorAnalysis = { events: [], ...((((saved || {}).stats || {}).errorAnalysis) || {}), ...(output.stats.errorAnalysis || {}) };
+    output.stats.errorAnalysis.events = sanitizeErrorEvents(output.stats.errorAnalysis.events);
+    output.learningPath = { ...clone(base.learningPath), ...((saved || {}).learningPath || {}) };
+    output.learningPath.placement = { ...clone(base.learningPath.placement), ...(((saved || {}).learningPath || {}).placement || {}) };
+    output.learningPath.modules = { ...clone(base.learningPath.modules), ...(((saved || {}).learningPath || {}).modules || {}) };
+    output.learningPath.completion = { ...clone(base.learningPath.completion), ...(((saved || {}).learningPath || {}).completion || {}) };
     output.daily = { ...clone(base.daily), ...((saved || {}).daily || {}) };
+    output.daily.history = { ...clone(base.daily.history), ...((((saved || {}).daily || {}).history) || {}) };
     output.pokemonCache = sanitizePokemonCache(output.pokemonCache);
-    output.diagnostics = { errors: [], repairs: [], lastBackup: null, ...(output.diagnostics || {}) };
+    output.diagnostics = { errors: [], repairs: [], lastBackup: null, maintenance: {}, ...(output.diagnostics || {}) };
     output.diagnostics.errors = Array.isArray(output.diagnostics.errors) ? output.diagnostics.errors.slice(-50) : [];
     output.diagnostics.repairs = Array.isArray(output.diagnostics.repairs) ? output.diagnostics.repairs.slice(-50) : [];
+    const maintenance = output.diagnostics.maintenance && typeof output.diagnostics.maintenance === "object" ? output.diagnostics.maintenance : {};
+    output.diagnostics.maintenance = {
+      lastRun: maintenance.lastRun && !Number.isNaN(new Date(maintenance.lastRun).getTime()) ? new Date(maintenance.lastRun).toISOString() : null,
+      lastSaveBytes: finiteNonNegative(maintenance.lastSaveBytes),
+      lastCompaction: maintenance.lastCompaction && typeof maintenance.lastCompaction === "object" ? maintenance.lastCompaction : null,
+      quotaRecoveries: finiteNonNegative(maintenance.quotaRecoveries)
+    };
     output.language = ["de", "en"].includes(output.language) ? output.language : defaultLanguage;
     return output;
   }
@@ -140,7 +380,7 @@
   function migrateLegacy(old) {
     const migrated = deepMerge(defaults, old || {});
     migrated.version = BUILD_VERSION;
-    migrated.dataSchema = 5;
+    migrated.dataSchema = DATA_SCHEMA;
     migrated.route = "home";
     migrated.onboardingComplete = Boolean(old?.onboardingComplete);
     migrated.language = old?.language || defaultLanguage;
@@ -164,6 +404,74 @@
     } catch (_) {}
   }
 
+  function sanitizePathAreaRates(value) {
+    const source=value&&typeof value==="object"?value:{};
+    return Object.fromEntries(Object.entries(source).filter(([key])=>typeof key==="string"&&key.length<50).map(([key,rate])=>[key,Math.min(100,finiteNonNegative(rate))]));
+  }
+
+  function sanitizePathCompletion(value) {
+    const source=value&&typeof value==="object"?value:{};
+    const completedAt=source.completedAt&&!Number.isNaN(new Date(source.completedAt).getTime())?new Date(source.completedAt).toISOString():null;
+    return {completedAt,finalRate:Math.min(100,finiteNonNegative(source.finalRate)),attempts:finiteNonNegative(source.attempts),areaRates:sanitizePathAreaRates(source.areaRates)};
+  }
+
+  function sanitizePathModuleProgress(value) {
+    const progress = value && typeof value === "object" ? value : {};
+    const completedAt = progress.completedAt && !Number.isNaN(new Date(progress.completedAt).getTime()) ? new Date(progress.completedAt).toISOString() : null;
+    const lastAt = progress.lastAt && !Number.isNaN(new Date(progress.lastAt).getTime()) ? new Date(progress.lastAt).toISOString() : null;
+    return {
+      attempts: finiteNonNegative(progress.attempts),
+      bestRate: Math.min(100, finiteNonNegative(progress.bestRate)),
+      lastRate: Math.min(100, finiteNonNegative(progress.lastRate)),
+      completed: Boolean(progress.completed),
+      validated: Boolean(progress.validated),
+      completedAt,
+      lastAt,
+      lastAreas: sanitizePathAreaRates(progress.lastAreas),
+      bestAreas: sanitizePathAreaRates(progress.bestAreas),
+      recommendedModules: unique((Array.isArray(progress.recommendedModules) ? progress.recommendedModules : []).filter(id => LEARNING_PATH_MODULE_IDS.includes(id))).slice(0, 6),
+      lastRequirementsPassed: Boolean(progress.lastRequirementsPassed)
+    };
+  }
+
+  function pathPlacementFromHistory(repaired) {
+    const rateFor = modes => {
+      const totals = modes.reduce((sum, mode) => sum + finiteNonNegative(repaired.stats.modes?.[mode]?.total), 0);
+      const correct = modes.reduce((sum, mode) => sum + finiteNonNegative(repaired.stats.modes?.[mode]?.correct), 0);
+      return { totals, rate: percent(correct, totals) };
+    };
+    const direction = rateFor(["effectiveness", "impact"]);
+    const factors = rateFor(["multiplier", "impact"]);
+    const validated = [];
+    if (direction.totals >= 30 && direction.rate >= 85) validated.push("basics-direction");
+    if (factors.totals >= 30 && factors.rate >= 82 && validated.includes("basics-direction")) validated.push("basics-factors");
+    return {
+      assessedAt: new Date().toISOString(),
+      source: validated.length ? "history" : "new",
+      validatedModules: validated
+    };
+  }
+
+  function repairLearningPath(repaired, candidatePath) {
+    const source = candidatePath && typeof candidatePath === "object" ? candidatePath : {};
+    const modules = {};
+    LEARNING_PATH_MODULE_IDS.forEach(id => { modules[id] = sanitizePathModuleProgress(source.modules?.[id]); });
+    let placement = source.placement && typeof source.placement === "object" ? source.placement : null;
+    if (!placement?.assessedAt || Number.isNaN(new Date(placement.assessedAt).getTime())) placement = pathPlacementFromHistory(repaired);
+    const validated = unique((Array.isArray(placement.validatedModules) ? placement.validatedModules : []).filter(id => LEARNING_PATH_MODULE_IDS.includes(id)));
+    validated.forEach(id => { modules[id].validated = true; });
+    repaired.learningPath = {
+      version: LEARNING_PATH_VERSION,
+      placement: {
+        assessedAt: new Date(placement.assessedAt).toISOString(),
+        source: placement.source === "history" ? "history" : "new",
+        validatedModules: validated
+      },
+      modules,
+      completion: sanitizePathCompletion(source.completion)
+    };
+  }
+
   function repairState(candidate) {
     const repaired = deepMerge(defaults, candidate || {});
     const fixes = [];
@@ -172,6 +480,10 @@
     if (repaired.stats.correct > repaired.stats.total) { repaired.stats.correct = repaired.stats.total; fixes.push("stats.correct"); }
     repaired.stats.history = repaired.stats.history.filter(Boolean).slice(-100);
     repaired.stats.mistakes = repaired.stats.mistakes.filter(item => item && typeof item === "object").slice(-300);
+    repaired.stats.learning = repaired.stats.learning && typeof repaired.stats.learning === "object" ? repaired.stats.learning : { events: [] };
+    repaired.stats.learning.events = sanitizeLearningEvents(repaired.stats.learning.events);
+    repaired.stats.errorAnalysis = repaired.stats.errorAnalysis && typeof repaired.stats.errorAnalysis === "object" ? repaired.stats.errorAnalysis : { events: [] };
+    repaired.stats.errorAnalysis.events = sanitizeErrorEvents(repaired.stats.errorAnalysis.events);
     const profileSource = candidate?.profile || {};
     repaired.profile.name = typeof profileSource.name === "string" ? profileSource.name.trim().slice(0, 24) : "";
     const joinedCandidate = new Date(profileSource.joinedAt || "");
@@ -193,6 +505,26 @@
     repaired.profile.favoriteType = TYPES.includes(profileSource.favoriteType) ? profileSource.favoriteType : null;
     if (profileSource.favoritePokemonId != null && repaired.profile.favoritePokemonId == null) fixes.push("profile.favoritePokemonId");
     if (profileSource.favoriteType != null && repaired.profile.favoriteType == null) fixes.push("profile.favoriteType");
+    const phase3State = QuizmonPhase3State.sanitize(candidate, {
+      favoritesApi: QuizmonFavorites,
+      trainingListsApi: QuizmonTrainingLists,
+      flashcardsApi: QuizmonFlashcards,
+      pokemonIds: new Set(QuizmonKnowledgeData.POKEMON.map(item => item.id)),
+      types: new Set(TYPES),
+      highlightedPokemonId: repaired.profile.favoritePokemonId,
+      highlightedType: repaired.profile.favoriteType,
+      fallbackName: (kind,index) => kind === "pokemon" ? `Pokémon ${index + 1}` : `Typen ${index + 1}`,
+      flashcardKeys: new Set([
+        ...TYPES.map(type => `types:${type}`),
+        ...QuizmonKnowledgeData.POKEMON.map(item => `pokemon:${item.id}`),
+        ...QuizmonKnowledgeContent.MOVES.map(item => `moves:${item.id}`),
+        ...QuizmonKnowledgeContent.ABILITIES.map(item => `abilities:${item.id}`),
+        ...QuizmonKnowledgeContent.ITEMS.map(item => `items:${item.id}`)
+      ])
+    });
+    repaired.favorites = phase3State.favorites;
+    repaired.trainingLists = phase3State.trainingLists;
+    repaired.flashcards = phase3State.flashcards;
 
     const oldLevel = getLevelInfo(repaired.stats.xp).current.level;
     const oldMastered = TYPES.filter(type => repaired.stats.types[type].total >= 5 && percent(repaired.stats.types[type].correct, repaired.stats.types[type].total) >= 80).length;
@@ -218,8 +550,10 @@
     repaired.animations = repaired.animations !== false;
     repaired.haptics = repaired.haptics !== false;
     repaired.onboardingComplete = Boolean(repaired.onboardingComplete);
-    repaired.statsTab = ["overview","types","errors","achievements"].includes(repaired.statsTab) ? repaired.statsTab : "overview";
-    repaired.learnTab = ["lexicon","lab"].includes(repaired.learnTab) ? repaired.learnTab : "lexicon";
+    repaired.statsTab = ["overview","learning","types","errors","achievements"].includes(repaired.statsTab) ? repaired.statsTab : "overview";
+    const hadLegacyKnowledgeTab = ["knowledge","lexicon"].includes(repaired.learnTab);
+    repaired.learnTab = ["path","lab","cards"].includes(repaired.learnTab) ? repaired.learnTab : "path";
+    if(hadLegacyKnowledgeTab && repaired.route === "learn") repaired.route = "knowledge";
     Object.keys(repaired.stats.modes).forEach(mode => {
       const value = repaired.stats.modes[mode] || {};
       value.total = finiteNonNegative(value.total);
@@ -246,24 +580,60 @@
         config.display = ["both","image","name"].includes(config.display) ? config.display : "both";
       }
     });
-    const playableModes = ["effectiveness","multiplier","impact","pokemon"];
-    if (!playableModes.includes(repaired.lastMode)) { repaired.lastMode = null; repaired.lastConfig = null; }
+    if (!PLAYABLE_MODES.includes(repaired.lastMode)) { repaired.lastMode = null; repaired.lastConfig = null; }
     else repaired.lastConfig = { ...clone(repaired.config[repaired.lastMode]), ...(repaired.lastConfig && typeof repaired.lastConfig === "object" ? repaired.lastConfig : {}) };
-    const historyModes = new Set([...playableModes,"weak","daily","review"]);
+    const historyModes = new Set(LEARNING_EVENT_MODES);
     repaired.stats.history = repaired.stats.history.filter(item => item && typeof item === "object" && historyModes.has(item.mode)).map(item => ({
       ...item,
+      id: typeof item.id === "string" && item.id.length <= 100 ? item.id : null,
       correct: finiteNonNegative(item.correct),
+      answers: finiteNonNegative(item.answers || item.total),
       total: finiteNonNegative(item.total),
       rate: Math.min(100, finiteNonNegative(item.rate)),
-      duration: finiteNonNegative(item.duration)
-    })).slice(-100);
-    repaired.stats.mistakes = repaired.stats.mistakes.filter(item => item && typeof item === "object" && item.spec && ["effectiveness","multiplier","impact","pokemon"].includes(item.spec.kind)).slice(-300);
+      duration: finiteNonNegative(item.duration),
+      smartPlanKind: ["discovery","personal"].includes(item.smartPlanKind) ? item.smartPlanKind : null,
+      learningFocus: unique(Array.isArray(item.learningFocus) ? item.learningFocus.filter(validLearningKey) : []).slice(0,6),
+      learningImproved: unique(Array.isArray(item.learningImproved) ? item.learningImproved.filter(validLearningKey) : []).slice(0,6),
+      learningAttention: unique(Array.isArray(item.learningAttention) ? item.learningAttention.filter(validLearningKey) : []).slice(0,6),
+      difficultyCounts: {
+        easy: finiteNonNegative(item.difficultyCounts?.easy),
+        medium: finiteNonNegative(item.difficultyCounts?.medium),
+        hard: finiteNonNegative(item.difficultyCounts?.hard)
+      },
+      adaptiveDifficulty: Boolean(item.adaptiveDifficulty),
+      difficultyAdjustments: {
+        up: finiteNonNegative(item.difficultyAdjustments?.up),
+        down: finiteNonNegative(item.difficultyAdjustments?.down),
+        steady: finiteNonNegative(item.difficultyAdjustments?.steady)
+      },
+      difficultyTimeline: (Array.isArray(item.difficultyTimeline)?item.difficultyTimeline:[]).filter(level=>["easy","medium","hard"].includes(level)).slice(0,20),
+      pathModuleId: LEARNING_PATH_MODULE_IDS.includes(item.pathModuleId) ? item.pathModuleId : null,
+      pathPassed: Boolean(item.pathPassed)
+    }));
+    repaired.stats.history = dedupeFirstBy(repaired.stats.history, item => item.id || [item.date,item.mode,item.answers,item.correct,item.duration,item.pathModuleId || ""].join("|")).slice(0, HISTORY_LIMIT);
+    repaired.stats.mistakes = repaired.stats.mistakes.filter(item => item && typeof item === "object" && item.spec && ["effectiveness","multiplier","impact","pokemon"].includes(item.spec.kind)).map(item => ({
+      ...item,
+      wrongCount: finiteNonNegative(item.wrongCount),
+      correctReviews: finiteNonNegative(item.correctReviews),
+      status: item.status === "resolved" ? "resolved" : "open",
+      lastIssues: (Array.isArray(item.lastIssues) ? item.lastIssues : []).map(sanitizeErrorIssue).filter(Boolean).slice(0, 12),
+      patternKeys: unique((Array.isArray(item.patternKeys) ? item.patternKeys : []).map(sanitizeErrorPatternKey).filter(Boolean)).slice(0, 12)
+    })).slice(-MISTAKE_LIMIT);
+    repairLearningPath(repaired, candidate?.learningPath);
     repaired.daily.streak = finiteNonNegative(repaired.daily.streak);
+    repaired.daily.bestStreak = Math.max(repaired.daily.streak, finiteNonNegative(repaired.daily.bestStreak));
     repaired.daily.completed = Boolean(repaired.daily.completed);
+    repaired.daily.goalTarget = 10;
+    repaired.daily.goalProgress = Math.min(repaired.daily.goalTarget, finiteNonNegative(repaired.daily.goalProgress));
+    if (repaired.daily.completed && repaired.daily.date === todayKey() && repaired.daily.goalProgress === 0) repaired.daily.goalProgress = repaired.daily.goalTarget;
+    repaired.daily.goalCompleted = Boolean(repaired.daily.goalCompleted || repaired.daily.goalProgress >= repaired.daily.goalTarget);
+    repaired.daily.goalRewardClaimed = Boolean(repaired.daily.goalRewardClaimed || repaired.daily.goalCompleted);
+    repaired.daily.history = repaired.daily.history && typeof repaired.daily.history === "object" && !Array.isArray(repaired.daily.history) ? repaired.daily.history : {};
+    repaired.daily.history = Object.fromEntries(Object.entries(repaired.daily.history).filter(([key,value]) => /^\d{4}-\d{2}-\d{2}$/.test(key) && value && typeof value === "object").slice(-45).map(([key,value]) => [key, { progress: finiteNonNegative(value.progress), completed: Boolean(value.completed) }]));
     repaired.pokemonCache = sanitizePokemonCache(repaired.pokemonCache);
     repaired.diagnostics.repairs.push(...fixes.map(field => ({ time: new Date().toISOString(), field })));
     repaired.diagnostics.repairs = repaired.diagnostics.repairs.slice(-50);
-    repaired.version = BUILD_VERSION; repaired.dataSchema = 6;
+    repaired.version = BUILD_VERSION; repaired.dataSchema = DATA_SCHEMA;
     return repaired;
   }
 
@@ -285,11 +655,81 @@
     return clone(defaults);
   }
 
+  function compactStateCollections(target, { aggressive = false, record = true } = {}) {
+    if (!target || typeof target !== "object") return null;
+    const learningLimit = aggressive ? 600 : LEARNING_EVENT_LIMIT;
+    const errorLimit = aggressive ? 450 : ERROR_EVENT_LIMIT;
+    const historyLimit = aggressive ? 24 : HISTORY_LIMIT;
+    const cacheLimit = aggressive ? 100 : POKEMON_CACHE_LIMIT;
+    const before = {
+      learning: target.stats?.learning?.events?.length || 0,
+      errors: target.stats?.errorAnalysis?.events?.length || 0,
+      history: target.stats?.history?.length || 0,
+      pokemon: Object.keys(target.pokemonCache || {}).length
+    };
+    if (target.stats?.learning) target.stats.learning.events = dedupeLatestBy(target.stats.learning.events, item => item?.id).slice(-learningLimit);
+    if (target.stats?.errorAnalysis) target.stats.errorAnalysis.events = dedupeLatestBy(target.stats.errorAnalysis.events, item => item?.id).slice(-errorLimit);
+    if (target.stats) target.stats.history = dedupeFirstBy(target.stats.history, item => item?.id || [item?.date,item?.mode,item?.answers,item?.correct,item?.duration,item?.pathModuleId || ""].join("|")).slice(0, historyLimit);
+    const cacheEntries = Object.entries(sanitizePokemonCache(target.pokemonCache)).slice(-cacheLimit);
+    target.pokemonCache = Object.fromEntries(cacheEntries);
+    if (target.diagnostics) {
+      target.diagnostics.errors = (Array.isArray(target.diagnostics.errors) ? target.diagnostics.errors : []).slice(aggressive ? -20 : -50);
+      target.diagnostics.repairs = (Array.isArray(target.diagnostics.repairs) ? target.diagnostics.repairs : []).slice(aggressive ? -20 : -50);
+    }
+    const after = {
+      learning: target.stats?.learning?.events?.length || 0,
+      errors: target.stats?.errorAnalysis?.events?.length || 0,
+      history: target.stats?.history?.length || 0,
+      pokemon: Object.keys(target.pokemonCache || {}).length
+    };
+    const report = {
+      aggressive,
+      learningRemoved: Math.max(0, before.learning - after.learning),
+      errorEventsRemoved: Math.max(0, before.errors - after.errors),
+      historyRemoved: Math.max(0, before.history - after.history),
+      pokemonRemoved: Math.max(0, before.pokemon - after.pokemon)
+    };
+    if (record && target.diagnostics?.maintenance && Object.values(report).some(value => typeof value === "number" && value > 0)) {
+      target.diagnostics.maintenance.lastRun = new Date().toISOString();
+      target.diagnostics.maintenance.lastCompaction = report;
+    }
+    return report;
+  }
+
+  function isQuotaError(error) {
+    return error?.name === "QuotaExceededError" || error?.name === "NS_ERROR_DOM_QUOTA_REACHED" || Number(error?.code) === 22 || Number(error?.code) === 1014;
+  }
+
+  function serializeState(target) {
+    const first = JSON.stringify(target);
+    if (target.diagnostics?.maintenance) target.diagnostics.maintenance.lastSaveBytes = byteLength(first);
+    return JSON.stringify(target);
+  }
+
   function saveState() {
     state.version = BUILD_VERSION;
-    state.dataSchema = 6;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-    catch (error) { console.warn("Could not save progress", error); logError(error, "saveState"); }
+    state.dataSchema = DATA_SCHEMA;
+    compactStateCollections(state);
+    try {
+      localStorage.setItem(STORAGE_KEY, serializeState(state));
+    } catch (error) {
+      if (isQuotaError(error)) {
+        try {
+          const compacted = clone(state);
+          compactStateCollections(compacted, { aggressive: true });
+          compacted.diagnostics.maintenance.quotaRecoveries = finiteNonNegative(compacted.diagnostics.maintenance.quotaRecoveries) + 1;
+          compacted.diagnostics.maintenance.lastRun = new Date().toISOString();
+          localStorage.setItem(STORAGE_KEY, serializeState(compacted));
+          state = compacted;
+        } catch (retryError) {
+          console.warn("Could not save progress after compaction", retryError);
+          logError(retryError, "saveState.compacted");
+        }
+      } else {
+        console.warn("Could not save progress", error);
+        logError(error, "saveState");
+      }
+    }
     updateHeader();
   }
 
@@ -303,11 +743,11 @@
     return value;
   }
 
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  function tp(singularKey, pluralKey, count, vars = {}) {
+    return t(QuizmonI18n.pluralKey(state.language, count, singularKey, pluralKey), { ...vars, count });
   }
+
+  function escapeHtml(value) { return QuizmonCore.escapeHtml(value); }
 
   function typeLabel(type) { return t(`type.${type}`); }
 
@@ -316,40 +756,245 @@
     return `<span class="type-chip ${extraClass}" data-type="${type}" style="--type-color:${meta.color}"><span class="type-symbol" aria-hidden="true">${meta.icon}</span><span>${escapeHtml(typeLabel(type))}</span></span>`;
   }
 
-  function shuffle(items, random = Math.random) {
-    const copy = [...items];
-    for (let i = copy.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
+  function shuffle(items, random = Math.random) { return QuizmonCore.shuffle(items, random); }
+  function randomItem(items, random = Math.random) { return QuizmonCore.randomItem(items, random); }
+  function unique(items) { return QuizmonCore.unique(items); }
+  function finiteNonNegative(value, fallback = 0) { return QuizmonCore.finiteNonNegative(value, fallback); }
+  function validRoute(route) { return QuizmonRouter.validRoute(route); }
+  function sanitizePokemonCache(cache) { return QuizmonCore.sanitizePokemonCache(cache, TYPES, POKEMON_CACHE_LIMIT); }
+  function effectiveness(attackingType, defendingTypes) { return QuizmonCore.effectiveness(TYPE_CHART, attackingType, defendingTypes); }
+  function percent(correct, total) { return QuizmonCore.percent(correct, total); }
+  function formatMultiplier(value) { return QuizmonCore.formatMultiplier(value); }
+  function multiplierMeaning(value) {
+    if (value === 0) return t("multiplier.zero");
+    if (value === .25) return t("multiplier.quarter");
+    if (value === .5) return t("multiplier.half");
+    if (value === 1) return t("multiplier.normal");
+    if (value === 2) return t("multiplier.double");
+    if (value === 4) return t("multiplier.quad");
+    return t("multiplier.other", { value: formatMultiplier(value) });
   }
-  function randomItem(items, random = Math.random) { return items[Math.floor(random() * items.length)]; }
-  function unique(items) { return [...new Set(items.filter(Boolean))]; }
-  function finiteNonNegative(value, fallback = 0) {
-    const number = Number(value);
-    return Number.isFinite(number) && number >= 0 ? number : fallback;
+  function explanationFactorText(attacker, defender, value) {
+    const vars = { attacker:typeLabel(attacker), defender:typeLabel(defender), value:formatMultiplier(value) };
+    if (value === 0) return t("explanation.factor.zero", vars);
+    if (value === .5) return t("explanation.factor.half", vars);
+    if (value === 1) return t("explanation.factor.neutral", vars);
+    if (value === 2) return t("explanation.factor.double", vars);
+    return t("explanation.factor.other", vars);
   }
-  function validRoute(route) {
-    return ["home","train","learn","learn-detail","stats","settings","profile","session","summary"].includes(route)
-      || /^setup-(effectiveness|multiplier|impact|pokemon)$/.test(route || "");
+
+  const TYPE_MNEMONIC_KEYS = {
+    "normal:ghost": "mnemonic.normalGhost",
+    "fire:grass": "mnemonic.fireGrass",
+    "fire:ice": "mnemonic.fireIce",
+    "fire:bug": "mnemonic.fireBug",
+    "fire:steel": "mnemonic.fireSteel",
+    "water:fire": "mnemonic.waterFire",
+    "water:ground": "mnemonic.waterGround",
+    "water:rock": "mnemonic.waterRock",
+    "grass:water": "mnemonic.grassWater",
+    "grass:ground": "mnemonic.grassGround",
+    "grass:rock": "mnemonic.grassRock",
+    "electric:water": "mnemonic.electricWater",
+    "electric:flying": "mnemonic.electricFlying",
+    "electric:ground": "mnemonic.electricGround",
+    "ice:grass": "mnemonic.iceGrass",
+    "ice:ground": "mnemonic.iceGround",
+    "ice:flying": "mnemonic.iceFlying",
+    "ice:dragon": "mnemonic.iceDragon",
+    "fighting:normal": "mnemonic.fightingNormal",
+    "fighting:ice": "mnemonic.fightingIce",
+    "fighting:rock": "mnemonic.fightingRock",
+    "fighting:ghost": "mnemonic.fightingGhost",
+    "fighting:dark": "mnemonic.fightingDark",
+    "fighting:steel": "mnemonic.fightingSteel",
+    "poison:grass": "mnemonic.poisonGrass",
+    "poison:steel": "mnemonic.poisonSteel",
+    "poison:fairy": "mnemonic.poisonFairy",
+    "ground:fire": "mnemonic.groundFire",
+    "ground:electric": "mnemonic.groundElectric",
+    "ground:poison": "mnemonic.groundPoison",
+    "ground:flying": "mnemonic.groundFlying",
+    "ground:rock": "mnemonic.groundRock",
+    "ground:steel": "mnemonic.groundSteel",
+    "flying:grass": "mnemonic.flyingGrass",
+    "flying:fighting": "mnemonic.flyingFighting",
+    "flying:bug": "mnemonic.flyingBug",
+    "psychic:fighting": "mnemonic.psychicFighting",
+    "psychic:dark": "mnemonic.psychicDark",
+    "bug:grass": "mnemonic.bugGrass",
+    "bug:psychic": "mnemonic.bugPsychic",
+    "rock:fire": "mnemonic.rockFire",
+    "rock:ice": "mnemonic.rockIce",
+    "rock:flying": "mnemonic.rockFlying",
+    "rock:bug": "mnemonic.rockBug",
+    "ghost:normal": "mnemonic.ghostNormal",
+    "ghost:psychic": "mnemonic.ghostPsychic",
+    "ghost:ghost": "mnemonic.ghostGhost",
+    "dragon:dragon": "mnemonic.dragonDragon",
+    "dragon:fairy": "mnemonic.dragonFairy",
+    "dark:psychic": "mnemonic.darkPsychic",
+    "steel:ice": "mnemonic.steelIce",
+    "steel:rock": "mnemonic.steelRock",
+    "steel:fairy": "mnemonic.steelFairy",
+    "fairy:fighting": "mnemonic.fairyFighting",
+    "fairy:dragon": "mnemonic.fairyDragon",
+    "fairy:dark": "mnemonic.fairyDark"
+  };
+
+  function typeMnemonicTexts(attacker, defenders) {
+    return unique(defenders.map(defender => {
+      const key = TYPE_MNEMONIC_KEYS[`${attacker}:${defender}`];
+      if (!key) return null;
+      const value = TYPE_CHART[attacker]?.[defender] ?? 1;
+      return value === 2 || value === 0 ? t(key) : null;
+    }).filter(Boolean));
   }
-  function sanitizePokemonCache(cache) {
-    if (!cache || typeof cache !== "object" || Array.isArray(cache)) return {};
-    const entries = Object.entries(cache).slice(-160).filter(([, item]) => {
-      if (!item || typeof item !== "object") return false;
-      const id = Number(item.id);
-      return Number.isInteger(id) && id > 0 && typeof item.name === "string"
-        && Array.isArray(item.types) && item.types.length > 0 && item.types.every(type => TYPES.includes(type))
-        && typeof item.image === "string";
-    });
-    return Object.fromEntries(entries);
+
+  function typeMnemonicHtml(attacker, defenders) {
+    const texts = typeMnemonicTexts(attacker, defenders);
+    if (!texts.length) return "";
+    return `<aside class="feedback-mnemonic">
+      <div class="feedback-mnemonic-title"><span aria-hidden="true">✦</span><strong>${t("explanation.mnemonicTitle")}</strong></div>
+      <div class="feedback-mnemonic-lines">${texts.map(text => `<p>${escapeHtml(text)}</p>`).join("")}</div>
+      <small>${t("explanation.mnemonicNote")}</small>
+    </aside>`;
   }
-  function effectiveness(attackingType, defendingTypes) {
-    return defendingTypes.reduce((value, defendingType) => value * (TYPE_CHART[attackingType]?.[defendingType] ?? 1), 1);
+
+  function typeInteractionExplanation(attacker, defenders) {
+    const safeDefenders = defenders.filter(type => TYPES.includes(type)).slice(0,2);
+    const values = safeDefenders.map(defender => TYPE_CHART[attacker]?.[defender] ?? 1);
+    const result = values.reduce((total, value) => total * value, 1);
+    const factors = safeDefenders.map((defender,index) => explanationFactorText(attacker,defender,values[index]));
+    const formula = `${values.map(formatMultiplier).join(" × ")} = ${formatMultiplier(result)}`;
+    let summary;
+    if (safeDefenders.length === 1) summary = t("explanation.single.result", { result:formatMultiplier(result) });
+    else if (values.includes(0)) summary = t("explanation.dual.immunity");
+    else if (result === 4) summary = t("explanation.dual.quad", { formula });
+    else if (result === .25) summary = t("explanation.dual.quarter", { formula });
+    else if (result === 1 && values.includes(2) && values.includes(.5)) summary = t("explanation.dual.cancel", { formula });
+    else if (result === 1 && values.every(value => value === 1)) summary = t("explanation.dual.neutral", { formula });
+    else summary = t("explanation.dual.result", { formula, result:formatMultiplier(result) });
+    return { attacker, defenders:safeDefenders, values, result, factors, formula, summary, immunity:values.includes(0) };
   }
-  function percent(correct, total) { return total ? Math.round((correct / total) * 100) : 0; }
-  function formatMultiplier(value) { return value === .25 ? "¼×" : value === .5 ? "½×" : `${value}×`; }
+
+  function typeInteractionExplanationHtml(attacker, defenders) {
+    const explanation = typeInteractionExplanation(attacker,defenders);
+    return `<div class="feedback-why${explanation.immunity ? " immunity" : ""}">
+      <div class="feedback-why-title"><span aria-hidden="true">?</span><strong>${t("explanation.whyTitle")}</strong></div>
+      <div class="feedback-why-factors">${explanation.factors.map(text => `<p>${escapeHtml(text)}</p>`).join("")}</div>
+      <p class="feedback-why-summary">${escapeHtml(explanation.summary)}</p>
+      ${typeMnemonicHtml(attacker, explanation.defenders)}
+    </div>`;
+  }
+
+  function matchupBreakdown(attacker, defenders, options = {}) {
+    const values = defenders.map(defender => TYPE_CHART[attacker]?.[defender] ?? 1);
+    const result = values.reduce((total, value) => total * value, 1);
+    const factors = defenders.map((defender, index) => `<div class="feedback-factor">
+      <span class="feedback-direction">${typeChip(attacker,"small")}<b aria-hidden="true">→</b>${typeChip(defender,"small")}</span>
+      <span class="feedback-factor-result"><strong>${formatMultiplier(values[index])}</strong><small>${escapeHtml(multiplierMeaning(values[index]))}</small></span>
+    </div>`).join("");
+    const formula = defenders.length > 1 ? `<div class="feedback-formula"><span>${t("session.multiplyFactors")}</span><strong>${values.map(formatMultiplier).join(" × ")} = ${formatMultiplier(result)}</strong></div>` : "";
+    const className = options.compact ? "feedback-matchup-card compact" : "feedback-matchup-card";
+    const explanation = options.explain ? typeInteractionExplanationHtml(attacker,defenders) : "";
+    return `<div class="${className}">${factors}${formula}<div class="feedback-final-result"><span>${t("session.finalResult")}</span><strong>${formatMultiplier(result)}</strong><small>${escapeHtml(multiplierMeaning(result))}</small></div>${explanation}</div>`;
+  }
+  function feedbackProgressiveDetails(html, open = false) {
+    if (!html) return "";
+    return `<details class="feedback-progressive-details" ${open ? "open" : ""}><summary><span><strong>${t("cleanup2.feedbackDetails")}</strong><small>${t("cleanup2.feedbackDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div>${html}</div></details>`;
+  }
+
+  function feedbackHeading(correct, subtitle = "") {
+    return `<div class="feedback-heading"><strong>${correct ? t("session.right") : t("session.notQuite")}</strong>${subtitle ? `<span>${escapeHtml(subtitle)}</span>` : ""}</div>`;
+  }
+
+  function feedbackReferenceActions({ types = [], attacker = null, defenders = [] } = {}) {
+    const safeTypes = unique(types.filter(type => TYPES.includes(type))).slice(0, 2);
+    const safeDefenders = unique(defenders.filter(type => TYPES.includes(type))).slice(0, 2);
+    const typeButtons = safeTypes.map(type => `<button type="button" class="feedback-learning-button" data-feedback-type="${type}">${t("explanation.openType", { type:typeLabel(type) })}</button>`).join("");
+    const labButton = TYPES.includes(attacker) && safeDefenders.length
+      ? `<button type="button" class="feedback-learning-button" data-feedback-lab="true" data-feedback-attack="${attacker}" data-feedback-defenders="${safeDefenders.join(",")}">${t("explanation.openCalculator")}</button>`
+      : "";
+    if (!typeButtons && !labButton) return "";
+    return `<section class="feedback-learning-actions"><small>${t("explanation.learnMore")}</small><div>${typeButtons}${labButton}</div></section>`;
+  }
+
+  function explanationLearningHintHtml(spec) {
+    if (!spec) return "";
+    const keys = [];
+    const isDual = spec.kind === "pokemon" ? (spec.pokemon?.types?.length || 0) > 1 : (spec.defendingTypes?.length || 0) > 1;
+    if (isDual) keys.push("skill:dual");
+    const skillKey = { effectiveness:"skill:effectiveness", multiplier:"skill:multiplier", impact:"skill:impact", pokemon:"skill:pokemon" }[spec.kind];
+    if (skillKey) keys.push(skillKey);
+    if (spec.attackingType) keys.push(`attack:${spec.attackingType}`);
+    (spec.defendingTypes || []).forEach(type => keys.push(`defense:${type}`));
+    (spec.pokemon?.types || []).forEach(type => keys.push(`pokemon:${type}`));
+    const profile = getLearningProfile();
+    const area = unique(keys).map(key => learningAreaForKey(profile, key)).find(item => item && item.total >= 3 && (item.status === "need" || item.status === "developing" || item.trend === "down"));
+    if (!area) return "";
+    const message = area.key === "skill:dual"
+      ? t("explanation.personalDual")
+      : t("explanation.personalArea", { area:area.label });
+    return `<div class="feedback-learning-hint"><span aria-hidden="true">◎</span><p>${escapeHtml(message)}</p></div>`;
+  }
+
+  function pokemonTypeExplanationHtml(spec, selected) {
+    const expected = spec.pokemon.types;
+    const missing = expected.filter(type => !selected.includes(type));
+    const extra = selected.filter(type => !expected.includes(type));
+    const typeNames = expected.map(typeLabel).join(state.language === "de" ? " und " : " and ");
+    const summary = expected.length === 1
+      ? t("explanation.pokemonSingle", { pokemon:spec.pokemon.name, types:typeNames })
+      : t("explanation.pokemonDual", { pokemon:spec.pokemon.name, types:typeNames });
+    const details = [
+      missing.length ? `<p>${escapeHtml(t("explanation.pokemonMissing", { types:missing.map(typeLabel).join(", ") }))}</p>` : "",
+      extra.length ? `<p>${escapeHtml(t("explanation.pokemonExtra", { types:extra.map(typeLabel).join(", ") }))}</p>` : ""
+    ].join("");
+    return `<div class="feedback-why pokemon-explanation">
+      <div class="feedback-why-title"><span aria-hidden="true">?</span><strong>${t("explanation.whyTitle")}</strong></div>
+      <div class="feedback-why-factors"><p>${escapeHtml(summary)}</p>${details}</div>
+      <p class="feedback-why-summary">${escapeHtml(t("explanation.pokemonRule"))}</p>
+    </div>`;
+  }
+
+  function showFeedbackTypeReference(type) {
+    if (!TYPES.includes(type)) return;
+    const attack = groupByMultiplier(TYPES, target => effectiveness(type, [target]));
+    const defense = groupByMultiplier(TYPES, attacker => effectiveness(attacker, [type]));
+    const meta = TYPE_META[type];
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="feedbackReferenceTitle">
+      <section class="modal-card feedback-reference-modal" style="--type-color:${meta.color}">
+        <div class="feedback-reference-head"><span class="feedback-reference-symbol">${meta.icon}</span><div><p class="quiz-kicker">${t("explanation.lexiconKicker")}</p><h2 id="feedbackReferenceTitle">${escapeHtml(typeLabel(type))}</h2><p>${t("explanation.lexiconIntro")}</p></div></div>
+        <div class="feedback-reference-grid">
+          <article><h3>${t("learn.attackProfile")}</h3>${learnMultiplierGroup("2×",t("learn.strongAgainst"),attack[2],"strong")}${learnMultiplierGroup("½×",t("learn.weakAgainst"),attack[.5],"resist")}${learnMultiplierGroup("0×",t("learn.noEffect"),attack[0],"immune")}</article>
+          <article><h3>${t("learn.defenseProfile")}</h3>${learnMultiplierGroup("2×",t("learn.vulnerable"),defense[2],"danger")}${learnMultiplierGroup("½×",t("learn.resists"),defense[.5],"resist")}${learnMultiplierGroup("0×",t("learn.immune"),defense[0],"immune")}</article>
+        </div>
+        <div class="modal-actions"><button id="closeFeedbackReference" class="primary-button">${t("common.close")}</button></div>
+      </section>
+    </div>`, { initialFocus:"#closeFeedbackReference" });
+    document.getElementById("closeFeedbackReference")?.addEventListener("click", () => closeModal());
+  }
+
+  function showFeedbackLabReference(attacker, defenders) {
+    const safeDefenders = defenders.filter(type => TYPES.includes(type)).slice(0,2);
+    if (!TYPES.includes(attacker) || !safeDefenders.length) return;
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="feedbackLabTitle">
+      <section class="modal-card feedback-reference-modal compact-reference-modal">
+        <div class="feedback-reference-head"><span class="feedback-reference-symbol neutral">×</span><div><p class="quiz-kicker">${t("explanation.calculatorKicker")}</p><h2 id="feedbackLabTitle">${t("explanation.calculatorTitle")}</h2><p>${t("explanation.calculatorIntro")}</p></div></div>
+        ${matchupBreakdown(attacker, safeDefenders, { explain:true })}
+        <div class="modal-actions"><button id="closeFeedbackReference" class="primary-button">${t("common.close")}</button></div>
+      </section>
+    </div>`, { initialFocus:"#closeFeedbackReference" });
+    document.getElementById("closeFeedbackReference")?.addEventListener("click", () => closeModal());
+  }
+
+  function bindFeedbackLearningActions(container) {
+    container?.querySelectorAll("[data-feedback-type]").forEach(button => button.addEventListener("click", () => showFeedbackTypeReference(button.dataset.feedbackType)));
+    container?.querySelectorAll("[data-feedback-lab]").forEach(button => button.addEventListener("click", () => {
+      showFeedbackLabReference(button.dataset.feedbackAttack, String(button.dataset.feedbackDefenders || "").split(",").filter(Boolean));
+    }));
+  }
   function formatDuration(seconds) {
     const safe = Math.max(0, Math.round(seconds || 0));
     const minutes = Math.floor(safe / 60);
@@ -427,18 +1072,113 @@
       .filter(item => item.total >= 3)
       .sort((a,b) => b.rate - a.rate || b.total - a.total)[0] || null;
   }
-  function todayKey() {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  function dateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
-  function normalizeDailyState() {
+  function todayKey() { return dateKey(new Date()); }
+  function offsetDateKey(offsetDays = 0) {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() + offsetDays);
+    return dateKey(date);
+  }
+  function dailyGoalInfo() {
+    const target = 10;
+    const progress = Math.min(target, finiteNonNegative(state.daily.goalProgress));
+    return {
+      target,
+      progress,
+      remaining: Math.max(0, target - progress),
+      percent: Math.min(100, Math.round((progress / target) * 100)),
+      completed: Boolean(state.daily.goalCompleted || progress >= target),
+      streak: finiteNonNegative(state.daily.streak),
+      bestStreak: Math.max(finiteNonNegative(state.daily.bestStreak), finiteNonNegative(state.daily.streak))
+    };
+  }
+  function weeklyGoalEntries() {
+    return Array.from({ length: 7 }, (_, index) => {
+      const offset = index - 6;
+      const key = offsetDateKey(offset);
+      const date = new Date(`${key}T12:00:00`);
+      const saved = state.daily.history?.[key] || {};
+      const isToday = offset === 0;
+      const completed = isToday ? dailyGoalInfo().completed : Boolean(saved.completed);
+      const progress = isToday ? dailyGoalInfo().progress : finiteNonNegative(saved.progress);
+      const label = new Intl.DateTimeFormat(state.language === "de" ? "de-DE" : "en-GB", { weekday: "short" }).format(date).replace(".", "").slice(0, 2);
+      return { key, label, completed, progress, isToday };
+    });
+  }
+  function normalizeDailyState(persist = true) {
     const today = todayKey();
+    let changed = false;
     if (state.daily.date !== today) {
+      const previousDate = state.daily.date;
+      if (previousDate && state.daily.history && !state.daily.history[previousDate]) {
+        state.daily.history[previousDate] = { progress: finiteNonNegative(state.daily.goalProgress), completed: Boolean(state.daily.goalCompleted) };
+      }
+      const yesterday = offsetDateKey(-1);
+      if (state.daily.lastCompletedDate && ![today, yesterday].includes(state.daily.lastCompletedDate)) state.daily.streak = 0;
       state.daily.date = today;
       state.daily.completed = false;
       state.daily.result = null;
-      saveState();
+      state.daily.goalProgress = 0;
+      state.daily.goalCompleted = false;
+      state.daily.goalRewardClaimed = false;
+      changed = true;
     }
+    state.daily.goalTarget = 10;
+    state.daily.history = state.daily.history && typeof state.daily.history === "object" ? state.daily.history : {};
+    state.daily.history[today] = { progress: finiteNonNegative(state.daily.goalProgress), completed: Boolean(state.daily.goalCompleted) };
+    const keep = new Set(Array.from({ length: 45 }, (_, index) => offsetDateKey(-index)));
+    Object.keys(state.daily.history).forEach(key => { if (!keep.has(key)) delete state.daily.history[key]; });
+    if (changed && persist) saveState();
+    return changed;
+  }
+  function recordDailyGoalProgress() {
+    normalizeDailyState(false);
+    const beforeCompleted = Boolean(state.daily.goalCompleted);
+    if (!beforeCompleted) state.daily.goalProgress = Math.min(10, finiteNonNegative(state.daily.goalProgress) + 1);
+    let completedNow = false;
+    let bonusXp = 0;
+    if (!beforeCompleted && state.daily.goalProgress >= 10) {
+      completedNow = true;
+      state.daily.goalCompleted = true;
+      const today = todayKey();
+      const yesterday = offsetDateKey(-1);
+      state.daily.streak = state.daily.lastCompletedDate === yesterday ? finiteNonNegative(state.daily.streak) + 1 : 1;
+      state.daily.bestStreak = Math.max(finiteNonNegative(state.daily.bestStreak), state.daily.streak);
+      state.daily.lastCompletedDate = today;
+      if (!state.daily.goalRewardClaimed) {
+        state.daily.goalRewardClaimed = true;
+        bonusXp = 25;
+      }
+    }
+    state.daily.history[todayKey()] = { progress: finiteNonNegative(state.daily.goalProgress), completed: Boolean(state.daily.goalCompleted) };
+    return { ...dailyGoalInfo(), completedNow, bonusXp, show: !beforeCompleted || completedNow };
+  }
+  function dailyGoalWeekMarkup() {
+    return `<div class="daily-goal-week" aria-label="${escapeHtml(t("daily.weekLabel"))}">${weeklyGoalEntries().map(day => `<span class="${day.completed ? "is-complete" : ""} ${day.isToday ? "is-today" : ""}" title="${escapeHtml(day.key)}"><small>${escapeHtml(day.label)}</small><i>${day.completed ? "✓" : ""}</i></span>`).join("")}</div>`;
+  }
+  function dailyGoalCardMarkup(id = "dailyGoalAction", compact = false) {
+    const goal = dailyGoalInfo();
+    return `<section class="daily-goal-card ${goal.completed ? "is-complete" : ""} ${compact ? "compact" : ""}" style="--daily-progress:${goal.percent}%">
+      <div class="daily-goal-main">
+        <span class="daily-goal-flame" aria-hidden="true">${goal.completed ? "✓" : "🔥"}</span>
+        <span class="daily-goal-copy"><small>${t("daily.kicker")}</small><strong>${goal.completed ? t("daily.completedTitle") : t("daily.title")}</strong><em>${goal.completed ? tp("daily.completedTextOne", "daily.completedText", goal.streak, { streak: goal.streak }) : t("daily.progressText", { progress: goal.progress, target: goal.target })}</em></span>
+        <span class="daily-goal-streak"><small>${t("daily.streak")}</small><strong>🔥 ${goal.streak}</strong></span>
+      </div>
+      <div class="daily-goal-track" aria-label="${goal.percent}%"><i></i></div>
+      ${compact ? "" : dailyGoalWeekMarkup()}
+      <button id="${id}" class="daily-goal-action" type="button"><span>${goal.completed ? t("daily.keepTraining") : t("daily.continue")}</span><strong>${goal.completed ? `+${t("daily.doneToday")}` : tp("daily.remainingOne", "daily.remaining", goal.remaining)}</strong><b aria-hidden="true">›</b></button>
+    </section>`;
+  }
+  function startDailyGoalTraining() {
+    if (state.lastMode && state.lastConfig && state.daily.completed) {
+      state.config[state.lastMode] = { ...state.config[state.lastMode], ...clone(state.lastConfig) };
+      startSession(state.lastMode);
+      return;
+    }
+    startDailySession();
   }
   function seededRandom(seedText) {
     let hash = 2166136261;
@@ -459,7 +1199,10 @@
     document.documentElement.dataset.theme = actualTheme();
     document.documentElement.dataset.animations = state.animations ? "on" : "off";
     document.documentElement.lang = state.language;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", actualTheme() === "dark" ? "#10171b" : "#f4f6f8");
+    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
+      meta.setAttribute("content", actualTheme() === "dark" ? "#10171b" : "#f4f6f8");
+      meta.removeAttribute("media");
+    });
     document.querySelectorAll("[data-nav-label]").forEach(item => item.textContent = t(`nav.${item.dataset.navLabel}`));
     backButton.setAttribute("aria-label", t("common.back"));
     backButton.setAttribute("title", t("common.back"));
@@ -467,6 +1210,8 @@
     homeButton.setAttribute("title", t("nav.home"));
     levelButton.setAttribute("aria-label", t("profile.openLabel"));
     levelButton.setAttribute("title", t("profile.openLabel"));
+    const skipLink = document.querySelector(".skip-link");
+    if (skipLink) skipLink.textContent = t("a11y.skipToContent");
   }
   function motionEnabled() {
     return Boolean(state.animations) && !reducedMotionQuery.matches;
@@ -737,6 +1482,104 @@
       .filter(item => item?.unlock?.kind === "level" && Number(item.unlock.value) === Number(level));
   }
 
+  function allLevelRewards() {
+    return [...PROFILE_AVATARS, ...PROFILE_BANNERS, ...PROFILE_TITLES, ...PROFILE_SETS]
+      .filter(item => item?.unlock?.kind === "level");
+  }
+
+  function rewardKey(item) { return `${item?.kind || "reward"}:${item?.id || "unknown"}`; }
+
+  function uniqueRewardItems(items = []) {
+    const seen = new Set();
+    return items.filter(item => {
+      const key = rewardKey(item);
+      if (!item || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function nextLevelRewardInfo(level = getLevelInfo().current.level) {
+    const future = allLevelRewards().filter(item => Number(item.unlock.value) > Number(level));
+    if (!future.length) return null;
+    const targetLevel = Math.min(...future.map(item => Number(item.unlock.value)));
+    const levelEntry = LEVELS.find(entry => Number(entry.level) === targetLevel);
+    return {
+      level: targetLevel,
+      xp: levelEntry?.xp ?? state.stats.xp,
+      xpRemaining: Math.max(0, (levelEntry?.xp ?? state.stats.xp) - state.stats.xp),
+      items: uniqueRewardItems(future.filter(item => Number(item.unlock.value) === targetLevel))
+    };
+  }
+
+  function rewardKindLabel(item) { return t(`rewards.kind.${item?.kind || "title"}`); }
+
+  function rewardVisualMarkup(item, extraClass = "") {
+    if (!item) return `<span class="reward-visual reward-generic ${extraClass}" aria-hidden="true">?</span>`;
+    if (item.kind === "avatar") return profileAvatarMarkup(item.id, `reward-visual reward-avatar ${extraClass}`);
+    if (item.kind === "banner") return `<span class="reward-visual reward-banner profile-banner profile-banner-${item.id} ${extraClass}" aria-hidden="true"><i></i></span>`;
+    if (item.kind === "set") return `<span class="reward-visual reward-set ${extraClass}" aria-hidden="true">SET</span>`;
+    if (item.kind === "title") return "";
+    return `<span class="reward-visual reward-generic ${extraClass}" aria-hidden="true">?</span>`;
+  }
+
+  function rewardHeadline(info) {
+    if (!info?.items?.length) return "";
+    const first = cosmeticName(info.items[0]);
+    const remaining = info.items.length - 1;
+    return remaining > 0 ? `${first} · ${t("rewards.more", { count: remaining })}` : first;
+  }
+
+  function rewardListMarkup(items = []) {
+    return uniqueRewardItems(items).map(item => {
+      const visual = rewardVisualMarkup(item);
+      return `<article class="reward-list-item ${visual ? "" : "no-visual"}">
+        ${visual}
+        <span><small>${escapeHtml(rewardKindLabel(item))}</small><strong>${escapeHtml(cosmeticName(item))}</strong></span>
+      </article>`;
+    }).join("");
+  }
+
+
+  function collectionProgressInfo() {
+    const avatars = unlockedProfileCount(PROFILE_AVATARS);
+    const banners = unlockedProfileCount(PROFILE_BANNERS);
+    const titles = unlockedProfileCount(PROFILE_TITLES);
+    const sets = PROFILE_SETS.filter(set => profileSetStatus(set).complete).length;
+    const totalAvatars = PROFILE_AVATARS.length;
+    const totalBanners = PROFILE_BANNERS.length;
+    const totalTitles = PROFILE_TITLES.length;
+    const totalSets = PROFILE_SETS.length;
+    const unlocked = avatars + banners + titles + sets;
+    const total = totalAvatars + totalBanners + totalTitles + totalSets;
+    return {
+      avatars, banners, titles, sets,
+      totalAvatars, totalBanners, totalTitles, totalSets,
+      unlocked, total,
+      percent: total ? Math.round((unlocked / total) * 100) : 0
+    };
+  }
+
+  function collectionProgressMarkup(buttonId, variant = "full") {
+    const info = collectionProgressInfo();
+    const compact = variant === "compact";
+    return `<section class="collection-progress-card ${compact ? "compact" : ""}" style="--collection-progress:${info.percent}%">
+      <div class="collection-progress-heading">
+        <span class="collection-progress-icon" aria-hidden="true">◇</span>
+        <span><small>${t("collection.kicker")}</small><strong>${t("collection.title")}</strong><em>${t("collection.total", { unlocked: info.unlocked, total: info.total })}</em></span>
+        <b>${info.percent}%</b>
+      </div>
+      <div class="collection-progress-track" aria-label="${info.percent}%"><i></i></div>
+      ${compact ? "" : `<div class="collection-category-grid">
+        <span><small>${t("profile.avatarsTab")}</small><strong>${info.avatars}/${info.totalAvatars}</strong></span>
+        <span><small>${t("profile.bannersTab")}</small><strong>${info.banners}/${info.totalBanners}</strong></span>
+        <span><small>${t("profile.titlesTab")}</small><strong>${info.titles}/${info.totalTitles}</strong></span>
+        <span><small>${t("profile.setsTab")}</small><strong>${info.sets}/${info.totalSets}</strong></span>
+      </div>`}
+      ${buttonId ? `<button id="${buttonId}" type="button" class="collection-progress-action">${t("collection.open")}<span aria-hidden="true">›</span></button>` : ""}
+    </section>`;
+  }
+
   function addXp(amount) {
     if (!amount) return;
     const before = getLevelInfo();
@@ -761,39 +1604,150 @@
   }
 
   function modeName(mode) { return t(`mode.${mode}`); }
+  function sessionModeName() {
+    if(session?.trainingList?.name)return session.trainingList.name;
+    if(session?.mode==="path"&&session.pathModuleId){const module=pathModuleById(session.pathModuleId);if(module)return t(module.titleKey);}
+    return modeName(session?.mode||"path");
+  }
+
+  function scrollRouteToTop() {
+    const root = document.documentElement;
+    const previous = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto";
+    root.scrollTop = 0;
+    document.body.scrollTop = 0;
+    requestAnimationFrame(() => {
+      root.scrollTop = 0;
+      document.body.scrollTop = 0;
+      root.style.scrollBehavior = previous;
+    });
+  }
+
+  function captureRouteSnapshot() {
+    return {
+      route: state.route,
+      learnTab: state.learnTab,
+      statsTab: state.statsTab,
+      knowledge: {
+        view: knowledgeView,
+        learnType,
+        pokemonId: knowledgePokemonId,
+        pokemonPage: knowledgePokemonPage,
+        pokemonTab: knowledgePokemonDetailTab,
+        contentKind: knowledgeContentKind,
+        contentId: knowledgeContentId,
+        contentPage: knowledgeContentPage,
+        searchQuery: knowledgeSearchQuery,
+        searchFilter: knowledgeSearchFilter,
+        searchVisibleCount: knowledgeSearchVisibleCount,
+        searchOrigin: knowledgeSearchOrigin,
+        searchOpenedResult: knowledgeSearchOpenedResult,
+        searchResultScrollY: knowledgeSearchResultScrollY
+      },
+      scrollY: Math.max(0, window.scrollY || document.documentElement.scrollTop || 0)
+    };
+  }
+
+  function browserHistoryState(snapshot = captureRouteSnapshot(), index = browserHistoryIndex) {
+    return { quizmon: { index, snapshot } };
+  }
+
+  function routeHistoryUrl(route = state.route) {
+    const url = new URL(location.href);
+    url.searchParams.set("route", QuizmonRouter.validRoute(route) ? route : "home");
+    return `${url.pathname}${url.search}${url.hash}`;
+  }
+
+  function replaceBrowserHistorySnapshot() {
+    if (applyingBrowserHistory || !history?.replaceState) return;
+    history.replaceState(browserHistoryState(), "", routeHistoryUrl());
+  }
+
+  function pushBrowserHistorySnapshot() {
+    if (applyingBrowserHistory || !history?.pushState) return;
+    browserHistoryIndex += 1;
+    history.pushState(browserHistoryState(), "", routeHistoryUrl());
+  }
+
+  function restoreRouteSnapshot(snapshot, options = {}) {
+    if (!snapshot || !QuizmonRouter.validRoute(snapshot.route)) return false;
+    applyingBrowserHistory = true;
+    state.route = snapshot.route;
+    state.learnTab = ["path","lab","cards"].includes(snapshot.learnTab) ? snapshot.learnTab : state.learnTab;
+    state.statsTab = typeof snapshot.statsTab === "string" ? snapshot.statsTab : state.statsTab;
+    const knowledge = snapshot.knowledge || {};
+    knowledgeView = typeof knowledge.view === "string" ? knowledge.view : "home";
+    learnType = TYPES.includes(knowledge.learnType) ? knowledge.learnType : null;
+    knowledgePokemonId = Number.isFinite(Number(knowledge.pokemonId)) ? Number(knowledge.pokemonId) : null;
+    knowledgePokemonPage = Math.max(0, Number(knowledge.pokemonPage) || 0);
+    knowledgePokemonDetailTab = ["overview","moves","evolution"].includes(knowledge.pokemonTab) ? knowledge.pokemonTab : "overview";
+    knowledgeContentKind = typeof knowledge.contentKind === "string" ? knowledge.contentKind : null;
+    knowledgeContentId = knowledge.contentId ?? null;
+    knowledgeContentPage = Math.max(0, Number(knowledge.contentPage) || 0);
+    knowledgeSearchQuery = typeof knowledge.searchQuery === "string" ? knowledge.searchQuery : "";
+    knowledgeSearchFilter = QuizmonKnowledgeSearch.KIND_ORDER.includes(knowledge.searchFilter) ? knowledge.searchFilter : "all";
+    knowledgeSearchVisibleCount = Math.max(KNOWLEDGE_SEARCH_PAGE_SIZE, Number(knowledge.searchVisibleCount) || KNOWLEDGE_SEARCH_PAGE_SIZE);
+    knowledgeSearchOrigin = knowledge.searchOrigin && typeof knowledge.searchOrigin === "object" ? knowledge.searchOrigin : null;
+    knowledgeSearchOpenedResult = Boolean(knowledge.searchOpenedResult);
+    knowledgeSearchResultScrollY = Math.max(0, Number(knowledge.searchResultScrollY) || 0);
+    saveState();
+    render();
+    applyingBrowserHistory = false;
+    restoreKnowledgeScroll(snapshot.scrollY);
+    requestAnimationFrame(() => view.focus({ preventScroll: true }));
+    if (options.replace) replaceBrowserHistorySnapshot();
+    return true;
+  }
+
+  function initializeBrowserHistory() {
+    const existing = history.state?.quizmon;
+    browserHistoryIndex = Number.isFinite(Number(existing?.index)) ? Number(existing.index) : 0;
+    history.replaceState(browserHistoryState(captureRouteSnapshot(), browserHistoryIndex), "", routeHistoryUrl());
+  }
+
+  function canUseBrowserBack() {
+    return browserHistoryIndex > 0 && Boolean(history.state?.quizmon);
+  }
 
   function setRoute(route, options = {}) {
     const fromRoute = state.route;
     const changed = fromRoute !== route;
+    if (!options.fromHistory && (changed || options.forceHistory)) replaceBrowserHistorySnapshot();
     prepareRouteMotion(fromRoute, route, options.direction);
     state.route = route;
     saveState();
     render();
 
     if (!changed) {
-      window.scrollTo({ top: 0, behavior: motionEnabled() ? "smooth" : "auto" });
+      if (options.forceHistory && !options.fromHistory) pushBrowserHistorySnapshot();
+      if (!options.preserveScroll) {
+        if (motionEnabled()) window.scrollTo({ top: 0, behavior: "smooth" });
+        else scrollRouteToTop();
+      }
       return;
     }
 
-    if (!options.preserveScroll) {
-      window.scrollTo({ top: 0, behavior: "auto" });
-    }
+    if (!options.preserveScroll) scrollRouteToTop();
+    if (!options.fromHistory) pushBrowserHistorySnapshot();
     requestAnimationFrame(() => view.focus({ preventScroll: true }));
   }
 
-  function isInnerRoute(route) { return route.startsWith("setup-") || ["session", "summary", "learn-detail", "profile"].includes(route); }
+  function isInnerRoute(route) { return QuizmonRouter.isInnerRoute(route); }
 
   function updateHeader() {
     const level = getLevelInfo();
+    const goal = dailyGoalInfo();
     levelNumber.textContent = `Lv. ${level.current.level}`;
-    headerStreak.textContent = `🔥 ${state.stats.streak}`;
+    headerStreak.textContent = `🔥 ${goal.streak}`;
+    if(brandVersion)brandVersion.textContent=["knowledge","learn-detail"].includes(state.route)?`${PUBLIC_VERSION} · ${t("nav.knowledge")}`:PUBLIC_VERSION;
+    headerStreak.setAttribute("title", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
+    headerStreak.setAttribute("aria-label", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
   }
 
   function updateNavigation() {
     const inner = isInnerRoute(state.route);
     let active = state.route;
     if (state.route.startsWith("setup-") || ["session", "summary"].includes(state.route)) active = "train";
-    if (state.route === "learn-detail") active = "learn";
     if (state.route === "profile") active = "home";
 
     navButtons.forEach(button => {
@@ -820,12 +1774,31 @@
 
   function updateDocumentTitle() {
     let label = t("nav.home");
-    if (state.route === "train" || state.route.startsWith("setup-") || ["session", "summary"].includes(state.route)) label = t("nav.train");
-    else if (["learn", "learn-detail"].includes(state.route)) label = t("nav.learn");
+    if (state.route === "play") label = t("nav.play");
+    else if (state.route === "train" || state.route.startsWith("setup-") || ["session", "summary"].includes(state.route)) label = t("nav.train");
+    else if (state.route === "learn") label = t("nav.learn");
+    else if (["knowledge", "learn-detail"].includes(state.route)) label = t("nav.knowledge");
     else if (state.route === "stats") label = t("nav.stats");
     else if (state.route === "settings") label = t("nav.settings");
+    else if (state.route === "support") label = t("nav.support");
     else if (state.route === "profile") label = t("profile.title");
     document.title = state.route === "home" ? "Quizmon" : `Quizmon – ${label}`;
+  }
+
+  function currentRouteLabel() {
+    if (state.route === "session") {
+      const total = Number.isFinite(session?.length) ? session.length : (session?.sequence?.length || 0);
+      return session ? `${t("nav.train")} · ${tp("a11y.questionOne", "a11y.questionMany", (session.index || 0) + 1, { total })}` : t("nav.train");
+    }
+    if (state.route === "summary") return t("a11y.summaryOpened");
+    if (state.route === "profile") return t("profile.title");
+    if (state.route === "learn-detail") return t("nav.knowledge");
+    if (state.route.startsWith("setup-")) return t("nav.train");
+    return t(`nav.${state.route}`);
+  }
+
+  function announceRoute() {
+    QuizmonRouter.announce(routeAnnouncer, currentRouteLabel());
   }
 
   function renderRecoveryState(error) {
@@ -848,139 +1821,210 @@
       updateDocumentTitle();
 
       if (state.route === "home") renderHome();
+      else if (state.route === "play") renderFutureArea("play");
       else if (state.route === "train") renderTrain();
       else if (state.route === "learn") renderLearn();
+      else if (state.route === "knowledge") renderKnowledgePage();
       else if (state.route === "learn-detail") renderLearnDetail();
       else if (state.route === "stats") renderStats();
       else if (state.route === "settings") renderSettings();
+      else if (state.route === "support") renderFutureArea("support");
       else if (state.route === "profile") renderProfile();
       else if (state.route.startsWith("setup-")) renderSetup(state.route.replace("setup-", ""));
       else if (state.route === "session") renderQuestion();
       else if (state.route === "summary") renderSummary();
       else { state.route = "home"; renderHome(); }
 
+      announceRoute();
       if (!state.onboardingComplete && !onboardingOpen) openOnboarding(0);
     } catch (error) {
       renderRecoveryState(error);
     }
   }
 
-  function getWeakTypes(limit = 3) {
-    return TYPES.map(type => {
-      const stats = state.stats.types[type];
-      const rate = percent(stats.correct, stats.total);
-      const confidence = Math.min(1, stats.total / 12);
-      const score = stats.total ? (100 - rate) * (.55 + confidence * .45) : -1;
-      return { type, rate, total: stats.total, score };
-    }).filter(item => item.total >= 3).sort((a, b) => b.score - a.score || b.total - a.total).slice(0, limit);
+
+  function buildRecommendationContext() {
+    const profile = getLearningProfile();
+    const analysis = summarizeErrorAnalysis();
+    const activePattern = analysis.patterns.find(item => item.confidence.id !== "first" && ["worsening","active"].includes(item.development.status)) || null;
+    const availablePattern = analysis.patterns.find(item => item.confidence.id !== "first" && item.development.status !== "resolved") || null;
+    const smart = smartRecommendation(profile);
+    const nextPath = pathNextModule();
+    const openMistakeSpecs = state.stats.mistakes.filter(item => item?.status !== "resolved" && item?.spec).map(item => clone(item.spec));
+    let primary;
+    if (activePattern) {
+      primary = {
+        kind:"problem", icon:errorPatternIcon(activePattern), title:errorPatternTitle(activePattern), text:errorPatternText(activePattern),
+        action:"problem", patternKey:activePattern.key, questionCount:8,
+        meta:t("cleanup.meta.problem"), label:t("cleanup.action.problem"),
+        accentType:activePattern.sample?.attackingType || activePattern.sample?.defendingTypes?.[0] || null
+      };
+    } else if (["need","declining","discovery"].includes(smart.kind)) {
+      primary = { ...smart, action:"smart", questionCount:10, meta:t("cleanup.meta.smart"), label:t("cleanup.action.smart"), accentType:smart.area?.type || null };
+    } else if (nextPath) {
+      primary = {
+        kind:"path", icon:nextPath.icon, title:t(nextPath.titleKey), text:t(nextPath.subtitleKey),
+        action:"path", moduleId:nextPath.id, questionCount:nextPath.questions?.length || 5,
+        meta:t("cleanup.meta.path"), label:t("cleanup.action.path"), accentType:nextPath.types?.[0] || null
+      };
+    } else {
+      primary = { ...smart, action:"smart", questionCount:10, meta:t("cleanup.meta.smart"), label:t("cleanup.action.smart"), accentType:smart.area?.type || null };
+    }
+    return { profile, analysis, activePattern, availablePattern, smart, nextPath, openMistakeSpecs, primary };
+  }
+
+  function primaryLearningRecommendation(context = null) {
+    return (context || buildRecommendationContext()).primary;
+  }
+  function primaryRecommendationFocusMarkup(recommendation) {
+    if (recommendation.action === "problem") {
+      const pattern = errorPatternByKey(recommendation.patternKey);
+      if (pattern?.sample?.attackingType) return `<div class="adaptive-focus-types">${typeChip(pattern.sample.attackingType,"small")}<span>→</span>${(pattern.sample.defendingTypes||[]).slice(0,2).map(type=>typeChip(type,"small")).join("")}</div>`;
+    }
+    if (recommendation.action === "path") {
+      const module = pathModuleById(recommendation.moduleId);
+      if (module?.types?.length) return `<div class="adaptive-focus-types">${module.types.slice(0,3).map(type=>typeChip(type,"small")).join("")}</div>`;
+    }
+    if (recommendation.area?.type) return `<div class="adaptive-focus-types">${typeChip(recommendation.area.type,"small")}</div>`;
+    return "";
+  }
+
+  function activatePrimaryRecommendation(recommendation) {
+    if (!recommendation) return;
+    if (recommendation.action === "problem") { showErrorPatternDetail(recommendation.patternKey); return; }
+    if (recommendation.action === "path") { state.learnTab="path"; setRoute("learn"); requestAnimationFrame(()=>openLearningPathModule(recommendation.moduleId)); return; }
+    showSmartTrainingPreview();
+  }
+
+  function showPrimaryRecommendationReason(recommendation) {
+    if (!recommendation) return;
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="primaryReasonTitle"><section class="modal-card adaptive-reason-modal" tabindex="-1">
+      <header><span aria-hidden="true">${recommendation.icon}</span><div><p class="quiz-kicker">${t("cleanup.whyKicker")}</p><h2 id="primaryReasonTitle">${escapeHtml(recommendation.title)}</h2><p>${escapeHtml(recommendation.text)}</p></div></header>
+      <section><strong>${t("cleanup.whyTitle")}</strong><p>${t("cleanup.whyText")}</p></section>
+      <div class="modal-actions"><button id="closePrimaryReason" class="secondary-button">${t("common.close")}</button><button id="continuePrimaryReason" class="primary-button">${escapeHtml(recommendation.label)}</button></div>
+    </section></div>`, { initialFocus:"#continuePrimaryReason" });
+    document.getElementById("closePrimaryReason")?.addEventListener("click",()=>closeModal());
+    document.getElementById("continuePrimaryReason")?.addEventListener("click",()=>closeModal(()=>activatePrimaryRecommendation(recommendation)));
+  }
+
+  function compactDailyProgressMarkup(id = "dailyMixAction") {
+    const goal=dailyGoalInfo();
+    return `<section class="adaptive-daily-progress ${goal.completed?"complete":""}" style="--daily-progress:${goal.percent}%">
+      <div><span aria-hidden="true">${goal.completed?"✓":"🔥"}</span><div><small>${t("cleanup.dailyKicker")}</small><strong>${goal.completed?t("cleanup.dailyComplete"):t("cleanup.dailyTitle")}</strong><p>${goal.completed?tp("cleanup.dailyCompleteTextOne","cleanup.dailyCompleteText",goal.streak,{streak:goal.streak}):t("cleanup.dailyProgress",{progress:goal.progress,target:goal.target})}</p></div></div>
+      <i><b></b></i>
+      <button id="${id}" type="button">${t("cleanup.dailyMix")}<span aria-hidden="true">›</span></button>
+    </section>`;
+  }
+
+  function adaptiveHeroMarkup(recommendation, context = "home") {
+    const accent=recommendation.accentType&&TYPE_META[recommendation.accentType]?TYPE_META[recommendation.accentType].color:"var(--primary)";
+    return `<section class="adaptive-recommendation-hero ${context} ${recommendation.kind}" style="--adaptive-accent:${accent}">
+      <div class="adaptive-recommendation-glow" aria-hidden="true"></div>
+      <div class="adaptive-recommendation-top"><span class="adaptive-recommendation-icon" aria-hidden="true">${recommendation.icon}</span><span>${t("cleanup.adaptiveKicker")}</span><em>${t("cleanup.adaptiveBadge")}</em></div>
+      <div class="adaptive-recommendation-copy"><small>${t("cleanup.todayRecommendation")}</small><h2>${escapeHtml(recommendation.title)}</h2><p>${escapeHtml(recommendation.text)}</p>${primaryRecommendationFocusMarkup(recommendation)}</div>
+      <div class="adaptive-recommendation-footer"><span><b>${recommendation.questionCount}</b> ${t("cleanup.questions")}</span><span>${escapeHtml(recommendation.meta)}</span></div>
+      <div class="adaptive-recommendation-actions"><button class="primary-button" data-primary-recommendation>${escapeHtml(recommendation.label)} <span aria-hidden="true">›</span></button><button class="adaptive-why-button" data-primary-reason>${t("cleanup.whyButton")}</button></div>
+    </section>`;
+  }
+
+
+  function homeAdaptiveCardMarkup(recommendation) {
+    const accent=recommendation.accentType&&TYPE_META[recommendation.accentType]?TYPE_META[recommendation.accentType].color:"var(--primary)";
+    return `<section class="home-adaptive-card ${recommendation.kind}" style="--adaptive-accent:${accent}">
+      <div class="home-adaptive-card-head"><span aria-hidden="true">${recommendation.icon}</span><div><small>${t("cleanup.adaptiveKicker")}</small><strong>${t("cleanup.todayRecommendation")}</strong></div><em>${t("cleanup.adaptiveBadge")}</em></div>
+      <div class="home-adaptive-card-copy"><h2>${escapeHtml(recommendation.title)}</h2><p>${escapeHtml(recommendation.text)}</p>${primaryRecommendationFocusMarkup(recommendation)}</div>
+      <div class="home-adaptive-card-meta"><span><b>${recommendation.questionCount}</b> ${t("cleanup.questions")}</span><span>${escapeHtml(recommendation.meta)}</span></div>
+      <div class="home-adaptive-card-actions"><button class="primary-button" data-primary-recommendation>${escapeHtml(recommendation.label)} <span aria-hidden="true">›</span></button><button class="adaptive-why-button" data-primary-reason>${t("cleanup.whyButton")}</button></div>
+    </section>`;
+  }
+
+
+  function renderFutureArea(kind) {
+    const isPlay=kind==="play";
+    const icon=isPlay?iconSvg("play"):iconSvg("support");
+    const title=t(isPlay?"placeholder.playTitle":"placeholder.supportTitle");
+    const textValue=t(isPlay?"placeholder.playText":"placeholder.supportText");
+    const detail=t(isPlay?"placeholder.playDetail":"placeholder.supportDetail");
+    view.innerHTML=`<section class="future-area-page ${kind}" aria-labelledby="futureAreaTitle">
+      <section class="future-area-card">
+        <span class="future-area-icon" aria-hidden="true">${icon}</span>
+        <div class="future-area-copy"><p class="quiz-kicker">${t("placeholder.kicker")}</p><h1 id="futureAreaTitle">${escapeHtml(title)}</h1><p>${escapeHtml(textValue)}</p></div>
+        <section class="future-area-note"><strong>${t("placeholder.noteTitle")}</strong><p>${escapeHtml(detail)}</p></section>
+        <div class="future-area-actions"><button class="primary-button" data-future-destination="${isPlay?"train":"home"}">${t(isPlay?"placeholder.openTraining":"placeholder.backHome")}</button>${isPlay?`<button class="secondary-button" data-future-destination="home">${t("placeholder.backHome")}</button>`:""}</div>
+      </section>
+    </section>`;
+    document.querySelectorAll("[data-future-destination]").forEach(button=>button.addEventListener("click",()=>setRoute(button.dataset.futureDestination)));
   }
 
   function renderHome() {
     session = null;
     const level = getLevelInfo();
-    const weak = getWeakTypes(1);
-    const last = state.stats.history[0];
-    const accuracy = percent(state.stats.correct, state.stats.total);
-    const focus = weak[0];
     const homeBanner = selectedBanner();
+    const recommendationContext = buildRecommendationContext();
+    const recommendation = primaryLearningRecommendation(recommendationContext);
 
     view.innerHTML = `
-      <section class="game-home" aria-labelledby="gameHomeTitle">
+      <section class="game-home restored-home" aria-labelledby="gameHomeTitle">
         <section class="game-home-stage">
           <div class="home-banner-layer profile-banner profile-banner-${homeBanner.id}" aria-hidden="true"><i></i><i></i><i></i></div>
           <div class="game-home-decoration" aria-hidden="true"><span></span><span></span><span></span></div>
 
-          <div class="game-home-header">
+          <div class="game-home-header restored-home-header">
             <div class="game-home-intro">
               <p class="game-home-eyebrow">${t("home.gameEyebrow")}</p>
               <h1 id="gameHomeTitle">${t("home.gameTitle")}</h1>
               <p>${t("home.gameSubtitle")}</p>
             </div>
 
-            <button class="game-trainer-card" id="openTrainerProfile" type="button" aria-label="${escapeHtml(t("profile.openLabel"))}">
+            <button class="game-trainer-card compact" id="openTrainerProfile" type="button" aria-label="${escapeHtml(t("profile.openLabel"))}">
               <div class="game-profile-avatar-wrap">${profileAvatarMarkup(selectedAvatar().id, "game-profile-avatar")}<span>Lv. ${level.current.level}</span></div>
-              <div class="game-trainer-copy">
-                <small>${t("profile.homeLabel")}</small>
-                <strong>${escapeHtml(trainerName())}</strong>
-                <span>${escapeHtml(cosmeticName(selectedTitle()))} · ${state.stats.xp} XP</span>
-                <div class="game-level-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></div>
-              </div>
-              <div class="game-streak-pill" title="${t("home.gameStreak")}">🔥 ${state.stats.streak}</div>
+              <div class="game-trainer-copy"><small>${t("profile.homeLabel")}</small><strong>${escapeHtml(trainerName())}</strong><span>${escapeHtml(cosmeticName(selectedTitle()))}</span><div class="game-level-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></div></div>
               <span class="game-trainer-arrow" aria-hidden="true">›</span>
             </button>
           </div>
 
-          <div class="game-home-layout">
-            <section class="game-menu-panel" aria-labelledby="gameMenuTitle">
+          <div class="game-home-layout restored-home-layout">
+            <section class="game-menu-panel expanded-main-menu-panel" aria-labelledby="gameMenuTitle">
               <div class="game-panel-heading">
-                <span>${t("home.gameMenuTitle")}</span>
+                <span id="gameMenuTitle">${t("home.gameMenuTitle")}</span>
                 <small>${t("home.gameMenuHint")}</small>
               </div>
-              <div class="game-menu-list">
-                ${gameMenuButton("train", iconSvg("train"), "01", t("home.gameTrain"), t("home.gameTrainDesc"), true)}
-                ${gameMenuButton("learn", iconSvg("learn"), "02", t("home.gameLearn"), t("home.gameLearnDesc"))}
-                ${gameMenuButton("stats", iconSvg("stats"), "03", t("home.gameProgress"), t("home.gameProgressDesc"))}
-                ${gameMenuButton("settings", iconSvg("settings"), "04", t("home.gameSettings"), t("home.gameSettingsDesc"))}
+              <div class="game-menu-list expanded-main-menu">
+                ${gameMenuButton("play", iconSvg("play"), "01", t("home.gamePlay"), t("home.gamePlayDesc"))}
+                ${gameMenuButton("train", iconSvg("train"), "02", t("home.gameTrain"), t("home.gameTrainDesc"))}
+                ${gameMenuButton("learn", iconSvg("learn"), "03", t("home.gameLearn"), t("home.gameLearnDesc"))}
+                ${gameMenuButton("knowledge", iconSvg("knowledge"), "04", t("home.gameKnowledge"), t("home.gameKnowledgeDesc"))}
+                ${gameMenuButton("stats", iconSvg("stats"), "05", t("home.gameProgress"), t("home.gameProgressDesc"))}
+                ${gameMenuButton("settings", iconSvg("settings"), "06", t("home.gameSettings"), t("home.gameSettingsDesc"))}
+                ${gameMenuButton("support", iconSvg("support"), "07", t("home.gameSupport"), t("home.gameSupportDesc"))}
               </div>
             </section>
 
-            <aside class="game-command-panel" aria-labelledby="gameTodayTitle">
+            <aside class="game-command-panel modern-home-command" aria-labelledby="gameTodayTitle">
               <div class="game-panel-heading">
                 <span id="gameTodayTitle">${t("home.gameToday")}</span>
                 <small>${t("home.gameTodayHint")}</small>
               </div>
-
-              <div class="game-quick-list">
-                <button class="game-quick-action recommended" id="dailyTraining">
-                  <span class="game-quick-icon">${iconSvg("daily")}</span>
-                  <span><strong>${state.daily.completed ? t("home.dailyDone") : t("home.daily")}</strong><small>${t("home.dailyDesc")}</small></span>
-                  <span class="game-quick-state">${state.daily.completed ? "✓" : "›"}</span>
-                </button>
-                <button class="game-quick-action" id="weakTraining">
-                  <span class="game-quick-icon">${iconSvg("weak")}</span>
-                  <span><strong>${t("home.weak")}</strong><small>${t("home.weakDesc")}</small></span>
-                  <span class="game-quick-state">›</span>
-                </button>
-                ${state.lastMode && state.lastConfig
-                  ? `<button class="game-quick-action" id="repeatLastTraining"><span class="game-quick-icon">${iconSvg("repeat")}</span><span><strong>${t("home.continue")}</strong><small>${t("home.continueDesc",{mode:modeName(state.lastMode)})}</small></span><span class="game-quick-state">›</span></button>`
-                  : `<button class="game-quick-action" id="openTrainingHub"><span class="game-quick-icon">${iconSvg("train")}</span><span><strong>${t("home.gameTrain")}</strong><small>${t("home.gameTrainDesc")}</small></span><span class="game-quick-state">›</span></button>`}
-              </div>
-
-              <div class="game-status-grid">
-                <div><small>${t("home.gameAccuracy")}</small><strong>${accuracy}%</strong></div>
-                <div><small>${t("home.gameSessions")}</small><strong>${state.stats.sessions}</strong></div>
-                <div><small>${t("home.gameStreak")}</small><strong>${state.stats.streak}</strong></div>
-              </div>
-
-              <div class="game-focus-grid">
-                <div class="game-focus-card">
-                  <small>${t("home.gameWeakSpot")}</small>
-                  ${focus ? `<strong>${typeChip(focus.type,"small")}<span>${focus.rate}%</span></strong>` : `<strong class="game-empty-focus">${t("home.gameNoFocus")}</strong>`}
-                </div>
-                <div class="game-focus-card">
-                  <small>${t("home.gameLastSession")}</small>
-                  ${last ? `<strong><span>${escapeHtml(modeName(last.mode))}</span><span>${last.rate}%</span></strong>` : `<strong class="game-empty-focus">${t("home.noSession")}</strong>`}
-                </div>
-              </div>
+              ${homeAdaptiveCardMarkup(recommendation)}
+              ${dailyGoalCardMarkup("homeDailyGoal")}
             </aside>
           </div>
         </section>
-
         ${deferredInstallPrompt ? `<button class="game-install-card" id="installApp"><span>＋</span><strong>${t("home.install")}</strong><small>${t("home.installDesc")}</small><i>›</i></button>` : ""}
-      </section>
-    `;
+      </section>`;
 
-    document.querySelectorAll("[data-destination]").forEach(button => button.addEventListener("click", () => setRoute(button.dataset.destination)));
-    document.getElementById("openTrainerProfile").addEventListener("click", () => setRoute("profile"));
-    document.getElementById("dailyTraining").addEventListener("click", startDailySession);
-    document.getElementById("weakTraining").addEventListener("click", startWeakSession);
-    document.getElementById("openTrainingHub")?.addEventListener("click", () => setRoute("train"));
-    document.getElementById("repeatLastTraining")?.addEventListener("click", () => {
-      if (!state.lastMode || !state.lastConfig) return;
-      state.config[state.lastMode] = { ...state.config[state.lastMode], ...clone(state.lastConfig) };
-      startSession(state.lastMode);
-    });
-    document.getElementById("installApp")?.addEventListener("click", installApp);
+    document.querySelectorAll("[data-destination]").forEach(button=>button.addEventListener("click",()=>{
+      const destination=button.dataset.destination;
+      if(destination==="knowledge"){
+        knowledgeView="home";knowledgePokemonId=null;knowledgeContentKind=null;knowledgeContentId=null;learnType=null;knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;
+      }
+      setRoute(destination);
+    }));
+    document.querySelector("[data-primary-recommendation]")?.addEventListener("click",()=>activatePrimaryRecommendation(recommendation));
+    document.querySelector("[data-primary-reason]")?.addEventListener("click",()=>showPrimaryRecommendationReason(recommendation));
+    document.getElementById("homeDailyGoal")?.addEventListener("click",startDailyGoalTraining);
+    document.getElementById("openTrainerProfile")?.addEventListener("click",()=>setRoute("profile"));
+    document.getElementById("installApp")?.addEventListener("click",installApp);
   }
 
   function renderProfile() {
@@ -997,6 +2041,7 @@
     const title = selectedTitle();
     const favoritePokemon = favoritePokemonEntry();
     const favoriteType = TYPES.includes(state.profile.favoriteType) ? state.profile.favoriteType : null;
+    const nextReward = nextLevelRewardInfo(level.current.level);
 
     view.innerHTML = `
       <section class="trainer-profile-page" aria-labelledby="trainerProfileTitle">
@@ -1025,10 +2070,41 @@
           </div>
         </section>
 
+        <section class="profile-dashboard-grid profile-priority-grid">
+          <article class="profile-panel profile-level-panel">
+            <div class="profile-panel-heading">
+              <span>↗</span>
+              <div><small>${t("profile.journey")}</small><h2>${t("profile.levelProgress")}</h2></div>
+            </div>
+            <div class="profile-level-summary">
+              <div><strong>Lv. ${level.current.level}</strong><span>${escapeHtml(t(level.current.key))}</span></div>
+              <b>${level.progress}%</b>
+            </div>
+            <div class="profile-progress-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></div>
+            <p>${level.next ? t("profile.nextLevel", { count: remainingXp, level: level.next.level }) : t("profile.maxLevelText")}</p>
+            ${nextReward ? `<div class="profile-next-reward">${rewardVisualMarkup(nextReward.items[0], "large")}<span><small>${t("rewards.nextTitle")} · ${t("rewards.levelLabel", { level: nextReward.level })}</small><strong>${escapeHtml(rewardHeadline(nextReward))}</strong><em>${t("rewards.xpToReward", { count: nextReward.xpRemaining })}</em></span></div>` : `<div class="profile-next-reward max"><span class="reward-visual reward-max large" aria-hidden="true">✓</span><span><small>${t("rewards.maxTitle")}</small><strong>${t("rewards.maxText")}</strong></span></div>`}
+          </article>
+
+          <article class="profile-panel profile-record-panel">
+            <div class="profile-panel-heading">
+              <span>✦</span>
+              <div><small>${t("profile.personalBest")}</small><h2>${t("profile.records")}</h2></div>
+            </div>
+            <div class="profile-record-list">
+              <span><small>${t("profile.bestStreak")}</small><strong>${state.stats.bestStreak}</strong></span>
+              <span><small>${t("profile.learningTime")}</small><strong>${formatDuration(state.stats.totalSeconds)}</strong></span>
+              <span><small>${t("profile.answered")}</small><strong>${state.stats.total}</strong></span>
+              <span><small>${t("profile.exploredTypes")}</small><strong>${explored}/18</strong></span>
+            </div>
+          </article>
+        </section>
+
+        ${collectionProgressMarkup("openProfileCollection","full")}
+
         <section class="profile-collection-strip" aria-label="${escapeHtml(t("profile.collection"))}">
           <div><span>${profileAvatarMarkup(avatar.id, "collection-mini-avatar")}</span><p><small>${t("profile.avatar")}</small><strong>${escapeHtml(cosmeticName(avatar))}</strong></p></div>
           <div><span class="profile-banner-swatch profile-banner profile-banner-${banner.id}"><i></i></span><p><small>${t("profile.banner")}</small><strong>${escapeHtml(cosmeticName(banner))}</strong></p></div>
-          <div><span class="profile-title-symbol">T</span><p><small>${t("profile.trainerTitle")}</small><strong>${escapeHtml(cosmeticName(title))}</strong></p></div>
+          <div class="profile-collection-title"><p><small>${t("profile.trainerTitle")}</small><strong>${escapeHtml(cosmeticName(title))}</strong></p></div>
           <button id="customizeTrainerProfileSecondary" class="secondary-button">${t("profile.changeLook")}</button>
         </section>
 
@@ -1056,34 +2132,6 @@
           ${profileKpi("◇", t("profile.types"), `${mastered}/18`, t("profile.typesHint", { explored }))}
         </section>
 
-        <section class="profile-dashboard-grid">
-          <article class="profile-panel profile-level-panel">
-            <div class="profile-panel-heading">
-              <span>↗</span>
-              <div><small>${t("profile.journey")}</small><h2>${t("profile.levelProgress")}</h2></div>
-            </div>
-            <div class="profile-level-summary">
-              <div><strong>Lv. ${level.current.level}</strong><span>${escapeHtml(t(level.current.key))}</span></div>
-              <b>${level.progress}%</b>
-            </div>
-            <div class="profile-progress-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></div>
-            <p>${level.next ? t("profile.nextLevel", { count: remainingXp, level: level.next.level }) : t("profile.maxLevelText")}</p>
-          </article>
-
-          <article class="profile-panel profile-record-panel">
-            <div class="profile-panel-heading">
-              <span>✦</span>
-              <div><small>${t("profile.personalBest")}</small><h2>${t("profile.records")}</h2></div>
-            </div>
-            <div class="profile-record-list">
-              <span><small>${t("profile.bestStreak")}</small><strong>${state.stats.bestStreak}</strong></span>
-              <span><small>${t("profile.learningTime")}</small><strong>${formatDuration(state.stats.totalSeconds)}</strong></span>
-              <span><small>${t("profile.answered")}</small><strong>${state.stats.total}</strong></span>
-              <span><small>${t("profile.exploredTypes")}</small><strong>${explored}/18</strong></span>
-            </div>
-          </article>
-        </section>
-
         <section class="profile-activity-card">
           <div class="profile-activity-copy">
             <p class="quiz-kicker">${t("profile.latestActivity")}</p>
@@ -1098,6 +2146,7 @@
 
     document.getElementById("editTrainerName").addEventListener("click", showProfileNameModal);
     document.getElementById("customizeTrainerProfile").addEventListener("click", openProfileCustomizer);
+    document.getElementById("openProfileCollection")?.addEventListener("click", openProfileCustomizer);
     document.getElementById("customizeTrainerProfileSecondary").addEventListener("click", openProfileCustomizer);
     document.getElementById("editProfileFavorites").addEventListener("click", openProfileFavorites);
     document.getElementById("profileStartTraining").addEventListener("click", () => setRoute("train"));
@@ -1180,6 +2229,7 @@
       setButtonBusy(saveButton, true, t("common.saving"));
       state.profile.favoritePokemonId = favoritePokemonEntry(profileFavoritesDraft.favoritePokemonId)?.id || null;
       state.profile.favoriteType = TYPES.includes(profileFavoritesDraft.favoriteType) ? profileFavoritesDraft.favoriteType : null;
+      syncProfileFavoritesIntoCollection();
       saveState();
       profileFavoritesDraft = null;
       closeModal(() => { renderProfile(); enqueueToast("♥", t("profile.favoritesSaved"), t("profile.favoritesSavedHint"), "success"); });
@@ -1193,7 +2243,7 @@
       ? profileAvatarMarkup(item.id, "profile-choice-avatar")
       : kind === "banner"
         ? `<span class="profile-choice-banner profile-banner profile-banner-${item.id}"><i></i></span>`
-        : `<span class="profile-choice-title-symbol">${escapeHtml(cosmeticName(item).slice(0,2).toUpperCase())}</span>`;
+        : "";
     const placeholder = item.placeholder ? `<em class="profile-placeholder-label">${t("profile.placeholder")}</em>` : "";
     const description = kind === "banner" && cosmeticDescription(item) ? `<span class="profile-choice-description">${escapeHtml(cosmeticDescription(item))}</span>` : "";
     return `<button type="button" class="profile-choice-card ${selected ? "selected" : ""} ${status.unlocked ? "" : "locked"}" data-profile-${kind}="${item.id}" aria-pressed="${selected}" aria-disabled="${!status.unlocked}" ${status.unlocked ? "" : "disabled"}>
@@ -1402,6 +2452,18 @@
     const attrs = `${svgClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`;
     const icons = {
       home: `<svg ${attrs}><path d="M3.5 10.5 12 4l8.5 6.5"></path><path d="M5.5 9.5V20h13V9.5"></path></svg>`,
+      play: `<svg ${attrs}><path d="m9 7 8 5-8 5z"></path><circle cx="12" cy="12" r="9"></circle></svg>`,
+      knowledge: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+      search: `<svg ${attrs}><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4 4"></path></svg>`,
+      favorite: `<svg ${attrs}><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>`,
+      list: `<svg ${attrs}><path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle></svg>`,
+      region: `<svg ${attrs}><path d="M4 6.5 9 4l6 2.5L20 4v13.5L15 20l-6-2.5L4 20z"></path><path d="M9 4v13.5"></path><path d="M15 6.5V20"></path></svg>`,
+      trainer: `<svg ${attrs}><circle cx="12" cy="8" r="4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg>`,
+      battle: `<svg ${attrs}><path d="m5 4 14 14"></path><path d="m19 4-5 5"></path><path d="m5 18 5-5"></path><path d="M4 4h4"></path><path d="M16 18h4"></path></svg>`,
+      item: `<svg ${attrs}><path d="m12 3 9 9-9 9-9-9z"></path><circle cx="12" cy="12" r="2"></circle></svg>`,
+      evolution: `<svg ${attrs}><path d="M5 17 17 5"></path><path d="M10 5h7v7"></path><path d="M5 8v9h9"></path></svg>`,
+      cards: `<svg ${attrs}><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8"></path><path d="M8 11h5"></path></svg>`,
+      support: `<svg ${attrs}><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>`,
       train: `<svg ${attrs}><path d="M6 4v4"></path><path d="M18 16v4"></path><path d="M4 6h4"></path><path d="M16 18h4"></path><path d="m8 8 8 8"></path><path d="m16 8-2-2"></path><path d="m8 16 2 2"></path></svg>`,
       learn: `<svg ${attrs}><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v17H7.5A2.5 2.5 0 0 0 5 22z"></path><path d="M5 5.5v14"></path><path d="M9 7h6"></path><path d="M9 11h6"></path></svg>`,
       stats: `<svg ${attrs}><path d="M4 20h16"></path><path d="M7 16v-4"></path><path d="M12 16V8"></path><path d="M17 16v-7"></path></svg>`,
@@ -1434,7 +2496,9 @@
       pokemon: { icon: iconSvg("pokemon"), number: "04" },
       daily: { icon: iconSvg("daily"), number: "" },
       weak: { icon: iconSvg("weak"), number: "" },
-      review: { icon: iconSvg("review"), number: "" }
+      review: { icon: iconSvg("review"), number: "" },
+      problem: { icon: iconSvg("weak"), number: "" },
+      path: { icon: iconSvg("learn"), number: "" }
     };
     return visuals[mode] || { icon: "Q", number: "" };
   }
@@ -1444,7 +2508,7 @@
   }
 
   function configSummary(mode, config = state.config[mode] || {}) {
-    const length = config.length === "infinite" ? t("setup.endless") : t("train.questionCount", { count: config.length || 10 });
+    const length = config.length === "infinite" ? t("setup.endless") : tp("train.questionCountOne", "train.questionCount", config.length || 10);
     const parts = [length, difficultyLabel(config.difficulty)];
     if (mode === "effectiveness") parts.push(t(`setup.${config.kind || "mixed"}`));
     if (["multiplier", "impact"].includes(mode)) parts.push(t(`setup.${config.defense || "mixed"}`));
@@ -1454,76 +2518,43 @@
 
   function renderTrain() {
     session = null;
-    const openMistakes = state.stats.mistakes.filter(item => item?.status !== "resolved" && item?.spec).map(item => clone(item.spec));
-    const accuracy = percent(state.stats.correct, state.stats.total);
-    const last = state.stats.history[0];
-    const quickActions = [
-      `<button class="training-focus-card primary" id="dailyTraining"><span class="training-focus-icon">${iconSvg("daily")}</span><span class="training-focus-copy"><small>${t("train.recommended")}</small><strong>${state.daily.completed ? t("home.dailyDone") : t("home.daily")}</strong><p>${t("home.dailyDesc")}</p></span><span class="training-focus-arrow">›</span></button>`,
-      `<button class="training-focus-card" id="weakTraining"><span class="training-focus-icon">${iconSvg("weak")}</span><span class="training-focus-copy"><small>${t("train.personal")}</small><strong>${t("home.weak")}</strong><p>${t("home.weakDesc")}</p></span><span class="training-focus-arrow">›</span></button>`,
-      state.lastMode && state.lastConfig
-        ? `<button class="training-focus-card" id="repeatLastTraining"><span class="training-focus-icon">${iconSvg("repeat")}</span><span class="training-focus-copy"><small>${t("train.continueLabel")}</small><strong>${t("home.continue")}</strong><p>${t("home.continueDesc",{mode:modeName(state.lastMode)})}</p></span><span class="training-focus-arrow">›</span></button>`
-        : `<button class="training-focus-card" data-mode-shortcut="effectiveness"><span class="training-focus-icon">${iconSvg("effectiveness")}</span><span class="training-focus-copy"><small>${t("train.free")}</small><strong>${escapeHtml(modeName("effectiveness"))}</strong><p>${t("mode.effectivenessDesc")}</p></span><span class="training-focus-arrow">›</span></button>`,
-      openMistakes.length
-        ? `<button class="training-focus-card warning" id="reviewOpenMistakes"><span class="training-focus-icon">${iconSvg("review")}</span><span class="training-focus-copy"><small>${t("train.reviewLabel")}</small><strong>${t("train.review")}</strong><p>${t("train.reviewDesc")}</p></span><span class="training-focus-count">${openMistakes.length}</span></button>`
-        : ""
-    ].filter(Boolean).join("");
+    const recommendationContext=buildRecommendationContext();
+    const recommendation=primaryLearningRecommendation(recommendationContext);
+    const openMistakes=recommendationContext.openMistakeSpecs;
+    const next=recommendationContext.nextPath;
+    const pattern=recommendationContext.availablePattern;
+    const customLists=trainingLists();
+    const targeted=[];
+    if(recommendation.action!=="problem"&&pattern) targeted.push(`<button class="training-focus-card warning" data-training-pattern="${escapeHtml(pattern.key)}"><span class="training-focus-icon">${errorPatternIcon(pattern)}</span><span class="training-focus-copy"><small>${t("cleanup.target.problem")}</small><strong>${escapeHtml(errorPatternTitle(pattern))}</strong><p>${escapeHtml(errorPatternText(pattern))}</p></span><span class="training-focus-arrow">›</span></button>`);
+    if(recommendation.action!=="path"&&next) targeted.push(`<button class="training-focus-card" data-training-path="${next.id}"><span class="training-focus-icon">${next.icon}</span><span class="training-focus-copy"><small>${t("cleanup.target.path")}</small><strong>${escapeHtml(t(next.titleKey))}</strong><p>${escapeHtml(t(next.subtitleKey))}</p></span><span class="training-focus-arrow">›</span></button>`);
+    if(openMistakes.length) targeted.push(`<button class="training-focus-card" id="reviewOpenMistakes"><span class="training-focus-icon">${iconSvg("review")}</span><span class="training-focus-copy"><small>${t("cleanup.target.mistakes")}</small><strong>${t("train.review")}</strong><p>${t("train.reviewDesc")}</p></span><span class="training-focus-count">${openMistakes.length}</span></button>`);
+    if(state.lastMode&&state.lastConfig&&targeted.length<3) targeted.push(`<button class="training-focus-card" id="repeatLastTraining"><span class="training-focus-icon">${iconSvg("repeat")}</span><span class="training-focus-copy"><small>${t("train.continueLabel")}</small><strong>${t("home.continue")}</strong><p>${t("home.continueDesc",{mode:modeName(state.lastMode)})}</p></span><span class="training-focus-arrow">›</span></button>`);
 
-    view.innerHTML = `
-      <section class="training-hub">
-        <section class="training-command-hero">
-          <div class="training-command-copy">
-            <p class="quiz-kicker">${t("train.kicker")}</p>
-            <h1>${t("train.title")}</h1>
-            <p>${t("train.subtitle")}</p>
-          </div>
-          <div class="training-command-stats" aria-label="${t("train.status")}">
-            <div><small>${t("train.accuracy")}</small><strong>${accuracy}%</strong></div>
-            <div><small>${t("train.streak")}</small><strong>${state.stats.streak}</strong></div>
-            <div><small>${t("train.sessions")}</small><strong>${state.stats.sessions}</strong></div>
-            <div><small>${t("train.openErrors")}</small><strong>${openMistakes.length}</strong></div>
-          </div>
-        </section>
+    view.innerHTML=`<section class="training-hub adaptive-training-hub">
+      <section class="training-command-hero simplified"><div class="training-command-copy"><p class="quiz-kicker">${t("cleanup.trainEyebrow")}</p><h1>${t("cleanup.trainTitle")}</h1><p>${t("cleanup.trainSubtitle")}</p></div><span class="training-adaptive-seal">◎ ${t("cleanup.adaptiveBadge")}</span></section>
+      ${adaptiveHeroMarkup(recommendation,"training")}
+      ${compactDailyProgressMarkup("trainingDailyMix")}
+      ${targeted.length?`<section class="training-section" aria-labelledby="targetedTrainingTitle"><div class="training-section-heading"><div><small>${t("cleanup.targetedKicker")}</small><h2 id="targetedTrainingTitle">${t("cleanup.targetedTitle")}</h2></div><p>${t("cleanup.targetedHint")}</p></div><div class="training-focus-grid targeted">${targeted.slice(0,3).join("")}</div></section>`:""}
+      ${customLists.length?`<section class="training-section" aria-labelledby="customTrainingListsTitle"><div class="training-section-heading"><div><small>${t("trainingLists.kicker")}</small><h2 id="customTrainingListsTitle">${t("trainingLists.title")}</h2></div><button type="button" class="ghost-button training-list-manage-link" data-manage-training-lists>${t("trainingLists.manage")}</button></div><div class="training-list-quick-grid">${customLists.slice(0,3).map(list=>`<button type="button" class="training-list-quick-card" data-start-training-list="${escapeHtml(list.id)}"><span aria-hidden="true">${list.kind==="pokemon"?"◉":"◆"}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t(`trainingLists.kind.${list.kind}`)} · ${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><i aria-hidden="true">›</i></button>`).join("")}</div></section>`:""}
+      <section class="training-section" aria-labelledby="trainingModesTitle"><div class="training-section-heading"><div><small>${t("cleanup.freeKicker")}</small><h2 id="trainingModesTitle">${t("train.free")}</h2></div><p>${t("cleanup.freeHint")}</p></div><div class="training-mode-grid simplified">${trainingModeCard("effectiveness",t("mode.effectivenessDesc"))}${trainingModeCard("multiplier",t("mode.multiplierDesc"))}${trainingModeCard("impact",t("mode.impactDesc"))}${trainingModeCard("pokemon",t("mode.pokemonDesc"))}</div></section>
+    </section>`;
 
-        <section class="training-section" aria-labelledby="trainingQuickTitle">
-          <div class="training-section-heading"><div><small>${t("train.quickKicker")}</small><h2 id="trainingQuickTitle">${t("train.forYou")}</h2></div><p>${last ? t("train.lastResult", { mode: modeName(last.mode), rate: last.rate }) : t("train.forYouHint")}</p></div>
-          <div class="training-focus-grid">${quickActions}</div>
-        </section>
-
-        <section class="training-section" aria-labelledby="trainingModesTitle">
-          <div class="training-section-heading"><div><small>${t("train.modeKicker")}</small><h2 id="trainingModesTitle">${t("train.free")}</h2></div><p>${t("train.freeHint")}</p></div>
-          <div class="training-mode-grid">
-            ${trainingModeCard("effectiveness", t("mode.effectivenessDesc"))}
-            ${trainingModeCard("multiplier", t("mode.multiplierDesc"))}
-            ${trainingModeCard("impact", t("mode.impactDesc"))}
-            ${trainingModeCard("pokemon", t("mode.pokemonDesc"))}
-          </div>
-        </section>
-      </section>
-    `;
-
-    document.querySelectorAll("[data-mode], [data-mode-shortcut]").forEach(button => button.addEventListener("click", () => setRoute(`setup-${button.dataset.mode || button.dataset.modeShortcut}`)));
-    document.getElementById("dailyTraining").addEventListener("click", startDailySession);
-    document.getElementById("weakTraining").addEventListener("click", startWeakSession);
-    document.getElementById("repeatLastTraining")?.addEventListener("click", () => {
-      if (!state.lastMode || !state.lastConfig) return;
-      state.config[state.lastMode] = { ...state.config[state.lastMode], ...clone(state.lastConfig) };
-      startSession(state.lastMode);
-    });
-    document.getElementById("reviewOpenMistakes")?.addEventListener("click", () => startReviewSession(openMistakes));
+    document.querySelector("[data-primary-recommendation]")?.addEventListener("click",()=>activatePrimaryRecommendation(recommendation));
+    document.querySelector("[data-primary-reason]")?.addEventListener("click",()=>showPrimaryRecommendationReason(recommendation));
+    document.getElementById("trainingDailyMix")?.addEventListener("click",startDailySession);
+    document.querySelectorAll("[data-training-pattern]").forEach(button=>button.addEventListener("click",()=>showErrorPatternDetail(button.dataset.trainingPattern)));
+    document.querySelectorAll("[data-training-path]").forEach(button=>button.addEventListener("click",()=>{state.learnTab="path";setRoute("learn");requestAnimationFrame(()=>openLearningPathModule(button.dataset.trainingPath));}));
+    document.getElementById("reviewOpenMistakes")?.addEventListener("click",()=>startReviewSession(openMistakes));
+    document.getElementById("repeatLastTraining")?.addEventListener("click",()=>{if(!state.lastMode||!state.lastConfig)return;if(state.lastConfig.trainingListId){startTrainingListSession(state.lastConfig.trainingListId,state.lastMode,state.lastConfig);return;}state.config[state.lastMode]={...state.config[state.lastMode],...clone(state.lastConfig)};startSession(state.lastMode);});
+    document.querySelectorAll("[data-start-training-list]").forEach(button=>button.addEventListener("click",()=>openTrainingListLaunch(button.dataset.startTrainingList)));
+    document.querySelector("[data-manage-training-lists]")?.addEventListener("click",()=>{knowledgeView="training-lists";setRoute("knowledge");});
+    document.querySelectorAll("[data-mode]").forEach(button=>button.addEventListener("click",()=>setRoute(`setup-${button.dataset.mode}`)));
   }
 
   function trainingModeCard(mode, description) {
-    const visual = modeVisual(mode);
-    const modeStats = state.stats.modes[mode] || blankModeStats();
-    const accuracy = percent(modeStats.correct, modeStats.total);
-    return `<button class="training-mode-card" data-mode="${mode}">
-      <span class="training-mode-number">${visual.number}</span>
-      <span class="training-mode-icon">${visual.icon}</span>
-      <span class="training-mode-copy"><strong>${escapeHtml(modeName(mode))}</strong><p>${escapeHtml(description)}</p><small>${escapeHtml(configSummary(mode))}</small></span>
-      <span class="training-mode-progress"><i style="width:${modeStats.total ? accuracy : 0}%"></i></span>
-      <span class="training-mode-meta">${modeStats.total ? `${accuracy}%` : t("train.notStarted")}</span>
-      <span class="training-mode-arrow">›</span>
-    </button>`;
+    const visual=modeVisual(mode);
+    const modeStats=state.stats.modes[mode]||blankModeStats();
+    return `<button class="training-mode-card simplified" data-mode="${mode}"><span class="training-mode-icon">${visual.icon}</span><span class="training-mode-copy"><strong>${escapeHtml(modeName(mode))}</strong><p>${escapeHtml(description)}</p><small>${modeStats.total?t("cleanup.freePlayed"):t("cleanup.freeConfigure")}</small></span><span class="training-mode-arrow">›</span></button>`;
   }
 
   function renderSetup(mode) {
@@ -1590,10 +2621,17 @@
   function newSession(mode, config = {}, sequence = null) {
     const lengthValue = config.length === "infinite" ? Infinity : Number(config.length || sequence?.length || 10);
     return {
+      id: typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `session-${Date.now()}-${Math.random().toString(36).slice(2,10)}`,
       mode, config: clone(config), length: sequence ? sequence.length : lengthValue, sequence: sequence ? clone(sequence) : null,
+      trainingList: config.trainingListId ? { id:String(config.trainingListId), name:String(config.trainingListName||""), kind:String(config.trainingListKind||"") } : null,
       index: 0, correct: 0, answers: [], wrongQuestions: [], wrongTypes: {}, startedAt: Date.now(), startXp: state.stats.xp,
       answered: false, ended: false, currentSpec: null, usedSignatures: [], usedPokemonIds: [],
       xpEarned: 0, levelUps: [], newUnlocks: [], rewardCelebrated: false,
+      combo: 0, bestCombo: 0, lastReward: null, previousComparable: null, questionStartedAt: null,
+      smartPlan: null, learningBefore: null, learningProgress: null, problemPlan: null, problemBefore: null, problemProgress: null,
+      pathModuleId: null, pathModuleBefore: null, pathProgress: null, pathReview: null, pathExamId: null,
+      adaptiveFlow: mode === "weak" ? { offset:0, lastChecked:0, adjustments:[], initialDifficultyCounts:{ easy:0, medium:0, hard:0 } } : null,
+      lastAdaptiveUpdate: null,
       reviewPending: mode === "review" && sequence ? unique(sequence.map(questionSignature)) : []
     };
   }
@@ -1622,29 +2660,7 @@
   }
 
   function startWeakSession() {
-    const weak = getWeakTypes(5);
-    if (!weak.length) {
-      enqueueToast("ℹ", t("home.weak"), t("home.noWeak"));
-      setRoute("setup-effectiveness");
-      return;
-    }
-    const sequence = [];
-    for (let i = 0; i < 10; i += 1) {
-      const focusType = weak[i % weak.length].type;
-      const kind = i % 4;
-      if (kind === 0) sequence.push(generateEffectivenessSpec({ focusType, difficulty:"hard", kind:"mixed" }));
-      else if (kind === 1) sequence.push(generateMultiplierSpec({ focusType, difficulty:"medium", defense:"mixed" }));
-      else if (kind === 2) sequence.push(generateImpactSpec({ focusType, difficulty:"hard", defense:"mixed" }));
-      else {
-        const candidates = FALLBACK_POKEMON.filter(p => p.types.includes(focusType));
-        if (candidates.length) {
-          const p = clone(randomItem(candidates));
-          sequence.push({ kind:"pokemon", pokemon:formatFallbackPokemon(p), display:"both", focusTypes:[...p.types] });
-        } else sequence.push(generateEffectivenessSpec({ focusType, difficulty:"hard", kind:"mixed" }));
-      }
-    }
-    session = newSession("weak", { length:10 }, shuffle(sequence));
-    prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); renderQuestion();
+    showSmartTrainingPreview();
   }
 
   function startReviewSession(specs) {
@@ -1653,13 +2669,79 @@
     prepareRouteMotion(state.route, "session", "forward"); state.route = "session"; saveState(); updateNavigation(); renderQuestion();
   }
 
+  function buildTrainingListSequence(list,mode,config={}) {
+    const length=Math.max(1,Number(config.length)||10);
+    if(list.kind==="pokemon"){
+      const valid=list.entries.map(id=>knowledgePokemonById(id)).filter(Boolean);
+      const sequence=[];
+      while(sequence.length<length&&valid.length){
+        const cycle=shuffle(valid,Math.random);
+        cycle.forEach(item=>{
+          if(sequence.length>=length)return;
+          sequence.push({kind:"pokemon",pokemon:{id:item.id,name:knowledgePokemonName(item),types:[...item.types],image:knowledgeArtwork(item)},display:config.display||state.config.pokemon.display||"both",focusTypes:[...item.types],_trainingListId:list.id});
+        });
+      }
+      return sequence;
+    }
+    const options={...config,allowedTypes:[...list.entries]};
+    return Array.from({length},()=>{
+      if(mode==="effectiveness")return {...generateEffectivenessSpec(options),_trainingListId:list.id};
+      if(mode==="multiplier")return {...generateMultiplierSpec(options),_trainingListId:list.id};
+      return {...generateImpactSpec(options),_trainingListId:list.id};
+    });
+  }
+
+  function startTrainingListSession(listId,mode,config={}) {
+    const list=trainingListById(listId);
+    if(!list||!QuizmonTrainingLists.canStart(list)){
+      showMessageDialog({title:t("trainingLists.tooSmallTitle"),message:t("trainingLists.tooSmallText"),buttonLabel:t("common.understood"),kind:"warning",icon:"!"});
+      return;
+    }
+    const compatible=QuizmonTrainingLists.compatibleModes(list.kind);
+    const selectedMode=compatible.includes(mode)?mode:compatible[0];
+    const sessionConfig={...clone(state.config[selectedMode]||{}),...config,length:Number(config.length)||10,trainingListId:list.id,trainingListName:list.name,trainingListKind:list.kind};
+    const sequence=buildTrainingListSequence(list,selectedMode,sessionConfig);
+    if(!sequence.length)return;
+    state.lastMode=selectedMode;
+    state.lastConfig=clone(sessionConfig);
+    session=newSession(selectedMode,sessionConfig,sequence);
+    session.trainingList={id:list.id,name:list.name,kind:list.kind};
+    prepareRouteMotion(state.route,"session","forward");state.route="session";saveState();updateNavigation();renderQuestion();
+  }
+
+  function renderTrainingListLaunchOptions() {
+    const root=document.querySelector("[data-training-list-launch-options]");
+    const list=trainingListLaunchDraft?trainingListById(trainingListLaunchDraft.listId):null;
+    if(!root||!list)return;
+    const modes=QuizmonTrainingLists.compatibleModes(list.kind);
+    root.innerHTML=`<section><small>${t("trainingLists.modeLabel")}</small><div class="training-list-launch-modes">${modes.map(mode=>`<button type="button" data-list-launch-mode="${mode}" class="${trainingListLaunchDraft.mode===mode?"active":""}" aria-pressed="${trainingListLaunchDraft.mode===mode}"><span>${modeVisual(mode).icon}</span><strong>${escapeHtml(modeName(mode))}</strong></button>`).join("")}</div></section><section><small>${t("trainingLists.lengthLabel")}</small><div class="tabs segmented-control" role="group" aria-label="${escapeHtml(t("trainingLists.lengthLabel"))}" style="--tab-count:2"><button class="tab-button ${trainingListLaunchDraft.length===10?"active":""}" aria-pressed="${trainingListLaunchDraft.length===10}" data-list-launch-length="10">10</button><button class="tab-button ${trainingListLaunchDraft.length===20?"active":""}" aria-pressed="${trainingListLaunchDraft.length===20}" data-list-launch-length="20">20</button></div></section><section><small>${t("trainingLists.difficultyLabel")}</small><div class="tabs segmented-control" role="group" aria-label="${escapeHtml(t("trainingLists.difficultyLabel"))}" style="--tab-count:3">${["easy","medium","hard"].map(level=>`<button class="tab-button ${trainingListLaunchDraft.difficulty===level?"active":""}" aria-pressed="${trainingListLaunchDraft.difficulty===level}" data-list-launch-difficulty="${level}">${escapeHtml(difficultyLabel(level))}</button>`).join("")}</div></section>`;
+    root.querySelectorAll("[data-list-launch-mode]").forEach(button=>button.addEventListener("click",()=>{trainingListLaunchDraft.mode=button.dataset.listLaunchMode;renderTrainingListLaunchOptions();}));
+    root.querySelectorAll("[data-list-launch-length]").forEach(button=>button.addEventListener("click",()=>{trainingListLaunchDraft.length=Number(button.dataset.listLaunchLength);renderTrainingListLaunchOptions();}));
+    root.querySelectorAll("[data-list-launch-difficulty]").forEach(button=>button.addEventListener("click",()=>{trainingListLaunchDraft.difficulty=button.dataset.listLaunchDifficulty;renderTrainingListLaunchOptions();}));
+  }
+
+  function openTrainingListLaunch(listId) {
+    const list=trainingListById(listId);if(!list)return;
+    if(!QuizmonTrainingLists.canStart(list)){
+      showMessageDialog({title:t("trainingLists.tooSmallTitle"),message:t("trainingLists.tooSmallText"),buttonLabel:t("common.understood"),kind:"warning",icon:"!"});return;
+    }
+    const mode=QuizmonTrainingLists.compatibleModes(list.kind)[0];
+    trainingListLaunchDraft={listId:list.id,mode,length:10,difficulty:state.config[mode]?.difficulty||"medium"};
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="trainingListLaunchTitle"><section class="modal-card training-list-launch-modal" tabindex="-1"><header><span aria-hidden="true">▶</span><div><p class="quiz-kicker">${t("trainingLists.startKicker")}</p><h2 id="trainingListLaunchTitle">${escapeHtml(list.name)}</h2><p>${t("trainingLists.startText",{count:list.entries.length})}</p></div></header><div data-training-list-launch-options></div><div class="modal-actions"><button type="button" class="secondary-button" data-list-launch-cancel>${t("common.cancel")}</button><button type="button" class="primary-button" data-list-launch-start>${t("trainingLists.start")}</button></div></section></div>`,{initialFocus:"[data-list-launch-start]"});
+    document.querySelector("[data-list-launch-cancel]")?.addEventListener("click",()=>{trainingListLaunchDraft=null;closeModal();});
+    document.querySelector("[data-list-launch-start]")?.addEventListener("click",()=>{const draft={...trainingListLaunchDraft};trainingListLaunchDraft=null;closeModal(()=>startTrainingListSession(draft.listId,draft.mode,{length:draft.length,difficulty:draft.difficulty}));});
+    renderTrainingListLaunchOptions();
+  }
+
   function generateEffectivenessSpec(options = {}) {
     const random = options.random || Math.random;
     const difficulty = options.difficulty || "medium";
     let questionKind = options.kind || "mixed";
     if (questionKind === "mixed") questionKind = random() < .55 ? "effective" : "resisted";
 
-    let attackingType = options.focusType && random() < .68 ? options.focusType : randomItem(TYPES, random);
+    const allowedTypes=unique((options.allowedTypes||[]).filter(type=>TYPES.includes(type)));
+    const attackingPool=allowedTypes.length?allowedTypes:TYPES;
+    let attackingType = options.focusType && random() < .68 ? options.focusType : randomItem(attackingPool, random);
     let correctPool = TYPES.filter(type => {
       const value = effectiveness(attackingType,[type]);
       return questionKind === "effective" ? value === 2 : value < 1;
@@ -1672,7 +2754,8 @@
 
     const optionCount = difficulty === "easy" ? 4 : 6;
     const maxAnswers = difficulty === "easy" ? 1 : Math.min(3, correctPool.length);
-    const answerCount = difficulty === "easy" ? 1 : 1 + Math.floor(random() * maxAnswers);
+    const minimumAnswers = difficulty === "hard" && correctPool.length > 1 ? 2 : 1;
+    const answerCount = minimumAnswers + Math.floor(random() * Math.max(1, maxAnswers - minimumAnswers + 1));
     const correctTargets = correctPool.slice(0, answerCount);
     const distractors = shuffle(TYPES.filter(t => !correctPool.includes(t)), random).slice(0, optionCount - answerCount);
     return { kind:"effectiveness", questionKind, attackingType, options:shuffle([...correctTargets,...distractors],random), correctTargets, focusTypes:[attackingType] };
@@ -1680,25 +2763,31 @@
 
   function generateMultiplierSpec(options = {}) {
     const random = options.random || Math.random;
+    const allowedTypes=unique((options.allowedTypes||[]).filter(type=>TYPES.includes(type)));
+    const defendingPool=allowedTypes.length?allowedTypes:TYPES;
     let defense = options.defense || "mixed";
-    if (defense === "mixed") defense = random() < .52 ? "single" : "dual";
+    if(defendingPool.length<2)defense="single";
+    else if (defense === "mixed") defense = random() < .52 ? "single" : "dual";
     let defendingTypes;
-    if (options.focusType && random() < .72) {
-      defendingTypes = defense === "single" ? [options.focusType] : [options.focusType, randomItem(TYPES.filter(t => t !== options.focusType),random)];
-    } else defendingTypes = defense === "single" ? [randomItem(TYPES,random)] : shuffle(TYPES,random).slice(0,2);
+    if (options.focusType && defendingPool.includes(options.focusType) && random() < .72) {
+      defendingTypes = defense === "single" ? [options.focusType] : [options.focusType, randomItem(defendingPool.filter(t => t !== options.focusType),random)];
+    } else defendingTypes = defense === "single" ? [randomItem(defendingPool,random)] : shuffle(defendingPool,random).slice(0,2);
     return { kind:"multiplier", defendingTypes, focusTypes:[...defendingTypes] };
   }
 
   function generateImpactSpec(options = {}) {
     const random = options.random || Math.random;
+    const allowedTypes=unique((options.allowedTypes||[]).filter(type=>TYPES.includes(type)));
+    const typePool=allowedTypes.length?allowedTypes:TYPES;
     let defense = options.defense || "mixed";
-    if (defense === "mixed") defense = random() < .48 ? "single" : "dual";
-    const attackingType = options.focusType && random() < .55 ? options.focusType : randomItem(TYPES, random);
+    if(typePool.length<2)defense="single";
+    else if (defense === "mixed") defense = random() < .48 ? "single" : "dual";
+    const attackingType = options.focusType && typePool.includes(options.focusType) && random() < .55 ? options.focusType : randomItem(typePool, random);
     let defendingTypes;
-    if (options.focusType && attackingType !== options.focusType && random() < .7) {
-      defendingTypes = defense === "single" ? [options.focusType] : [options.focusType, randomItem(TYPES.filter(type => type !== options.focusType), random)];
+    if (options.focusType && typePool.includes(options.focusType) && attackingType !== options.focusType && random() < .7) {
+      defendingTypes = defense === "single" ? [options.focusType] : [options.focusType, randomItem(typePool.filter(type => type !== options.focusType), random)];
     } else {
-      defendingTypes = defense === "single" ? [randomItem(TYPES, random)] : shuffle(TYPES, random).slice(0, 2);
+      defendingTypes = defense === "single" ? [randomItem(typePool, random)] : shuffle(typePool, random).slice(0, 2);
     }
     const correctMultiplier = effectiveness(attackingType, defendingTypes);
     const all = [0, .25, .5, 1, 2, 4];
@@ -1742,6 +2831,8 @@
     if (!session) { setRoute("home"); return; }
     if (session.index >= session.length || (session.sequence && session.index >= session.sequence.length)) { finishSession(); return; }
     session.answered = false;
+    session.lastReward = null;
+    session.lastAdaptiveUpdate = null;
     if (!session.sequence && session.mode === "pokemon") renderSessionLoading();
     let spec = session.sequence ? clone(session.sequence[session.index]) : await generateFreshSpec();
     if (!session || state.route !== "session" || !spec) return;
@@ -1753,6 +2844,7 @@
       session.usedPokemonIds = session.usedPokemonIds.slice(-30);
     }
     session.currentSpec = spec;
+    session.questionStartedAt = Date.now();
     if (spec.kind === "effectiveness") renderEffectivenessQuestion(spec);
     else if (spec.kind === "multiplier") renderMultiplierQuestion(spec);
     else if (spec.kind === "impact") renderImpactQuestion(spec);
@@ -1764,10 +2856,16 @@
     const progress = finite ? Math.min(100,Math.round((session.index/session.length)*100)) : 100;
     const label = finite ? t("session.question",{current:session.index+1,total:session.length}) : t("session.questionEndless",{current:session.index+1});
     const visual = modeVisual(session.mode);
+    const combo = Math.max(0, Number(session.combo || 0));
+    const adaptiveShortKey = session.currentSpec?._smartSessionAdjustment ? "difficulty.adjustedDuringShort" : "difficulty.adjustedShort";
+    const adaptiveDifficulty = session.mode === "weak" && session.currentSpec?._smartDifficulty ? `<em class="session-adaptive-difficulty ${session.currentSpec._smartDifficulty}">${escapeHtml(difficultyLabel(session.currentSpec._smartDifficulty))} · ${t(adaptiveShortKey)}</em>` : "";
     return `<header class="session-command-bar">
-      <div class="session-mode-identity"><span>${visual.icon}</span><div><small>${t("session.activeMode")}</small><strong>${escapeHtml(modeName(session.mode))}</strong></div></div>
+      <div class="session-mode-identity"><span>${visual.icon}</span><div><small>${t("session.activeMode")}</small><strong>${escapeHtml(sessionModeName())}</strong>${adaptiveDifficulty}</div></div>
       <div class="session-progress-block"><div><strong>${label}</strong><span>${progress}%</span></div><div class="session-progress"><span style="width:${progress}%"></span></div></div>
-      <div class="session-live-score"><small>${t("session.correctLive")}</small><strong>✓ ${session.correct}</strong></div>
+      <div class="session-live-metrics">
+        <div class="session-live-score"><small>${t("session.correctLive")}</small><strong id="sessionCorrectLive">✓ ${session.correct}</strong></div>
+        <div id="sessionComboLive" class="session-combo-pill ${combo >= 3 ? "is-hot" : ""}" aria-label="${escapeHtml(t("session.comboCount",{count:combo}))}"><small>${t("session.combo")}</small><strong>×${combo}</strong></div>
+      </div>
     </header>`;
   }
 
@@ -1795,7 +2893,7 @@
     spec.selected = new Set();
     view.innerHTML = `<section class="panel quiz-session-panel">${sessionHeader()}${hintHtml("effectiveness",t("session.multiHint"),t("session.multiHintText"))}
       <div class="quiz-question-stage">
-        <div class="quiz-head"><p class="quiz-kicker">${t("session.chooseAnswer")}</p><h1>${t("session.effectQuestion",{relation:effective?t("session.veryEffective"):t("session.notEffective")})}</h1><p>${spec.correctTargets.length===1?t("session.answerCountOne"):t("session.answerCountMany",{count:spec.correctTargets.length})}</p><div class="type-prompt question-type-prompt">${typeChip(spec.attackingType,"large")}</div></div>
+        <div class="quiz-head"><p class="quiz-kicker">${t("session.chooseAnswer")}</p><h1>${t("session.effectQuestion",{relation:effective?t("session.veryEffective"):t("session.notEffective")})}</h1><p>${spec.correctTargets.length===1?t("session.answerCountOne"):t("session.answerCountMany",{count:spec.correctTargets.length})}</p><div class="question-role-label">${t("learn.attackType")}</div><div class="type-prompt question-type-prompt">${typeChip(spec.attackingType,"large")}</div></div>
         <div class="answer-grid">${spec.options.map(type=>`<button class="answer-button" data-answer="${type}" aria-pressed="false">${typeChip(type)}</button>`).join("")}</div>
       </div>${sessionFooter()}</section>`;
     document.querySelectorAll("[data-answer]").forEach(button => button.addEventListener("click",()=>{
@@ -1810,17 +2908,25 @@
     if(!spec.selected.size){showFeedback("neutral",t("session.chooseFirst"));return;}
     session.answered=true;
     const selected=[...spec.selected];
-    const correct=selected.length===spec.correctTargets.length&&selected.every(type=>spec.correctTargets.includes(type));
-    const errorTypes=unique([...selected.filter(t=>!spec.correctTargets.includes(t)),...spec.correctTargets.filter(t=>!spec.selected.has(t))]);
-    document.querySelectorAll("[data-answer]").forEach(button=>{const type=button.dataset.answer;button.classList.add("is-locked");button.setAttribute("aria-disabled","true");if(spec.correctTargets.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
+    const correct=QuizmonQuiz.isExactSelection(selected,spec.correctTargets);
+    const errorTypes=QuizmonQuiz.selectionDifference(selected,spec.correctTargets);
+    document.querySelectorAll("[data-answer]").forEach(button=>{const type=button.dataset.answer;button.classList.add("is-locked");button.disabled=true;button.setAttribute("aria-disabled","true");if(spec.correctTargets.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
     recordQuestion(correct,unique([spec.attackingType,...errorTypes]),selected);
-    const details=spec.correctTargets.map(type=>`${typeChip(type,"small")} ${formatMultiplier(effectiveness(spec.attackingType,[type]))}`).join(" ");
-    showFeedback(correct?"success":"error",correct?`${t("session.right")} ${typeChip(spec.attackingType,"small")}`:`${t("session.notQuite")} ${t("session.correctTypes",{types:details})}<div class="explanation">${effectivenessExplanation(spec)}</div>`);
+    const subtitle = correct ? t("session.answerConfirmed") : t("explanation.effectivenessReview");
+    const reviewTarget = errorTypes[0] || spec.correctTargets[0];
+    const learningExtras = correct ? "" : `${explanationLearningHintHtml(spec)}${feedbackReferenceActions({ types:[spec.attackingType,reviewTarget], attacker:spec.attackingType, defenders:[reviewTarget] })}`;
+    const correctSummary=`<div class="feedback-correct-summary"><small>${t("cleanup2.correctSolution")}</small><div>${spec.correctTargets.map(type=>typeChip(type,"small")).join("")}</div></div>`;
+    const explanation=effectivenessExplanation(spec,!correct);
+    showFeedback(correct?"success":"error",correct
+      ? `${feedbackHeading(true,subtitle)}${correctSummary}${feedbackProgressiveDetails(explanation)}`
+      : `${feedbackHeading(false,subtitle)}<div class="feedback-matchup-list">${explanation}</div>${learningExtras}`);
     haptic(correct?"success":"error"); activateNextButton();
   }
 
-  function effectivenessExplanation(spec) {
-    return spec.correctTargets.map(target=>`${typeLabel(spec.attackingType)} → ${typeLabel(target)}: ${formatMultiplier(effectiveness(spec.attackingType,[target]))}`).join(" · ");
+  function effectivenessExplanation(spec, explainMistakes = false) {
+    const wrongSelections = explainMistakes ? [...(spec.selected || [])].filter(type => !spec.correctTargets.includes(type)) : [];
+    const shownTargets = unique([...spec.correctTargets,...wrongSelections]);
+    return shownTargets.map(target=>matchupBreakdown(spec.attackingType,[target],{compact:true,explain:explainMistakes})).join("");
   }
 
   function renderMultiplierQuestion(spec) {
@@ -1828,7 +2934,7 @@
     const buckets=[0,.25,.5,1,2,4];
     view.innerHTML=`<section class="panel quiz-session-panel multiplier-panel">${sessionHeader()}${hintHtml("multiplier",t("session.sortHint"),t("session.sortHintText"))}
       <div class="quiz-question-stage multiplier-question-stage">
-        <div class="quiz-head"><p class="quiz-kicker">${t("session.sortTypes")}</p><h1>${t("session.multiplierQuestion")}</h1><p>${t("session.multiplierSubtitle")}</p><div class="defender-types question-type-prompt">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div></div>
+        <div class="quiz-head"><p class="quiz-kicker">${t("session.sortTypes")}</p><h1>${t("session.multiplierQuestion")}</h1><p>${t("session.multiplierSubtitle")}</p><div class="question-role-label">${t("learn.defendingType")}</div><div class="defender-types question-type-prompt">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div></div>
         <div class="bucket-grid">${buckets.map(value=>`<button class="bucket" data-bucket="${value}" aria-label="${escapeHtml(t("session.assignTo",{value:formatMultiplier(value)}))}"><span class="bucket-title">${formatMultiplier(value)}</span><span class="bucket-items"></span></button>`).join("")}</div>
         <div class="type-pool" data-unassigned-pool="true"><div class="pool-heading"><strong>${t("session.unassigned")}</strong><span id="remainingCount"></span></div><div class="type-pool-items"></div></div>
       </div>${sessionFooter()}</section>`;
@@ -1979,26 +3085,36 @@
     session.answered=true;
     const wrong=TYPES.filter(type=>spec.assignments[type]!==effectiveness(type,spec.defendingTypes));
     const correct=!wrong.length;
-    document.querySelectorAll(".bucket .type-chip").forEach(chip=>{const type=chip.dataset.type;chip.classList.add("is-locked");chip.setAttribute("aria-disabled","true");chip.classList.add(spec.assignments[type]===effectiveness(type,spec.defendingTypes)?"is-correct":"is-wrong");});
-    document.querySelectorAll(".multiplier-panel [data-bucket]").forEach(bucket=>{bucket.classList.add("is-locked");bucket.setAttribute("aria-disabled","true");});
+    document.querySelectorAll(".bucket .type-chip").forEach(chip=>{const type=chip.dataset.type;chip.classList.add("is-locked");chip.disabled=true;chip.setAttribute("aria-disabled","true");chip.classList.add(spec.assignments[type]===effectiveness(type,spec.defendingTypes)?"is-correct":"is-wrong");});
+    document.querySelectorAll(".multiplier-panel [data-bucket]").forEach(bucket=>{bucket.classList.add("is-locked");bucket.disabled=true;bucket.setAttribute("aria-disabled","true");});
     recordQuestion(correct,spec.defendingTypes,clone(spec.assignments));
-    const formulas=wrong.slice(0,5).map(type=>multiplierFormula(type,spec.defendingTypes)).join("");
-    showFeedback(correct?"success":"error",correct?t("session.allCorrect"):`${t("session.correctCount",{correct:18-wrong.length})} ${t("session.wrongAssigned",{types:wrong.map(type=>typeChip(type,"small")).join(" ")})}${formulas?`<div class="explanation">${formulas}</div>`:""}`);
+    const shown=wrong.slice(0,5);
+    const correctionCards=shown.map((type,index)=>multiplierCorrection(type,spec.defendingTypes,spec.assignments[type],index)).join("");
+    if(correct){
+      showFeedback("success",`${feedbackHeading(true,t("session.allCorrect"))}<div class="feedback-defense-summary"><span>${t("learn.defendingType")}</span>${spec.defendingTypes.map(type=>typeChip(type,"small")).join("")}</div>`);
+    }else{
+      const remaining=Math.max(0,wrong.length-shown.length);
+      const learningExtras = `${explanationLearningHintHtml(spec)}${feedbackReferenceActions({ types:spec.defendingTypes, attacker:shown[0], defenders:spec.defendingTypes })}`;
+      showFeedback("error",`${feedbackHeading(false,t("session.correctCount",{correct:18-wrong.length}))}<p class="feedback-copy">${t("session.correctionsIntro",{count:shown.length})}</p><div class="feedback-correction-list">${correctionCards}</div>${remaining?`<p class="feedback-more">${t("session.moreCorrections",{count:remaining})}</p>`:""}${learningExtras}`);
+    }
     haptic(correct?"success":"error"); activateNextButton();
   }
 
   function multiplierFormula(attacker,defenders) {
-    const values=defenders.map(def=>TYPE_CHART[attacker]?.[def]??1);
-    const result=values.reduce((a,b)=>a*b,1);
-    return `<div class="formula">${typeChip(attacker,"small")} ${values.map(formatMultiplier).join(" × ")} = ${formatMultiplier(result)}</div>`;
+    return matchupBreakdown(attacker,defenders,{compact:true});
+  }
+
+  function multiplierCorrection(attacker,defenders,assignedValue,index=0) {
+    const correctValue=effectiveness(attacker,defenders);
+    return `<details class="feedback-correction-card" ${index===0?"open":""}><summary><div class="feedback-correction-head">${typeChip(attacker,"small")}<span><small>${t("session.yourAssignment")}</small><strong>${formatMultiplier(assignedValue)}</strong></span><span class="correct-value"><small>${t("session.correctAssignment")}</small><strong>${formatMultiplier(correctValue)}</strong></span><em>${t("explanation.details")}</em></div></summary><div class="feedback-correction-body">${matchupBreakdown(attacker,defenders,{compact:true,explain:true})}</div></details>`;
   }
 
   function renderImpactQuestion(spec) {
     spec.selectedMultiplier = null;
     view.innerHTML = `<section class="panel quiz-session-panel">${sessionHeader()}${hintHtml("impact",t("session.impactHint"),t("session.impactHintText"))}
       <div class="quiz-question-stage">
-        <div class="quiz-head"><p class="quiz-kicker">${t("session.calculateImpact")}</p><h1>${t("session.impactQuestion")}</h1><p>${t("session.impactSubtitle")}</p>
-        <div class="matchup-display"><div><small>${t("learn.attackType")}</small>${typeChip(spec.attackingType,"large")}</div><span class="matchup-arrow">→</span><div><small>${t("learn.defendingType")}</small><div class="defender-types compact">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div></div></div></div>
+        <div class="quiz-head"><p class="quiz-kicker">${spec.pokemon?t("path.pokemonImpactKicker"):t("session.calculateImpact")}</p><h1>${spec.pokemon?t("path.pokemonImpactQuestion"):t("session.impactQuestion")}</h1><p>${spec.pokemon?t("path.pokemonImpactSubtitle"):t("session.impactSubtitle")}</p>
+        <div class="matchup-display ${spec.pokemon?"pokemon-application":""}"><div><small>${t("learn.attackType")}</small>${typeChip(spec.attackingType,"large")}</div><span class="matchup-arrow">→</span><div><small>${t("learn.defendingType")}</small>${spec.pokemon?`<div class="path-session-pokemon"><img src="${escapeHtml(spec.pokemon.image)}" alt="${escapeHtml(spec.pokemon.name)}"><div><strong>${escapeHtml(spec.pokemon.name)}</strong><span>${spec.defendingTypes.map(type=>typeChip(type,"small")).join("")}</span></div></div>`:`<div class="defender-types compact">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div>`}</div></div></div>
         <div class="multiplier-options">${spec.options.map(value=>`<button class="multiplier-option" data-impact-value="${value}" aria-pressed="false"><strong>${formatMultiplier(value)}</strong><small>${impactOptionLabel(value)}</small></button>`).join("")}</div>
       </div>${sessionFooter()}</section>`;
     document.querySelectorAll("[data-impact-value]").forEach(button=>button.addEventListener("click",()=>{
@@ -2011,11 +3127,7 @@
   }
 
   function impactOptionLabel(value) {
-    if (value === 0) return t("onboarding.none");
-    if (value < 1) return t("onboarding.half");
-    if (value === 1) return t("onboarding.normal");
-    if (value === 4) return t("onboarding.quad");
-    return t("onboarding.double");
+    return multiplierMeaning(value);
   }
 
   function checkImpact(spec) {
@@ -2025,13 +3137,18 @@
     const correct=spec.selectedMultiplier===spec.correctMultiplier;
     document.querySelectorAll("[data-impact-value]").forEach(button=>{
       const value=Number(button.dataset.impactValue);
-      button.classList.add("is-locked");button.setAttribute("aria-disabled","true");
+      button.classList.add("is-locked");button.disabled=true;button.setAttribute("aria-disabled","true");
       if(value===spec.correctMultiplier)button.classList.add("correct");
       else if(value===spec.selectedMultiplier)button.classList.add("incorrect");
     });
     recordQuestion(correct,unique([spec.attackingType,...spec.defendingTypes]),spec.selectedMultiplier);
-    const formula=multiplierFormula(spec.attackingType,spec.defendingTypes);
-    showFeedback(correct?"success":"error",`${correct?t("session.right"):t("session.notQuite")} ${t("session.impactResult",{result:formatMultiplier(spec.correctMultiplier)})}<div class="explanation">${formula}</div>`);
+    const subtitle=correct?t("session.answerConfirmed"):t("session.correctResultShown");
+    const learningExtras = correct ? "" : `${explanationLearningHintHtml(spec)}${feedbackReferenceActions({ types:[spec.attackingType,...spec.defendingTypes], attacker:spec.attackingType, defenders:spec.defendingTypes })}`;
+    const breakdown=matchupBreakdown(spec.attackingType,spec.defendingTypes,{explain:!correct});
+    const correctSummary=`<div class="feedback-result-highlight"><small>${t("session.finalResult")}</small><strong>${formatMultiplier(spec.correctMultiplier)}</strong><span>${escapeHtml(multiplierMeaning(spec.correctMultiplier))}</span></div>`;
+    showFeedback(correct?"success":"error",correct
+      ? `${feedbackHeading(true,subtitle)}${correctSummary}${feedbackProgressiveDetails(breakdown)}`
+      : `${feedbackHeading(false,subtitle)}${breakdown}${learningExtras}`);
     haptic(correct?"success":"error");activateNextButton();
   }
 
@@ -2066,57 +3183,400 @@
     if(!spec.selected.size){showFeedback("neutral",t("session.chooseFirst"));return;}
     session.answered=true;
     const expected=spec.pokemon.types; const selected=[...spec.selected];
-    const correct=selected.length===expected.length&&selected.every(type=>expected.includes(type));
-    document.querySelectorAll("[data-pokemon-type]").forEach(button=>{const type=button.dataset.pokemonType;button.classList.add("is-locked");button.setAttribute("aria-disabled","true");if(expected.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
+    const correct=QuizmonQuiz.isExactSelection(selected,expected);
+    document.querySelectorAll("[data-pokemon-type]").forEach(button=>{const type=button.dataset.pokemonType;button.classList.add("is-locked");button.disabled=true;button.setAttribute("aria-disabled","true");if(expected.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
     recordQuestion(correct,expected,selected);
-    showFeedback(correct?"success":"error",correct?`${t("session.right")} ${escapeHtml(spec.pokemon.name)}`:`${t("session.correctTypes",{types:expected.map(type=>typeChip(type)).join(" ")})}`);
+    const subtitle=correct?t("session.pokemonConfirmed",{pokemon:spec.pokemon.name}):t("session.pokemonCorrection",{pokemon:spec.pokemon.name});
+    const explanation = correct ? "" : `${pokemonTypeExplanationHtml(spec,selected)}${explanationLearningHintHtml(spec)}${feedbackReferenceActions({ types:expected })}`;
+    showFeedback(correct?"success":"error",`${feedbackHeading(correct,subtitle)}<div class="feedback-pokemon-types"><span>${t("session.correctTypesLabel")}</span><div>${expected.map(type=>typeChip(type,"small")).join(" ")}</div></div>${explanation}`);
     haptic(correct?"success":"error"); activateNextButton();
   }
 
-  function questionSignature(spec) {
-    if(spec.kind==="effectiveness")return `e:${spec.attackingType}:${spec.questionKind}:${[...spec.correctTargets].sort().join(",")}`;
-    if(spec.kind==="multiplier")return `m:${[...spec.defendingTypes].sort().join(",")}`;
-    if(spec.kind==="impact")return `i:${spec.attackingType}:${[...spec.defendingTypes].sort().join(",")}`;
-    return `p:${spec.pokemon.id}`;
+  function questionSignature(spec) { return QuizmonQuiz.questionSignature(spec); }
+
+  function comboBonusFor(combo, isReview = false) { return QuizmonMotivation.comboBonusFor(combo, isReview); }
+
+  function nextComboTarget(combo, isReview = false) { return QuizmonMotivation.nextComboTarget(combo, isReview); }
+
+  function comboMilestoneKey(combo) {
+    if (combo >= 10) return "session.comboMilestoneTen";
+    if (combo >= 5) return "session.comboMilestoneFive";
+    return "session.comboMilestoneThree";
+  }
+
+  function rewardParticlesMarkup() {
+    return `<span class="reward-particles" aria-hidden="true">${Array.from({length:8},(_,index)=>`<i style="--particle:${index}"></i>`).join("")}</span>`;
+  }
+
+  function dailyGoalFeedbackMarkup(goal) {
+    if (!goal?.show) return "";
+    if (goal.completedNow) return `<div class="answer-daily-goal is-complete" style="--daily-answer-progress:100%">${rewardParticlesMarkup()}<span aria-hidden="true">🔥</span><div><small>${t("daily.completedTitle")}</small><strong>${t("daily.goalReward", { count: goal.bonusXp })}</strong><em>${tp("daily.streakLabelOne", "daily.streakLabel", goal.streak)}</em></div><i><b></b></i></div>`;
+    return `<div class="answer-daily-goal" style="--daily-answer-progress:${goal.percent}%"><span aria-hidden="true">◎</span><div><small>${t("daily.title")}</small><strong>${t("daily.progressText", { progress: goal.progress, target: goal.target })}</strong><em>${tp("daily.remainingOne", "daily.remaining", goal.remaining)}</em></div><i><b></b></i></div>`;
+  }
+
+  function answerRewardMarkup(reward) {
+    if (!reward) return "";
+    if (!reward.correct) {
+      const resetText = reward.previousCombo >= 2
+        ? t("session.comboResetWithCount", { count: reward.previousCombo })
+        : t("session.comboRetry");
+      return `<section class="answer-reward-card is-retry" aria-label="${escapeHtml(t("session.rewardFeedback"))}">
+        <span class="answer-reward-icon" aria-hidden="true">↻</span>
+        <span class="answer-reward-copy"><small>${t("session.nextChance")}</small><strong>${escapeHtml(resetText)}</strong><em>${t("session.comboRetryHint")}</em></span>
+        ${dailyGoalFeedbackMarkup(reward.dailyGoal)}
+      </section>`;
+    }
+    const next = nextComboTarget(reward.combo, reward.isReview);
+    const previousTarget = reward.combo < 3 ? 0 : reward.combo < 5 ? 3 : reward.combo < 10 ? 5 : Math.floor(reward.combo / 5) * 5;
+    const progress = Math.max(0, Math.min(100, Math.round(((reward.combo - previousTarget) / Math.max(1, next.target - previousTarget)) * 100)));
+    const milestone = reward.bonusXp > 0;
+    return `<section class="answer-reward-card ${milestone ? "is-milestone" : ""}" aria-label="${escapeHtml(t("session.rewardFeedback"))}" style="--combo-progress:${progress}%">
+      ${milestone ? rewardParticlesMarkup() : ""}
+      <span class="answer-reward-icon" aria-hidden="true">${milestone ? "✦" : "XP"}</span>
+      <span class="answer-reward-copy">
+        <small>${milestone ? t(comboMilestoneKey(reward.combo)) : t("session.instantReward")}</small>
+        <strong>${t("session.xpGained", { count: reward.baseXp })}${reward.bonusXp ? ` <b>+${reward.bonusXp} ${t("session.bonusXpShort")}</b>` : ""}</strong>
+        <em>${t("session.comboCount", { count: reward.combo })}</em>
+      </span>
+      <span class="answer-reward-next"><span><small>${t("session.nextComboTarget")}</small><strong>${t("session.comboTargetText", { count: next.remaining, bonus: next.bonus })}</strong></span><i><b></b></i></span>
+      ${dailyGoalFeedbackMarkup(reward.dailyGoal)}
+    </section>`;
+  }
+
+  function updateSessionLiveReward() {
+    if (!session) return;
+    const correctNode = document.getElementById("sessionCorrectLive");
+    if (correctNode) correctNode.textContent = `✓ ${session.correct}`;
+    const comboNode = document.getElementById("sessionComboLive");
+    if (!comboNode) return;
+    const combo = Math.max(0, Number(session.combo || 0));
+    comboNode.classList.toggle("is-hot", combo >= 3);
+    comboNode.classList.remove("just-updated", "is-milestone");
+    void comboNode.offsetWidth;
+    comboNode.classList.add("just-updated");
+    if (session.lastReward?.bonusXp) comboNode.classList.add("is-milestone");
+    comboNode.setAttribute("aria-label", t("session.comboCount", { count: combo }));
+    const strong = comboNode.querySelector("strong");
+    if (strong) strong.textContent = `×${combo}`;
+  }
+
+  function pushLearningObservation(map, key, score) {
+    if (!validLearningKey(key)) return;
+    const value = clampScore(score);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(value);
+  }
+
+  function finalizeLearningObservations(map) {
+    return [...map.entries()].map(([key, values]) => ({
+      key,
+      score: Math.round((values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)) * 1000) / 1000
+    }));
+  }
+
+  function errorRuleKey(code) { return QuizmonErrors.ruleKey(code); }
+
+  function errorSortedTypes(types) { return QuizmonErrors.sortedTypes(types, TYPES); }
+
+  function errorMatchupKey(attackingType, defendingTypes) { return QuizmonErrors.matchupKey(attackingType, defendingTypes, TYPES); }
+
+  function errorPokemonKey(pokemonId) { return QuizmonErrors.pokemonKey(pokemonId); }
+
+  function addErrorOpportunity(opportunities, key) {
+    const valid = sanitizeErrorPatternKey(key);
+    if (valid) opportunities.add(valid);
+  }
+
+  function addErrorIssue(issues, issue) {
+    const clean = sanitizeErrorIssue(issue);
+    if (!clean || issues.some(existing => existing.patternKey === clean.patternKey)) return;
+    issues.push(clean);
+  }
+
+  function addRuleErrorIssue(issues, code, context = {}) {
+    addErrorIssue(issues, { ...context, patternKey:errorRuleKey(code) });
+  }
+
+  function multiplierRuleEvidence(attackingType, defendingTypes, expected, actual, opportunities, issues) {
+    const defenders = errorSortedTypes(defendingTypes);
+    const numericActual = Number(actual);
+    const actualKnown = Number.isFinite(numericActual);
+    const factors = defenders.map(type => effectiveness(attackingType, [type]));
+    const context = { attackingType, defendingTypes:defenders, expectedMultiplier:expected, actualMultiplier:actualKnown ? numericActual : null };
+
+    if (expected === 0) {
+      addErrorOpportunity(opportunities, errorRuleKey("immunity-overlooked"));
+      if (actualKnown && numericActual !== 0) addRuleErrorIssue(issues, "immunity-overlooked", context);
+    } else {
+      addErrorOpportunity(opportunities, errorRuleKey("immunity-assumed"));
+      if (actualKnown && numericActual === 0) addRuleErrorIssue(issues, "immunity-assumed", context);
+    }
+    if (defenders.length === 2 && (expected === .25 || expected === .5)) {
+      addErrorOpportunity(opportunities, errorRuleKey("quarter-half-confusion"));
+      if (actualKnown && ((expected === .25 && numericActual === .5) || (expected === .5 && numericActual === .25))) addRuleErrorIssue(issues, "quarter-half-confusion", context);
+    }
+    if (defenders.length === 2 && (expected === 2 || expected === 4)) {
+      addErrorOpportunity(opportunities, errorRuleKey("double-quad-confusion"));
+      if (actualKnown && ((expected === 4 && numericActual === 2) || (expected === 2 && numericActual === 4))) addRuleErrorIssue(issues, "double-quad-confusion", context);
+    }
+    if (defenders.length === 2) {
+      addErrorOpportunity(opportunities, errorRuleKey("dual-multiplication"));
+      if (actualKnown && numericActual !== expected && factors.includes(numericActual)) addRuleErrorIssue(issues, "dual-multiplication", context);
+      const neutralized = expected === 1 && factors.includes(2) && factors.includes(.5);
+      if (neutralized) {
+        addErrorOpportunity(opportunities, errorRuleKey("dual-neutralization"));
+        if (actualKnown && numericActual !== 1) addRuleErrorIssue(issues, "dual-neutralization", context);
+      }
+    }
+    if (defenders.length === 1) {
+      addErrorOpportunity(opportunities, errorRuleKey("direction-reversal"));
+      const reverse = effectiveness(defenders[0], [attackingType]);
+      if (actualKnown && numericActual !== expected && numericActual === reverse) addRuleErrorIssue(issues, "direction-reversal", context);
+    }
+  }
+
+  function buildErrorAnalysisEvent(correct, userAnswer, spec) {
+    if (!spec || !session) return null;
+    const opportunities = new Set();
+    const issues = [];
+    const addMatchup = (attackingType, defendingTypes, expected, actual, wrong) => {
+      const patternKey = errorMatchupKey(attackingType, defendingTypes);
+      addErrorOpportunity(opportunities, patternKey);
+      if (wrong) addErrorIssue(issues, { patternKey, attackingType, defendingTypes, expectedMultiplier:expected, actualMultiplier:actual });
+    };
+
+    if (spec.kind === "effectiveness") {
+      const selected = new Set(Array.isArray(userAnswer) ? userAnswer : []);
+      const expectedTargets = new Set(spec.correctTargets || []);
+      const wantsEffective = spec.questionKind === "effective";
+      addErrorOpportunity(opportunities, errorRuleKey("direction-reversal"));
+      (spec.options || []).forEach(type => {
+        const expectedSelected = expectedTargets.has(type);
+        const actualSelected = selected.has(type);
+        const factor = effectiveness(spec.attackingType, [type]);
+        addMatchup(spec.attackingType, [type], factor, actualSelected ? 1 : 0, expectedSelected !== actualSelected);
+        if (actualSelected && !expectedSelected) {
+          const reverse = effectiveness(type, [spec.attackingType]);
+          const reverseMatches = wantsEffective ? reverse > 1 : reverse < 1;
+          if (reverseMatches) addRuleErrorIssue(issues, "direction-reversal", { attackingType:spec.attackingType, defendingTypes:[type], expectedMultiplier:factor, actualMultiplier:reverse });
+        }
+      });
+    } else if (spec.kind === "multiplier") {
+      const assignments = userAnswer && typeof userAnswer === "object" ? userAnswer : {};
+      TYPES.forEach(attackingType => {
+        const expected = effectiveness(attackingType, spec.defendingTypes);
+        const actual = Number(assignments[attackingType]);
+        const wrong = !Number.isFinite(actual) || actual !== expected;
+        addMatchup(attackingType, spec.defendingTypes, expected, Number.isFinite(actual) ? actual : null, wrong);
+        multiplierRuleEvidence(attackingType, spec.defendingTypes, expected, actual, opportunities, issues);
+      });
+    } else if (spec.kind === "impact") {
+      const expected = Number(spec.correctMultiplier);
+      const actual = Number(userAnswer);
+      addMatchup(spec.attackingType, spec.defendingTypes, expected, Number.isFinite(actual) ? actual : null, !correct);
+      multiplierRuleEvidence(spec.attackingType, spec.defendingTypes, expected, actual, opportunities, issues);
+    } else if (spec.kind === "pokemon") {
+      const selected = new Set(Array.isArray(userAnswer) ? userAnswer : []);
+      const expected = new Set(spec.pokemon?.types || []);
+      const pokemonKey = errorPokemonKey(spec.pokemon?.id);
+      addErrorOpportunity(opportunities, pokemonKey);
+      addErrorOpportunity(opportunities, errorRuleKey("pokemon-wrong-type"));
+      if (expected.size === 2) addErrorOpportunity(opportunities, errorRuleKey("pokemon-missing-secondary"));
+      if (expected.size === 1) addErrorOpportunity(opportunities, errorRuleKey("pokemon-extra-type"));
+      if (!correct) {
+        const context = { pokemonId:spec.pokemon?.id, pokemonName:spec.pokemon?.name || "" };
+        addErrorIssue(issues, { ...context, patternKey:pokemonKey });
+        addRuleErrorIssue(issues, "pokemon-wrong-type", context);
+        const selectedTypes = [...selected];
+        const expectedTypes = [...expected];
+        if (expected.size === 2 && selected.size === 1 && selectedTypes.every(type => expected.has(type))) addRuleErrorIssue(issues, "pokemon-missing-secondary", context);
+        if (expected.size === 1 && selected.size > 1 && expectedTypes.every(type => selected.has(type))) addRuleErrorIssue(issues, "pokemon-extra-type", context);
+      }
+    }
+
+    return sanitizeErrorEvent({
+      id:`error-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      at:new Date().toISOString(),
+      sessionId:`session-${session.startedAt}`,
+      mode:session.mode,
+      kind:spec.kind,
+      signature:questionSignature(spec),
+      correct,
+      opportunities:[...opportunities],
+      issues
+    });
+  }
+
+  function recordErrorAnalysisEvent(correct, userAnswer, spec) {
+    const event = buildErrorAnalysisEvent(correct, userAnswer, spec);
+    if (!event) return null;
+    state.stats.errorAnalysis.events.push(event);
+    state.stats.errorAnalysis.events = state.stats.errorAnalysis.events.slice(-ERROR_EVENT_LIMIT);
+    return event;
+  }
+
+  function recordLearningEvent(correct, userAnswer, spec) {
+    if (!spec || !state.stats.learning) return;
+    const observations = new Map();
+    const wrongTypes = [];
+    let dual = false;
+
+    if (spec.kind === "effectiveness") {
+      const selected = new Set(Array.isArray(userAnswer) ? userAnswer : []);
+      const expected = new Set(spec.correctTargets || []);
+      const options = Array.isArray(spec.options) ? spec.options : [];
+      const optionScores = options.map(type => {
+        const score = selected.has(type) === expected.has(type) ? 1 : 0;
+        pushLearningObservation(observations, `defense:${type}`, score);
+        if (!score) wrongTypes.push(type);
+        return score;
+      });
+      const questionScore = optionScores.length ? optionScores.reduce((sum, value) => sum + value, 0) / optionScores.length : Number(Boolean(correct));
+      pushLearningObservation(observations, `attack:${spec.attackingType}`, questionScore);
+      pushLearningObservation(observations, "skill:effectiveness", questionScore);
+    } else if (spec.kind === "multiplier") {
+      const assignments = userAnswer && typeof userAnswer === "object" ? userAnswer : {};
+      const typeScores = TYPES.map(type => {
+        const score = Number(assignments[type]) === effectiveness(type, spec.defendingTypes) ? 1 : 0;
+        pushLearningObservation(observations, `attack:${type}`, score);
+        if (!score) wrongTypes.push(type);
+        return score;
+      });
+      const questionScore = typeScores.reduce((sum, value) => sum + value, 0) / TYPES.length;
+      (spec.defendingTypes || []).forEach(type => pushLearningObservation(observations, `defense:${type}`, questionScore));
+      pushLearningObservation(observations, "skill:multiplier", questionScore);
+      dual = (spec.defendingTypes || []).length === 2;
+      if (dual) pushLearningObservation(observations, "skill:dual", questionScore);
+    } else if (spec.kind === "impact") {
+      const questionScore = Number(Boolean(correct));
+      pushLearningObservation(observations, `attack:${spec.attackingType}`, questionScore);
+      (spec.defendingTypes || []).forEach(type => pushLearningObservation(observations, `defense:${type}`, questionScore));
+      pushLearningObservation(observations, "skill:impact", questionScore);
+      pushLearningObservation(observations, "skill:multiplier", questionScore);
+      dual = (spec.defendingTypes || []).length === 2;
+      if (dual) pushLearningObservation(observations, "skill:dual", questionScore);
+      if (!correct) wrongTypes.push(spec.attackingType, ...(spec.defendingTypes || []));
+    } else if (spec.kind === "pokemon") {
+      const selected = new Set(Array.isArray(userAnswer) ? userAnswer : []);
+      const expected = new Set(spec.pokemon?.types || []);
+      pushLearningObservation(observations, "skill:pokemon", Number(Boolean(correct)));
+      unique([...expected, ...selected]).forEach(type => {
+        const score = selected.has(type) === expected.has(type) ? 1 : 0;
+        pushLearningObservation(observations, `pokemon:${type}`, score);
+        if (!score) wrongTypes.push(type);
+      });
+      dual = expected.size === 2;
+      if (dual) pushLearningObservation(observations, "skill:dual", Number(Boolean(correct)));
+    }
+
+    const event = sanitizeLearningEvent({
+      id: `learn-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      at: new Date().toISOString(),
+      mode: session.mode,
+      kind: spec.kind,
+      difficulty: spec?._smartDifficulty || session.config?.difficulty || null,
+      correct,
+      duration: session.questionStartedAt ? Date.now() - session.questionStartedAt : 0,
+      review: session.mode === "review",
+      dual,
+      focusTypes: spec.focusTypes || [],
+      wrongTypes,
+      observations: finalizeLearningObservations(observations)
+    });
+    if (!event) return null;
+    state.stats.learning.events.push(event);
+    state.stats.learning.events = state.stats.learning.events.slice(-LEARNING_EVENT_LIMIT);
+    return event;
   }
 
   function recordQuestion(correct,relatedTypes,userAnswer) {
     const specForReview=serializeCurrentQuestion(); const isReview=session.mode==="review";
     const modeStats=state.stats.modes[session.mode]||blankModeStats(); state.stats.modes[session.mode]=modeStats; modeStats.total+=1;if(correct)modeStats.correct+=1;
+    const previousCombo=Math.max(0,Number(session.combo||0));
     if(!isReview){
       state.stats.total+=1;
       if(correct){state.stats.correct+=1;state.stats.streak+=1;state.stats.bestStreak=Math.max(state.stats.bestStreak,state.stats.streak);}else state.stats.streak=0;
       unique(relatedTypes).forEach(type=>{const stats=state.stats.types[type];if(!stats)return;stats.total+=1;if(correct)stats.correct+=1;stats.lastSeen=new Date().toISOString();stats.recent.push(Boolean(correct));stats.recent=stats.recent.slice(-10);if(!correct)session.wrongTypes[type]=(session.wrongTypes[type]||0)+1;});
     }
-    updateMistakeBook(correct,specForReview,userAnswer);
-    session.answers.push({correct,kind:session.currentSpec.kind,relatedTypes:unique(relatedTypes)});
+    const errorEvent=recordErrorAnalysisEvent(correct,userAnswer,specForReview);
+    updateMistakeBook(correct,specForReview,userAnswer,errorEvent);
+    const learningEvent=recordLearningEvent(correct,userAnswer,specForReview);
+    const focusKey=session.currentSpec?._smartFocusKey||null;
+    const focusObservation=focusKey?learningEvent?.observations?.find(item=>item.key===focusKey):null;
+    session.answers.push({
+      correct,
+      kind:session.currentSpec.kind,
+      relatedTypes:unique(relatedTypes),
+      focusKey,
+      focusScore:focusObservation?focusObservation.score:Number(Boolean(correct)),
+      smartSource:session.currentSpec?._smartSource||null,
+      difficulty:session.currentSpec?._smartDifficulty||session.config?.difficulty||null,
+      baseDifficulty:session.currentSpec?._smartBaseDifficulty||session.currentSpec?._smartDifficulty||null,
+      duration:Number(learningEvent?.duration||0),
+      sessionAdjustment:session.currentSpec?._smartSessionAdjustment||null,
+      pathExamArea:session.currentSpec?._pathExamArea||null,
+      pathSourceModule:session.currentSpec?._pathSourceModule||null
+    });
+    session.lastAdaptiveUpdate=maybeAdjustSmartTrainingDuringSession();
     if(correct){
       session.correct+=1;
+      session.combo=previousCombo+1;
+      session.bestCombo=Math.max(Number(session.bestCombo||0),session.combo);
       if(isReview) session.reviewPending = session.reviewPending.filter(signature => signature !== questionSignature(specForReview));
     }else{
+      session.combo=0;
       session.wrongQuestions.push(specForReview);
       if(isReview&&session.sequence){session.sequence.push(clone(specForReview));session.length+=1;}
     }
-    addXp(correct?(isReview?5:10):0); checkAchievements(); saveState();
+    const baseXp=correct?(isReview?5:10):0;
+    const bonusXp=correct?comboBonusFor(session.combo,isReview):0;
+    const dailyGoal=recordDailyGoalProgress();
+    session.lastReward={correct,baseXp,bonusXp,combo:session.combo,previousCombo,isReview,dailyGoal};
+    addXp(baseXp+bonusXp+dailyGoal.bonusXp);
+    if(dailyGoal.completedNow){
+      setTimeout(()=>haptic("goal"),160);
+      enqueueToast("🔥",t("daily.completedTitle"),tp("daily.goalRewardToastOne","daily.goalRewardToast",dailyGoal.streak,{count:dailyGoal.bonusXp,streak:dailyGoal.streak}),"level");
+    }
+    checkAchievements();
+    updateHeader();
+    updateSessionLiveReward();
+    saveState();
   }
 
-  function updateMistakeBook(correct,spec,userAnswer) {
+  function updateMistakeBook(correct,spec,userAnswer,errorEvent=null) {
     const signature=questionSignature(spec); let item=state.stats.mistakes.find(entry=>entry.signature===signature);
     if(correct){
       if(item&&item.status!=="resolved"){item.correctReviews=(item.correctReviews||0)+1;item.lastSeen=new Date().toISOString();if(item.correctReviews>=2)item.status="resolved";}
       return;
     }
-    if(!item){item={id:`mistake-${Date.now()}-${Math.random().toString(16).slice(2)}`,signature,spec:clone(spec),wrongCount:0,correctReviews:0,status:"open",createdAt:new Date().toISOString(),lastSeen:new Date().toISOString(),lastAnswer:null};state.stats.mistakes.unshift(item);}
+    if(!item){item={id:`mistake-${Date.now()}-${Math.random().toString(16).slice(2)}`,signature,spec:clone(spec),wrongCount:0,correctReviews:0,status:"open",createdAt:new Date().toISOString(),lastSeen:new Date().toISOString(),lastAnswer:null,lastIssues:[],patternKeys:[],errorModelVersion:1};state.stats.mistakes.unshift(item);}
     item.wrongCount+=1;item.correctReviews=0;item.status="open";item.lastSeen=new Date().toISOString();item.lastAnswer=clone(userAnswer);
+    item.lastIssues=(errorEvent?.issues||[]).map(sanitizeErrorIssue).filter(Boolean).slice(0,12);
+    item.patternKeys=unique(item.lastIssues.map(issue=>issue.patternKey)).slice(0,12);
+    item.errorModelVersion=1;
     state.stats.mistakes=state.stats.mistakes.slice(0,100);
+  }
+
+  function smartSpecMetadata(spec) {
+    return {
+      _smartFocusKey: spec?._smartFocusKey || null,
+      _smartSource: spec?._smartSource || null,
+      _smartLabel: spec?._smartLabel || null,
+      _smartBaseDifficulty: spec?._smartBaseDifficulty || spec?._smartDifficulty || null,
+      _smartDifficulty: spec?._smartDifficulty || null,
+      _smartDifficultyReason: spec?._smartDifficultyReason || null,
+      _smartDifficultyCalibrating: Boolean(spec?._smartDifficultyCalibrating),
+      _smartSessionAdjustment: spec?._smartSessionAdjustment || null
+    };
   }
 
   function serializeCurrentQuestion() {
     const spec=session.currentSpec;
-    if(spec.kind==="effectiveness")return {kind:"effectiveness",questionKind:spec.questionKind,attackingType:spec.attackingType,options:[...spec.options],correctTargets:[...spec.correctTargets],focusTypes:[...spec.focusTypes]};
-    if(spec.kind==="multiplier")return {kind:"multiplier",defendingTypes:[...spec.defendingTypes],focusTypes:[...spec.focusTypes]};
-    if(spec.kind==="impact")return {kind:"impact",attackingType:spec.attackingType,defendingTypes:[...spec.defendingTypes],options:[...spec.options],correctMultiplier:spec.correctMultiplier,focusTypes:[...spec.focusTypes]};
-    return {kind:"pokemon",pokemon:clone(spec.pokemon),display:spec.display,focusTypes:[...spec.focusTypes]};
+    const smart=smartSpecMetadata(spec);
+    if(spec.kind==="effectiveness")return {...smart,kind:"effectiveness",questionKind:spec.questionKind,attackingType:spec.attackingType,options:[...spec.options],correctTargets:[...spec.correctTargets],focusTypes:[...spec.focusTypes]};
+    if(spec.kind==="multiplier")return {...smart,kind:"multiplier",defendingTypes:[...spec.defendingTypes],focusTypes:[...spec.focusTypes]};
+    if(spec.kind==="impact")return {...smart,kind:"impact",attackingType:spec.attackingType,defendingTypes:[...spec.defendingTypes],options:[...spec.options],correctMultiplier:spec.correctMultiplier,focusTypes:[...spec.focusTypes]};
+    return {...smart,kind:"pokemon",pokemon:clone(spec.pokemon),display:spec.display,focusTypes:[...spec.focusTypes]};
   }
 
   function checkAchievements() {
@@ -2131,8 +3591,16 @@
     state.stats.achievements[id]=new Date().toISOString(); enqueueToast(achievement.icon,t("toast.achievement"),t(achievement.titleKey),"unlock");
   }
 
-  function showFeedback(kind,html){const box=document.getElementById("feedback");if(!box)return;box.className="feedback";void box.offsetWidth;box.className=`feedback visible ${kind}`;box.innerHTML=html;}
-  function activateNextButton(){const button=document.getElementById("primaryAction");if(!button)return;const last=Number.isFinite(session.length)&&session.index+1>=session.length;const end=session.sequence&&session.index+1>=session.sequence.length;button.textContent=last||end?t("common.results"):t("common.next");button.classList.add("is-ready");button.setAttribute("aria-live","polite");button.onclick=advanceQuestion;}
+  function showFeedback(kind,html){
+    const box=document.getElementById("feedback");if(!box)return;
+    const rewardMarkup=session?.answered?answerRewardMarkup(session.lastReward):"";
+    box.className="feedback";void box.offsetWidth;box.className=`feedback visible ${kind}`;
+    box.innerHTML=`${html}${rewardMarkup}${adaptiveUpdateMarkup(session?.lastAdaptiveUpdate)}`;
+    bindFeedbackLearningActions(box);
+    document.querySelector(".session-actions")?.classList.add("after-feedback");
+    if(session?.lastReward?.bonusXp)setTimeout(()=>haptic("combo"),130);
+  }
+  function activateNextButton(){const button=document.getElementById("primaryAction");if(!button)return;const last=Number.isFinite(session.length)&&session.index+1>=session.length;const end=session.sequence&&session.index+1>=session.sequence.length;button.textContent=last||end?t("common.results"):t("common.next");button.classList.add("is-ready");button.removeAttribute("aria-live");button.onclick=advanceQuestion;}
   function advanceQuestion(){prepareRouteMotion("session","session","forward");session.index+=1;renderQuestion();}
   function requestFinishSession() {
     if (!session?.answers.length) { session=null; setRoute("home"); return; }
@@ -2146,21 +3614,57 @@
 
   function finishSession() {
     if(!session){setRoute("home");return;}
-    if(session.ended){state.route="summary";saveState();renderSummary();return;}
+    if(session.ended){setRoute("summary");return;}
     session.ended=true;
-    const duration=Math.max(1,Math.round((Date.now()-session.startedAt)/1000)); const total=session.answers.length; const rate=percent(session.correct,total); const isReview=session.mode==="review";
+    const duration=Math.max(1,Math.round((Date.now()-session.startedAt)/1000));
+    session.duration=duration;
+    const total=session.answers.length;
+    const rate=percent(session.correct,total);
+    const isReview=session.mode==="review";
     if(!isReview&&total){
-      state.stats.sessions+=1;state.stats.totalSeconds+=duration;state.stats.modes[session.mode].sessions+=1;
+      const previous=state.stats.history.find(item=>item&&item.mode===session.mode&&Number(item.answers)>0&&(session.mode!=="path"||item.pathModuleId===session.pathModuleId)&&String(item.trainingListId||"")===String(session.trainingList?.id||""));
+      session.previousComparable=previous?clone(previous):null;
+      if(session.mode==="weak")session.learningProgress=smartSessionProgress();
+      if(session.mode==="problem")session.problemProgress=problemSessionProgress();
+      if(session.mode==="path")session.pathProgress=completeLearningPathModule(rate);
+      state.stats.sessions+=1;
+      state.stats.totalSeconds+=duration;
+      state.stats.modes[session.mode].sessions+=1;
       const weakTypes=Object.entries(session.wrongTypes).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([type])=>type);
-      state.stats.history.unshift({date:new Date().toISOString(),mode:session.mode,answers:total,correct:session.correct,rate,duration,weakTypes});state.stats.history=state.stats.history.slice(0,30);
+      state.stats.history.unshift({
+        id:session.id, date:new Date().toISOString(),mode:session.mode,answers:total,correct:session.correct,rate,duration,weakTypes,
+        bestCombo:Math.max(0,Number(session.bestCombo||0)),difficulty:session.mode==="weak"?"adaptive":session.config?.difficulty||null,
+        smartPlanKind:session.smartPlan?.kind||null,
+        adaptiveDifficulty:ADAPTIVE_SESSION_MODES.includes(session.mode),
+        difficultyCounts:ADAPTIVE_SESSION_MODES.includes(session.mode)?smartActualDifficultyCounts(session.answers):(session.smartPlan?.difficultyCounts?{...session.smartPlan.difficultyCounts}:null),
+        difficultyAdjustments:ADAPTIVE_SESSION_MODES.includes(session.mode)?smartAdjustmentCounts(session.adaptiveFlow?.adjustments):null,
+        difficultyTimeline:ADAPTIVE_SESSION_MODES.includes(session.mode)?session.answers.map(answer=>answer.difficulty).filter(level=>ADAPTIVE_DIFFICULTIES.includes(level)).slice(0,20):[],
+        problemPatternKey:session.problemPlan?.patternKey||null,
+        problemPatternTitle:session.problemPlan?.title||null,
+        problemResolved:Boolean(session.problemProgress?.resolved),
+        problemImproved:Boolean(session.problemProgress?.improved),
+        pathModuleId:session.pathProgress?.moduleId||null,
+        pathPassed:Boolean(session.pathProgress?.passed),
+        pathReviewKey:session.pathReview?.key||null,
+        pathExamId:session.pathProgress?.exam?session.pathProgress.moduleId:null,
+        pathExamAreas:session.pathProgress?.exam?Object.fromEntries((session.pathProgress.areaResults||[]).map(item=>[item.key,item.rate])):null,
+        pathFinalCompleted:Boolean(session.pathProgress?.finalCompleted),
+        learningFocus:(session.learningProgress?.trained||[]).slice(0,6).map(item=>item.key),
+        learningImproved:(session.learningProgress?.improved||[]).slice(0,6).map(item=>item.key),
+        learningAttention:(session.learningProgress?.attention||[]).slice(0,6).map(item=>item.key),
+        trainingListId:session.trainingList?.id||null,
+        trainingListName:session.trainingList?.name||null,
+        trainingListKind:session.trainingList?.kind||null
+      });
+      state.stats.history=state.stats.history.slice(0,HISTORY_LIMIT);
       if(rate===100){addXp(50);unlockAchievement("perfect_session",total>=5);}
       if(session.mode==="daily")completeDaily(rate,duration);
       if(session.mode==="weak")unlockAchievement("weakness_session",true);
     }else if(isReview)state.stats.modes.review.sessions+=1;
-    saveState();prepareRouteMotion(state.route,"summary","forward");state.route="summary";saveState();renderSummary();
+    saveState();setRoute("summary",{direction:"forward"});
   }
 
-  function completeDaily(rate,duration){const today=todayKey();if(!state.daily.completed){const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);const yesterdayKey=`${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,"0")}-${String(yesterday.getDate()).padStart(2,"0")}`;state.daily.streak=state.daily.lastCompletedDate===yesterdayKey?state.daily.streak+1:1;state.daily.lastCompletedDate=today;state.daily.completed=true;state.daily.result={rate,duration};addXp(100);unlockAchievement("daily_first",true);}else state.daily.result={rate,duration};}
+  function completeDaily(rate,duration){if(!state.daily.completed){state.daily.completed=true;state.daily.result={rate,duration};addXp(100);unlockAchievement("daily_first",true);}else state.daily.result={rate,duration};}
 
   function summaryVerdict(rate) {
     if (rate === 100) return { icon: "★", title: t("summary.verdictPerfect"), text: t("summary.verdictPerfectText") };
@@ -2169,8 +3673,91 @@
     return { icon: "↻", title: t("summary.verdictPractice"), text: t("summary.verdictPracticeText") };
   }
 
-  function renderSummary() {
-    if(!session){setRoute("home");return;}
+  function sessionComparisonInfo(rate, duration, total) {
+    return QuizmonProgress.comparisonInfo({
+      rate, duration, total, correct: session?.correct || 0, previous: session?.previousComparable || null
+    });
+  }
+
+  function improvementCardMarkup(rate, duration, total) {
+    const info = sessionComparisonInfo(rate, duration, total);
+    if (info.kind === "baseline") return "";
+    const fewerErrors=Number(info.errorDelta)>0;
+    const clearlyFaster=Number(info.timeDelta)>=10;
+    const meaningfulBetter=info.kind==="better"&&(Number(info.delta)>=5||fewerErrors||clearlyFaster);
+    const meaningfulTarget=info.kind==="target"&&Math.abs(Number(info.delta))>=15;
+    if(!meaningfulBetter&&!meaningfulTarget)return "";
+    const positiveDetails=[];
+    if(fewerErrors)positiveDetails.push(t("improvement.fewerErrors",{count:info.errorDelta}));
+    if(clearlyFaster)positiveDetails.push(t("improvement.faster",{time:formatDuration(info.timeDelta)}));
+    const title=meaningfulBetter?t("improvement.betterTitle",{count:info.delta}):t("improvement.targetTitle",{rate:info.previousRate});
+    const text=meaningfulBetter?t("improvement.betterText",{mode:sessionModeName()}):t("improvement.targetText",{count:Math.abs(info.delta)});
+    return `<section class="summary-improvement-card ${meaningfulBetter?"better":"target"}">
+      <span class="summary-improvement-icon" aria-hidden="true">${meaningfulBetter?"↑":"↗"}</span>
+      <div class="summary-improvement-copy"><small>${t("improvement.kicker")}</small><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p>${positiveDetails.length?`<div class="summary-improvement-tags">${positiveDetails.map(item=>`<span>${escapeHtml(item)}</span>`).join("")}</div>`:""}</div>
+    </section>`;
+  }
+
+  function momentumInfo(canReview, rate) {
+    if(session?.mode==="path"){
+      const passed=Boolean(session.pathProgress?.passed);
+      const exam=Boolean(session.pathProgress?.exam);return {kind:"path",icon:passed?"→":"↻",title:passed?t("path.momentumPassed"):exam?t("path.exam.momentumPrep"):t("path.momentumRetry"),text:passed?t("path.momentumPassedText"):exam?t("path.exam.momentumPrepText"):t("path.momentumRetryText"),button:passed?t("path.backToPath"):exam?t("path.exam.prepButton"):t("path.retryCheck")};
+    }
+    const goal=dailyGoalInfo();
+    const nextReward=nextLevelRewardInfo(getLevelInfo().current.level);
+    if(canReview){
+      const count=session.wrongQuestions.length;
+      return {kind:"review",icon:"↻",title:count===1?t("momentum.reviewTitleOne"):t("momentum.reviewTitle",{count}),text:t("momentum.reviewText"),button:t("momentum.reviewButton")};
+    }
+    if(!goal.completed)return {kind:"daily",icon:"🔥",title:tp("momentum.dailyTitleOne","momentum.dailyTitle",goal.remaining),text:t("momentum.dailyText"),button:t("momentum.continueButton")};
+    if(nextReward&&nextReward.xpRemaining<=250)return {kind:"reward",icon:"✦",title:t("momentum.rewardTitle",{count:nextReward.xpRemaining,name:rewardHeadline(nextReward)}),text:t("momentum.rewardText"),button:t("momentum.continueButton")};
+    if(rate===100)return {kind:"perfect",icon:"★",title:t("momentum.perfectTitle"),text:t("momentum.perfectText"),button:t("momentum.continueButton")};
+    return {kind:"repeat",icon:"▶",title:t("momentum.repeatTitle"),text:t("momentum.repeatText"),button:t("momentum.continueButton")};
+  }
+
+  function startMomentumSession(canReview) {
+    if(session?.mode==="path"){
+      const moduleId=session.pathModuleId;const passed=Boolean(session.pathProgress?.passed);const exam=Boolean(session.pathProgress?.exam);const prep=session.pathProgress?.recommendedModules?.[0]||null;session=null;
+      if(!passed&&exam&&prep){state.learnTab="path";setRoute("learn");setTimeout(()=>openLearningPathModule(prep),0);return;}
+      if(!passed&&moduleId){const module=pathModuleById(moduleId);if(module?.exam)startLearningPathExam(moduleId);else startLearningPathModule(moduleId);return;}
+      state.learnTab="path";setRoute("learn");return;
+    }
+    if(canReview){const questions=clone(session.wrongQuestions);startReviewSession(questions);return;}
+    const mode=session.mode;
+    if(session.trainingList?.id){startTrainingListSession(session.trainingList.id,mode,session.config);return;}
+    if(["effectiveness","multiplier","impact","pokemon"].includes(mode)){startSession(mode);return;}
+    if(mode==="weak"){launchSmartTraining(buildSmartTrainingPlan());return;}
+    if(mode==="problem"&&session.problemPlan?.patternKey){const pattern=errorPatternByKey(session.problemPlan.patternKey);if(pattern){launchProblemTraining(buildProblemTrainingPlan(pattern));return;}}
+    if(mode==="daily"||mode==="review"||mode==="problem"){
+      state.config.effectiveness={...state.config.effectiveness,length:10};
+      startSession("effectiveness");
+      return;
+    }
+    setRoute("train");
+  }
+
+  function summaryScoreMarkup(rate,total) {
+    const exam=Boolean(session?.mode==="path"&&session.pathProgress?.exam);
+    return exam
+      ? `<div class="summary-score exam motion-summary-score"><strong>${rate}%</strong><small>${t("summary.answers",{correct:session.correct,total})}</small></div>`
+      : `<div class="summary-score answers motion-summary-score"><strong><span>${session.correct}</span><span aria-hidden="true">/</span><span>${total}</span></strong><small>${t("cleanup2.correctAnswers")}</small></div>`;
+  }
+
+  function summaryXpMarkup(xpEarned,levelInfo,didLevelUp,nextReward) {
+    const nearReward=nextReward&&nextReward.xpRemaining<=250;
+    const nearRewardVisual=nearReward?(rewardVisualMarkup(nextReward.items[0],"compact")||`<span class="reward-visual reward-title compact" aria-hidden="true">✦</span>`):"";
+    const levelText=didLevelUp?t("summary.levelReached",{level:levelInfo.current.level}):t("cleanup2.levelLabel",{level:levelInfo.current.level});
+    return `<section class="summary-xp-card ${didLevelUp?"level-up":"compact"}">
+      <div class="summary-xp-badge">${didLevelUp?"↑":"XP"}</div>
+      <div class="summary-xp-content">
+        <div class="summary-xp-heading"><span><small>${t("summary.xpEarned")}</small><strong>+${Math.max(0,xpEarned)} XP</strong></span><b>${escapeHtml(levelText)}</b></div>
+        <div class="summary-xp-track" aria-label="${levelInfo.progress}%"><i style="width:${levelInfo.progress}%"></i></div>
+        ${nearReward?`<div class="summary-near-reward">${nearRewardVisual}<span><small>${t("cleanup2.nextReachableGoal")}</small><strong>${t("rewards.xpToReward",{count:nextReward.xpRemaining})}</strong><em>${escapeHtml(rewardHeadline(nextReward))}</em></span></div>`:""}
+      </div>
+    </section>`;
+  }
+
+  function buildSummaryContext() {
     const total=session.answers.length;
     const rate=percent(session.correct,total);
     const xpEarned=state.stats.xp-session.startXp;
@@ -2179,49 +3766,439 @@
     const reviewComplete=session.mode==="review"&&session.reviewPending.length===0;
     const verdict=summaryVerdict(rate);
     const visual=modeVisual(session.mode);
-    const duration=Math.max(1,Math.round((Date.now()-session.startedAt)/1000));
+    const duration=Math.max(1,Number(session.duration||Math.round((Date.now()-session.startedAt)/1000)));
     const levelInfo=getLevelInfo();
     const gainedLevels=session.levelUps||[];
-    const unlockCount=(session.newUnlocks||[]).length;
+    const unlockedItems=uniqueRewardItems(gainedLevels.flatMap(levelUnlocksAt));
+    const unlockCount=unlockedItems.length;
     const didLevelUp=gainedLevels.length>0;
+    const nextReward=nextLevelRewardInfo(levelInfo.current.level);
+    const momentum=momentumInfo(canReview,rate);
+    const comparison=improvementCardMarkup(rate,duration,total);
+    const dailyGoal=dailyGoalInfo();
+    const wrongFocus=wrongTypes.length?`<section class="summary-focus-card compact"><div><p class="quiz-kicker">${t("summary.nextFocus")}</p><h2>${t("summary.focus")}</h2><p>${t("summary.thisSession")}</p></div><div class="summary-focus-types">${wrongTypes.map(([type,count])=>`<span>${typeChip(type)}<strong>${count}×</strong></span>`).join("")}</div></section>`:"";
+    return { total,rate,xpEarned,canReview,reviewComplete,verdict,visual,duration,levelInfo,unlockedItems,unlockCount,didLevelUp,nextReward,momentum,comparison,dailyGoal,wrongFocus };
+  }
 
-    view.innerHTML=`<section class="summary-shell">
+  function renderSummary() {
+    if(!session){setRoute("home");return;}
+    const { total,rate,xpEarned,canReview,reviewComplete,verdict,visual,duration,levelInfo,unlockedItems,unlockCount,didLevelUp,nextReward,momentum,comparison,dailyGoal,wrongFocus }=buildSummaryContext();
+
+    view.innerHTML=`<section class="summary-shell cleanup-summary">
       <section class="summary-hero-card">
-        <div class="summary-mode-pill"><span>${visual.icon}</span><strong>${escapeHtml(modeName(session.mode))}</strong></div>
+        <div class="summary-mode-pill"><span>${visual.icon}</span><strong>${escapeHtml(sessionModeName())}</strong></div>
         <div class="summary-hero-grid">
           <div class="summary-verdict"><span class="summary-verdict-icon">${verdict.icon}</span><p class="quiz-kicker">${t("summary.kicker")}</p><h1>${escapeHtml(verdict.title)}</h1><p>${reviewComplete?t("summary.reviewComplete"):verdict.text}</p></div>
-          <div class="summary-score motion-summary-score" style="--score:${rate}%"><span>${rate}%</span></div>
-        </div>
-        <div class="summary-answer-line">${t("summary.answers",{correct:session.correct,total})}</div>
-      </section>
-
-      <section class="summary-metric-grid">
-        <article><small>${t("summary.xp")}</small><strong>+${Math.max(0,xpEarned)} XP</strong></article>
-        <article><small>${t("summary.duration")}</small><strong>${formatDuration(duration)}</strong></article>
-        <article><small>${t("summary.streak")}</small><strong>${state.stats.streak}</strong></article>
-        <article><small>${t("summary.errors")}</small><strong>${session.wrongQuestions.length}</strong></article>
-      </section>
-
-      <section class="summary-xp-card ${didLevelUp?"level-up":""}">
-        <div class="summary-xp-badge">${didLevelUp?"↑":"XP"}</div>
-        <div class="summary-xp-content">
-          <div class="summary-xp-heading"><span><small>${didLevelUp?t("summary.levelUp"):t("summary.xpProgress")}</small><strong>${didLevelUp?t("summary.levelReached",{level:levelInfo.current.level}):escapeHtml(t(levelInfo.current.key))}</strong></span><b>Lv. ${levelInfo.current.level}</b></div>
-          <div class="summary-xp-track" aria-label="${levelInfo.progress}%"><i style="width:${levelInfo.progress}%"></i></div>
-          <p>${levelInfo.next?t("profile.nextLevel",{count:Math.max(0,levelInfo.next.xp-state.stats.xp),level:levelInfo.next.level}):t("profile.maxLevelText")}${unlockCount?` · ${t("summary.newUnlocks",{count:unlockCount})}`:""}</p>
+          ${summaryScoreMarkup(rate,total)}
         </div>
       </section>
 
-      ${wrongTypes.length?`<section class="summary-focus-card"><div><p class="quiz-kicker">${t("summary.nextFocus")}</p><h2>${t("summary.focus")}</h2><p>${t("summary.thisSession")}</p></div><div class="summary-focus-types">${wrongTypes.map(([type,count])=>`<span>${typeChip(type)}<strong>${count}×</strong></span>`).join("")}</div></section>`:""}
+      ${smartLearningSummaryMarkup()}
+      ${problemTrainingSummaryMarkup()}
+      ${learningPathSummaryMarkup()}
+      ${adaptiveSessionSummaryMarkup()}
+      ${comparison}
+      ${summaryXpMarkup(xpEarned,levelInfo,didLevelUp,nextReward)}
 
-      <section class="summary-actions-card">
-        <div><small>${t("summary.nextStep")}</small><strong>${canReview?t("summary.reviewRecommendation"):t("summary.keepTraining")}</strong></div>
-        <div class="actions summary-actions">${canReview?`<button id="reviewErrors" class="primary-button">${t("summary.review")}</button>`:""}${session.mode!=="review"&&["effectiveness","multiplier","impact","pokemon"].includes(session.mode)?`<button id="repeatSession" class="secondary-button">${t("summary.repeat")}</button>`:""}<button id="goHome" class="ghost-button">${t("summary.home")}</button></div>
+      <section class="summary-daily-goal-card ${dailyGoal.completed ? "is-complete" : ""}" style="--summary-daily-progress:${dailyGoal.percent}%">
+        <span aria-hidden="true">${dailyGoal.completed ? "🔥" : "◎"}</span>
+        <div><small>${t("daily.title")}</small><strong>${dailyGoal.completed ? tp("daily.completedTextOne", "daily.completedText", dailyGoal.streak, { streak: dailyGoal.streak }) : t("daily.progressText", { progress: dailyGoal.progress, target: dailyGoal.target })}</strong><em>${dailyGoal.completed ? t("daily.doneToday") : tp("daily.remainingOne", "daily.remaining", dailyGoal.remaining)}</em><i><b></b></i></div>
+      </section>
+
+      ${unlockCount?`<section class="summary-unlock-card"><div class="summary-unlock-heading"><span aria-hidden="true">✦</span><div><p class="quiz-kicker">${t("summary.levelUp")}</p><h2>${t("rewards.newTitle")}</h2><p>${t("rewards.newText",{count:unlockCount})}</p></div><button id="openUnlockedRewards" class="secondary-button">${t("rewards.open")}</button></div><div class="reward-list-grid">${rewardListMarkup(unlockedItems)}</div></section>`:""}
+
+      <details class="summary-secondary-details">
+        <summary><span><strong>${t("summary.details")}</strong><small>${t("summary.detailsHint")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <section class="summary-metric-grid">
+          <article><small>${t("summary.duration")}</small><strong>${formatDuration(duration)}</strong></article>
+          <article><small>${t("summary.bestCombo")}</small><strong>×${Math.max(0,Number(session.bestCombo||0))}</strong></article>
+          <article><small>${t("summary.errors")}</small><strong>${session.wrongQuestions.length}</strong></article>
+          <article><small>${t("profile.accuracy")}</small><strong>${rate}%</strong></article>
+        </section>
+        ${wrongFocus}
+      </details>
+
+      <section class="summary-momentum-card ${momentum.kind}">
+        <span class="summary-momentum-icon" aria-hidden="true">${momentum.icon}</span>
+        <div class="summary-momentum-copy"><small>${t("momentum.kicker")}</small><strong>${escapeHtml(momentum.title)}</strong><p>${escapeHtml(momentum.text)}</p></div>
+        <div class="summary-momentum-actions"><button id="continueMomentum" class="primary-button">${escapeHtml(momentum.button)}</button><button id="goHome" class="ghost-button">${t("momentum.finishToday")}</button></div>
       </section>
     </section>`;
-    if(didLevelUp&&!session.rewardCelebrated){session.rewardCelebrated=true;haptic("level");enqueueToast("⬆",t("toast.level",{level:levelInfo.current.level}),unlockCount?t("toast.unlocks",{count:unlockCount}):t(levelInfo.current.key),"level");}
-    document.getElementById("reviewErrors")?.addEventListener("click",()=>startReviewSession(session.wrongQuestions));
-    document.getElementById("repeatSession")?.addEventListener("click",()=>startSession(session.mode));
-    document.getElementById("goHome").addEventListener("click",()=>{session=null;setRoute("train");});
+    if(didLevelUp&&!session.rewardCelebrated){
+      session.rewardCelebrated=true;
+      haptic("level");
+      const firstUnlock=unlockedItems[0];
+      const unlockText=firstUnlock?(unlockCount>1?t("toast.unlockSpecific",{name:cosmeticName(firstUnlock),count:unlockCount-1}):t("toast.unlockOne",{name:cosmeticName(firstUnlock)})):t(levelInfo.current.key);
+      enqueueToast("⬆",t("toast.level",{level:levelInfo.current.level}),unlockText,"level");
+    }
+    document.getElementById("openUnlockedRewards")?.addEventListener("click",openProfileCustomizer);
+    document.getElementById("continueMomentum")?.addEventListener("click",()=>startMomentumSession(canReview));
+    document.getElementById("goHome").addEventListener("click",()=>{session=null;setRoute("home");});
+  }
+
+  function renderKnowledgePage() {
+    view.innerHTML=`<section class="learn-page knowledge-route-page">
+      <section class="learn-workspace panel knowledge-route-workspace"><div id="learnContent"></div></section>
+    </section>`;
+    renderKnowledge();
+  }
+
+  function flashcardItems(kind) {
+    const safeKind=QuizmonFlashcards.normalizeKind(kind);
+    if(safeKind==="types")return TYPES;
+    if(safeKind==="pokemon")return QuizmonKnowledgeData.POKEMON;
+    if(safeKind==="moves")return QuizmonKnowledgeContent.MOVES;
+    if(safeKind==="abilities")return QuizmonKnowledgeContent.ABILITIES;
+    return QuizmonKnowledgeContent.ITEMS;
+  }
+
+  function flashcardKindIcon(kind) {
+    if(kind==="types")return TYPE_META.psychic.icon;
+    if(kind==="pokemon")return iconSvg("pokemon");
+    if(kind==="moves")return iconSvg("evolution");
+    if(kind==="abilities")return iconSvg("battle");
+    return iconSvg("item");
+  }
+
+  function flashcardKindName(kind) { return t(`flashcards.kind.${kind}`); }
+
+  function flashcardLearningStateOptions() {
+    return {validKeys:new Set([
+      ...TYPES.map(type=>`types:${type}`),
+      ...QuizmonKnowledgeData.POKEMON.map(item=>`pokemon:${item.id}`),
+      ...QuizmonKnowledgeContent.MOVES.map(item=>`moves:${item.id}`),
+      ...QuizmonKnowledgeContent.ABILITIES.map(item=>`abilities:${item.id}`),
+      ...QuizmonKnowledgeContent.ITEMS.map(item=>`items:${item.id}`)
+    ])};
+  }
+
+  function flashcardResolveReviewEntry(entry) {
+    if(!entry)return null;
+    if(entry.kind==="types")return TYPES.includes(String(entry.id))?String(entry.id):null;
+    if(entry.kind==="pokemon")return QuizmonKnowledgeData.BY_ID.get(Number(entry.id))||null;
+    if(entry.kind==="moves")return QuizmonKnowledgeContent.MOVE_BY_ID.get(Number(entry.id))||null;
+    if(entry.kind==="abilities")return QuizmonKnowledgeContent.ABILITY_BY_ID.get(Number(entry.id))||null;
+    if(entry.kind==="items")return QuizmonKnowledgeContent.ITEM_BY_ID.get(Number(entry.id))||null;
+    return null;
+  }
+
+  function flashcardReviewItems(kind) {
+    state.flashcards=QuizmonFlashcards.sanitizeLearningState(state.flashcards,flashcardLearningStateOptions());
+    return state.flashcards.review.filter(entry=>entry.kind===kind).map(flashcardResolveReviewEntry).filter(Boolean);
+  }
+
+  function flashcardWeakTypes() {
+    const profile=getLearningProfile();
+    const needs=(profile.needs||[]).map(area=>area.type).filter(type=>TYPES.includes(type));
+    const legacy=TYPES.filter(type=>state.stats.types[type].total>=3)
+      .sort((a,b)=>percent(state.stats.types[a].correct,state.stats.types[a].total)-percent(state.stats.types[b].correct,state.stats.types[b].total))
+      .filter(type=>percent(state.stats.types[type].correct,state.stats.types[type].total)<75);
+    return unique([...needs,...legacy]).slice(0,8);
+  }
+
+  function flashcardWeakPokemon() {
+    const weakTypes=flashcardWeakTypes();
+    if(!weakTypes.length)return [];
+    return QuizmonKnowledgeData.POKEMON.filter(item=>item.types.some(type=>weakTypes.includes(type)));
+  }
+
+  function flashcardFavoriteItems(kind) {
+    if(kind==="types")return favoriteTypeEntries().map(entry=>entry.type).filter(type=>TYPES.includes(type));
+    if(kind==="pokemon")return favoritePokemonEntries().map(entry=>QuizmonKnowledgeData.BY_ID.get(Number(entry.id))).filter(Boolean);
+    return [];
+  }
+
+  function flashcardListItems(kind,listId) {
+    const list=trainingLists().find(item=>item.id===listId&&item.kind===kind);
+    if(!list)return [];
+    if(kind==="types")return list.entries.filter(type=>TYPES.includes(type));
+    return list.entries.map(id=>QuizmonKnowledgeData.BY_ID.get(Number(id))).filter(Boolean);
+  }
+
+  function flashcardSourceOptions(kind) {
+    const safeKind=QuizmonFlashcards.normalizeKind(kind);
+    const options=[{id:"all",label:t("flashcards.sourceAll"),text:t("flashcards.sourceTextAll"),icon:flashcardKindIcon(safeKind)}];
+    const favorites=flashcardFavoriteItems(safeKind);
+    if(favorites.length)options.push({id:"favorites",label:t("flashcards.sourceFavorites"),text:t("flashcards.sourceTextFavorites",{count:favorites.length}),icon:"♥"});
+    if(safeKind==="types"){
+      const weak=flashcardWeakTypes();
+      if(weak.length)options.push({id:"weak",label:t("flashcards.sourceWeakTypes"),text:t("flashcards.sourceTextWeakTypes",{count:weak.length}),icon:"◎"});
+    }else if(safeKind==="pokemon"){
+      const weak=flashcardWeakPokemon();
+      if(weak.length)options.push({id:"weak",label:t("flashcards.sourceWeakPokemon"),text:t("flashcards.sourceTextWeakPokemon",{count:weak.length}),icon:"◎"});
+    }
+    const review=flashcardReviewItems(safeKind);
+    if(review.length)options.push({id:"review",label:t("flashcards.sourceReview"),text:t("flashcards.sourceTextReview",{count:review.length}),icon:"↻"});
+    trainingLists().filter(list=>list.kind===safeKind&&list.entries.length).forEach(list=>options.push({id:`list:${list.id}`,label:list.name,text:t("flashcards.sourceTextList",{count:list.entries.length}),icon:"☷"}));
+    return options;
+  }
+
+  function flashcardSourceItems(kind,sourceId=flashcardSetupSource,generation=flashcardSetupGeneration) {
+    const safeKind=QuizmonFlashcards.normalizeKind(kind);
+    let items;
+    if(sourceId==="favorites")items=flashcardFavoriteItems(safeKind);
+    else if(sourceId==="weak")items=safeKind==="types"?flashcardWeakTypes():safeKind==="pokemon"?flashcardWeakPokemon():[];
+    else if(sourceId==="review")items=flashcardReviewItems(safeKind);
+    else if(String(sourceId).startsWith("list:"))items=flashcardListItems(safeKind,String(sourceId).slice(5));
+    else items=flashcardItems(safeKind);
+    const selectedGeneration=QuizmonKnowledgeFilter.normalizeGeneration(generation);
+    if(selectedGeneration&&safeKind!=="types")items=items.filter(item=>Number(item?.generation)===selectedGeneration);
+    return items;
+  }
+
+  function flashcardSelectedSource(kind) {
+    const options=flashcardSourceOptions(kind);
+    let selected=options.find(option=>option.id===flashcardSetupSource);
+    if(!selected){flashcardSetupSource="all";selected=options[0];}
+    return {options,selected};
+  }
+
+  function flashcardPersonalSourceCount() {
+    return QuizmonFlashcards.KINDS.reduce((sum,kind)=>sum+Math.max(0,flashcardSourceOptions(kind).length-1),0);
+  }
+
+  function flashcardSetupMarkup() {
+    const selectedKind=QuizmonFlashcards.normalizeKind(flashcardSetupKind);
+    const selectedCount=QuizmonFlashcards.normalizeCount(flashcardSetupCount);
+    const {options:sourceOptions,selected:selectedSource}=flashcardSelectedSource(selectedKind);
+    const available=flashcardSourceItems(selectedKind,selectedSource.id,flashcardSetupGeneration).length;
+    const planned=selectedCount==="all"?available:Math.min(Number(selectedCount),available);
+    const generationDisabled=selectedKind==="types";
+    const generationValue=generationDisabled?"all":String(QuizmonKnowledgeFilter.normalizeGeneration(flashcardSetupGeneration)||"all");
+    const generationMarkup=generationDisabled?"":`<section class="flashcards-setup-section flashcards-generation-section" aria-labelledby="flashcardGenerationTitle">
+        <div class="flashcards-section-heading"><div><small>${t("flashcards.stepThree")}</small><h3 id="flashcardGenerationTitle">${t("flashcards.chooseGeneration")}</h3></div><span>${generationValue==="all"?"∞":generationValue}</span></div>
+        <label class="flashcard-source-select"><span>${t("flashcards.generationLabel")}</span><select data-flashcard-generation><option value="all" ${generationValue==="all"?"selected":""}>${escapeHtml(t("knowledge.generationFilter.all"))}</option>${QuizmonKnowledgeFilter.GENERATIONS.map(generation=>`<option value="${generation}" ${String(generation)===generationValue?"selected":""}>${escapeHtml(t("knowledge.generationFilter.option",{generation}))}</option>`).join("")}</select></label>
+        <p class="flashcard-generation-note">${t("flashcards.generationNote")}</p>
+      </section>`;
+    return `<section class="flashcards-setup" aria-labelledby="flashcardsSetupTitle">
+      <section class="flashcards-intro-card">
+        <span aria-hidden="true">▤</span>
+        <div><p class="quiz-kicker">${t("flashcards.kicker")}</p><h3 id="flashcardsSetupTitle">${t("flashcards.setupTitle")}</h3><p>${t("flashcards.setupTextPersonal")}</p></div>
+      </section>
+      <section class="flashcards-setup-section" aria-labelledby="flashcardKindTitle">
+        <div class="flashcards-section-heading"><div><small>${t("flashcards.stepOne")}</small><h3 id="flashcardKindTitle">${t("flashcards.chooseKind")}</h3></div><span>${QuizmonFlashcards.KINDS.length}</span></div>
+        <div class="flashcard-kind-grid">${QuizmonFlashcards.KINDS.map(kind=>{
+          const selected=kind===selectedKind;
+          return `<button type="button" class="flashcard-kind-card ${selected?"selected":""}" data-flashcard-kind="${kind}" aria-pressed="${selected}">
+            <span class="flashcard-kind-icon" aria-hidden="true">${flashcardKindIcon(kind)}</span>
+            <span><small>${t("flashcards.cardCount",{count:flashcardItems(kind).length})}</small><strong>${escapeHtml(flashcardKindName(kind))}</strong><p>${escapeHtml(t(`flashcards.kindText.${kind}`))}</p></span>
+            <i aria-hidden="true">${selected?"✓":"›"}</i>
+          </button>`;
+        }).join("")}</div>
+      </section>
+      <section class="flashcards-setup-section flashcards-source-section" aria-labelledby="flashcardSourceTitle">
+        <div class="flashcards-section-heading"><div><small>${t("flashcards.stepTwo")}</small><h3 id="flashcardSourceTitle">${t("flashcards.chooseSource")}</h3></div><span>${sourceOptions.length}</span></div>
+        <label class="flashcard-source-select"><span>${t("flashcards.sourceLabel")}</span><select data-flashcard-source>${sourceOptions.map(option=>`<option value="${escapeHtml(option.id)}" ${option.id===selectedSource.id?"selected":""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>
+        <section class="flashcard-source-preview"><span aria-hidden="true">${selectedSource.icon}</span><div><small>${t("flashcards.personalSource")}</small><strong>${escapeHtml(selectedSource.label)}</strong><p>${escapeHtml(selectedSource.text)}</p></div><b>${available}</b></section>
+      </section>
+      ${generationMarkup}
+      <section class="flashcards-setup-section flashcards-count-section" aria-labelledby="flashcardCountTitle">
+        <div class="flashcards-section-heading"><div><small>${t(generationDisabled?"flashcards.stepThree":"flashcards.stepFour")}</small><h3 id="flashcardCountTitle">${t("flashcards.chooseCount")}</h3></div><span>${planned}</span></div>
+        <div class="flashcard-count-options" role="group" aria-label="${escapeHtml(t("flashcards.chooseCount"))}">${QuizmonFlashcards.COUNT_OPTIONS.map(value=>{
+          const selected=String(value)===String(selectedCount);
+          const label=value==="all"?t("flashcards.allCards"):t("flashcards.countOption",{count:value});
+          return `<button type="button" class="${selected?"selected":""}" data-flashcard-count="${value}" aria-pressed="${selected}"><strong>${value==="all"?"∞":value}</strong><span>${escapeHtml(label)}</span></button>`;
+        }).join("")}</div>
+        <section class="flashcard-start-summary">
+          <span aria-hidden="true">${flashcardKindIcon(selectedKind)}</span>
+          <div><small>${t("flashcards.readyKicker")}</small><strong>${escapeHtml(selectedSource.label)}</strong><p>${available?t("flashcards.readyTextPersonal",{count:planned,kind:flashcardKindName(selectedKind)}):t("flashcards.noCardsForSelection")}</p></div>
+          <button type="button" class="primary-button" data-flashcard-start ${available?"":"disabled"}>${t("flashcards.start")}</button>
+        </section>
+      </section>
+      <p class="flashcards-offline-note"><span aria-hidden="true">○</span>${t("flashcards.selfAssessmentNote")}</p>
+    </section>`;
+  }
+
+  function renderFlashcardSetup() {
+    const root=document.getElementById("learnContent");
+    if(!root)return;
+    root.innerHTML=flashcardSetupMarkup();
+    root.querySelectorAll("[data-flashcard-kind]").forEach(button=>button.addEventListener("click",()=>{flashcardSetupKind=QuizmonFlashcards.normalizeKind(button.dataset.flashcardKind);flashcardSetupSource="all";renderFlashcardSetup();}));
+    root.querySelector("[data-flashcard-source]")?.addEventListener("change",event=>{flashcardSetupSource=String(event.target.value||"all");renderFlashcardSetup();});
+    root.querySelector("[data-flashcard-generation]")?.addEventListener("change",event=>{flashcardSetupGeneration=QuizmonKnowledgeFilter.normalizeGeneration(event.target.value)||"all";renderFlashcardSetup();});
+    root.querySelectorAll("[data-flashcard-count]").forEach(button=>button.addEventListener("click",()=>{flashcardSetupCount=QuizmonFlashcards.normalizeCount(button.dataset.flashcardCount);renderFlashcardSetup();}));
+    root.querySelector("[data-flashcard-start]")?.addEventListener("click",startFlashcardSession);
+  }
+
+  function startFlashcardSession(options={}) {
+    const kind=QuizmonFlashcards.normalizeKind(options.kind||flashcardSetupKind);
+    const sourceId=String(options.sourceId||flashcardSetupSource||"all");
+    const generation=options.generation??flashcardSetupGeneration;
+    const count=options.count??flashcardSetupCount;
+    const sourceOptions=flashcardSourceOptions(kind);
+    const source=sourceOptions.find(item=>item.id===sourceId)||sourceOptions[0];
+    const items=flashcardSourceItems(kind,source.id,generation);
+    if(!items.length){enqueueToast("!",t("flashcards.noCardsTitle"),t("flashcards.noCardsForSelection"),"info");return;}
+    flashcardSetupKind=kind;flashcardSetupSource=source.id;flashcardSetupGeneration=generation;flashcardSetupCount=count;
+    flashcardSession=QuizmonFlashcards.createSession(items,{kind,count,sourceId:source.id,sourceLabel:source.label,generation});
+    haptic("selection");
+    renderFlashcards();
+  }
+
+  function flashcardTypeGroups(type) {
+    return {
+      strong:TYPES.filter(defender=>(TYPE_CHART[type]?.[defender]??1)===2),
+      weak:TYPES.filter(attacker=>(TYPE_CHART[attacker]?.[type]??1)===2),
+      resists:TYPES.filter(attacker=>(TYPE_CHART[attacker]?.[type]??1)===.5),
+      immune:TYPES.filter(attacker=>(TYPE_CHART[attacker]?.[type]??1)===0)
+    };
+  }
+
+  function flashcardTypeList(multiplier,label,types) {
+    return `<section class="flashcard-fact-group"><small><b>${escapeHtml(multiplier)}</b><span>${escapeHtml(label)}</span></small><div>${types.length?types.map(type=>typeChip(type,"small")).join(""):`<span class="flashcard-none">${t("flashcards.none")}</span>`}</div></section>`;
+  }
+
+  function flashcardFrontMarkup(kind,item) {
+    if(kind==="types")return `<div class="flashcard-front-visual type" style="--flashcard-accent:${TYPE_META[item]?.color||"var(--primary)"}"><span>${TYPE_META[item]?.icon||"◆"}</span></div><small>${t("flashcards.frontLabel")}</small><h3>${escapeHtml(typeLabel(item))}</h3><p>${t("flashcards.typePrompt")}</p>`;
+    if(kind==="pokemon")return `<div class="flashcard-front-visual pokemon"><img src="${escapeHtml(knowledgeArtwork(item))}" alt=""></div><small>${t("flashcards.frontLabel")}</small><h3>${escapeHtml(knowledgePokemonName(item))}</h3><p>#${String(item.id).padStart(4,"0")}</p>`;
+    if(kind==="moves")return `<div class="flashcard-front-visual move" style="--flashcard-accent:${TYPE_META[item.type]?.color||"var(--primary)"}"><span>${TYPE_META[item.type]?.icon||"↗"}</span></div><small>${t("flashcards.frontLabel")}</small><h3>${escapeHtml(knowledgeEntryName(item))}</h3><p>${escapeHtml(typeLabel(item.type))}</p>`;
+    if(kind==="abilities")return `<div class="flashcard-front-visual ability"><span>✦</span></div><small>${t("flashcards.frontLabel")}</small><h3>${escapeHtml(knowledgeEntryName(item))}</h3><p>${t("knowledge.generation",{generation:item.generation})}</p>`;
+    return `<div class="flashcard-front-visual item"><img src="${escapeHtml(knowledgeItemArtwork(item))}" alt=""></div><small>${t("flashcards.frontLabel")}</small><h3>${escapeHtml(knowledgeEntryName(item))}</h3><p>${escapeHtml(knowledgePocketLabel(item.pocket))}</p>`;
+  }
+
+  function flashcardBackMarkup(kind,item) {
+    if(kind==="types"){
+      const groups=flashcardTypeGroups(item);
+      return `<small>${t("flashcards.backLabel")}</small><h3>${escapeHtml(typeLabel(item))}</h3><div class="flashcard-type-facts">${flashcardTypeList("2×",t("learn.strongAgainst"),groups.strong)}${flashcardTypeList("2×",t("learn.vulnerable"),groups.weak)}${flashcardTypeList("½×",t("learn.resists"),groups.resists)}${flashcardTypeList("0×",t("learn.immune"),groups.immune)}</div>`;
+    }
+    if(kind==="pokemon")return `<small>${t("flashcards.backLabel")}</small><h3>${escapeHtml(knowledgePokemonName(item))}</h3><div class="flashcard-back-tags">${item.types.map(type=>typeChip(type,"small")).join("")}</div><dl class="flashcard-data-list"><div><dt>${t("knowledge.generationLabel")}</dt><dd>${item.generation}</dd></div><div><dt>${t("knowledge.abilities")}</dt><dd>${escapeHtml(item.abilities.map(ability=>state.language==="en"?ability.en:ability.de).join(" · "))}</dd></div></dl>`;
+    if(kind==="moves")return `<small>${t("flashcards.backLabel")}</small><h3>${escapeHtml(knowledgeEntryName(item))}</h3><div class="flashcard-back-tags">${typeChip(item.type,"small")}<span>${escapeHtml(knowledgeDamageClassLabel(item.damageClass))}</span></div><dl class="flashcard-stat-grid"><div><dt>${t("knowledge.power")}</dt><dd>${item.power??"—"}</dd></div><div><dt>${t("knowledge.accuracy")}</dt><dd>${item.accuracy==null?"—":`${item.accuracy}%`}</dd></div><div><dt>${t("knowledge.pp")}</dt><dd>${item.pp??"—"}</dd></div></dl><p class="flashcard-effect">${escapeHtml(knowledgeExcerpt(knowledgeEntryEffect(item),260))}</p>`;
+    if(kind==="abilities")return `<small>${t("flashcards.backLabel")}</small><h3>${escapeHtml(knowledgeEntryName(item))}</h3><div class="flashcard-back-tags"><span>${t("knowledge.generation",{generation:item.generation})}</span><span>${t("knowledge.pokemonLinked",{count:item.pokemonIds.length})}</span></div><p class="flashcard-effect">${escapeHtml(knowledgeExcerpt(knowledgeEntryEffect(item),300))}</p>`;
+    return `<small>${t("flashcards.backLabel")}</small><h3>${escapeHtml(knowledgeEntryName(item))}</h3><div class="flashcard-back-tags"><span>${escapeHtml(knowledgePocketLabel(item.pocket))}</span><span>${t("knowledge.generation",{generation:item.generation})}</span></div><p class="flashcard-effect">${escapeHtml(knowledgeExcerpt(knowledgeEntryEffect(item),300))}</p>`;
+  }
+
+  function flashcardToggleReveal() {
+    if(!flashcardSession||flashcardSession.phase==="summary")return;
+    QuizmonFlashcards.reveal(flashcardSession,!flashcardSession.revealed);
+    haptic("selection");
+    renderFlashcards();
+  }
+
+  function flashcardMove(delta) {
+    if(!flashcardSession||flashcardSession.phase==="summary")return;
+    QuizmonFlashcards.move(flashcardSession,delta);
+    haptic("selection");
+    renderFlashcards();
+  }
+
+  function flashcardShuffle() {
+    if(!flashcardSession||flashcardSession.phase==="summary")return;
+    QuizmonFlashcards.reshuffle(flashcardSession);
+    haptic("move");
+    enqueueToast("↻",t("flashcards.shuffled"),t("flashcards.shuffledText"),"info");
+    renderFlashcards();
+  }
+
+  function persistFlashcardSession() {
+    if(!flashcardSession||flashcardSession.phase!=="summary"||flashcardSession.persisted)return;
+    state.flashcards=QuizmonFlashcards.applySessionToLearningState(state.flashcards,flashcardSession,flashcardLearningStateOptions());
+    flashcardSession.persisted=true;
+    saveState();
+  }
+
+  function flashcardRate(rating) {
+    if(!flashcardSession?.revealed)return;
+    const result=QuizmonFlashcards.rateCurrent(flashcardSession,rating);
+    if(!result.accepted)return;
+    haptic(rating==="known"?"success":"selection");
+    if(result.transition==="review")enqueueToast("↻",t("flashcards.reviewStarts"),t("flashcards.reviewStartsText",{count:result.reviewCount}),"info");
+    if(result.transition==="summary")persistFlashcardSession();
+    renderFlashcards();
+  }
+
+  function flashcardRepeatUnresolved() {
+    if(!flashcardSession)return;
+    if(!QuizmonFlashcards.repeatUnresolved(flashcardSession))return;
+    flashcardSession.persisted=false;
+    haptic("move");
+    renderFlashcards();
+  }
+
+  function flashcardRestart() {
+    if(!flashcardSession)return;
+    const previous=flashcardSession;
+    flashcardSession=QuizmonFlashcards.createSession(previous.initialDeck,{kind:previous.kind,count:"all",sourceId:previous.sourceId,sourceLabel:previous.sourceLabel,generation:previous.generation});
+    haptic("selection");
+    renderFlashcards();
+  }
+
+  function finishFlashcardSession() {
+    flashcardSession=null;
+    renderLearn();
+  }
+
+  function flashcardSummaryMarkup() {
+    const result=QuizmonFlashcards.summary(flashcardSession);
+    const initiallyOpen=result.unsure+result.unknown;
+    const resolved=Math.max(0,initiallyOpen-result.unresolved);
+    const resultTitle=result.unresolved?t("flashcards.unresolvedTitle",{count:result.unresolved}):initiallyOpen?t("flashcards.allResolvedTitle"):t("flashcards.perfectTitle");
+    const resultText=result.unresolved?t("flashcards.unresolvedText",{count:result.unresolved,resolved}):initiallyOpen?t("flashcards.allResolvedText",{resolved}):t("flashcards.perfectText",{count:result.total});
+    return `<section class="flashcard-summary" aria-labelledby="flashcardSummaryTitle">
+      <section class="flashcard-summary-hero"><span aria-hidden="true">✓</span><div><p class="quiz-kicker">${t("flashcards.summaryKicker")}</p><h3 id="flashcardSummaryTitle">${t("flashcards.summaryTitle")}</h3><p>${t("flashcards.summaryText",{count:result.total,source:flashcardSession.sourceLabel||flashcardKindName(flashcardSession.kind)})}</p></div></section>
+      <div class="flashcard-summary-metrics"><article><small>${t("flashcards.ratingKnown")}</small><strong>${result.known}</strong></article><article><small>${t("flashcards.ratingUnsure")}</small><strong>${result.unsure}</strong></article><article><small>${t("flashcards.ratingUnknown")}</small><strong>${result.unknown}</strong></article></div>
+      <section class="flashcard-review-result ${result.unresolved?"attention":"complete"}"><span aria-hidden="true">${result.unresolved?"↻":"★"}</span><div><strong>${resultTitle}</strong><p>${resultText}</p></div></section>
+      <div class="flashcard-summary-actions">${result.unresolved?`<button type="button" class="primary-button" data-flashcard-repeat>${t("flashcards.repeatUnresolved")}</button>`:""}<button type="button" class="${result.unresolved?"secondary-button":"primary-button"}" data-flashcard-restart>${t("flashcards.newRound")}</button><button type="button" class="ghost-button" data-flashcard-summary-exit>${t("flashcards.backToLearn")}</button></div>
+      <p class="flashcards-offline-note"><span aria-hidden="true">i</span>${t("flashcards.summaryStatsNote")}</p>
+    </section>`;
+  }
+
+  function renderFlashcards() {
+    const root=document.getElementById("learnContent");
+    if(!root||!flashcardSession?.initialDeck?.length){flashcardSession=null;renderFlashcardSetup();return;}
+    if(flashcardSession.phase==="summary"){
+      persistFlashcardSession();
+      root.innerHTML=flashcardSummaryMarkup();
+      root.querySelector("[data-flashcard-repeat]")?.addEventListener("click",flashcardRepeatUnresolved);
+      root.querySelector("[data-flashcard-restart]")?.addEventListener("click",flashcardRestart);
+      root.querySelector("[data-flashcard-summary-exit]")?.addEventListener("click",finishFlashcardSession);
+      return;
+    }
+    const item=QuizmonFlashcards.current(flashcardSession);
+    const progress=QuizmonFlashcards.progress(flashcardSession);
+    const kind=flashcardSession.kind;
+    const revealed=Boolean(flashcardSession.revealed);
+    const rating=QuizmonFlashcards.ratingFor(flashcardSession,item);
+    const review=flashcardSession.phase==="review";
+    root.innerHTML=`<section class="flashcard-session ${review?"is-review":""}" aria-labelledby="flashcardSessionTitle">
+      <header class="flashcard-session-head">
+        <div><p class="quiz-kicker">${review?t("flashcards.reviewKicker",{round:flashcardSession.reviewRound}):t("flashcards.sessionKicker")}</p><h3 id="flashcardSessionTitle">${escapeHtml(flashcardSession.sourceLabel||flashcardKindName(kind))}</h3><p>${t("flashcards.progressText",{current:progress.current,total:progress.total})} · ${escapeHtml(flashcardKindName(kind))}</p></div>
+        <div><button type="button" class="secondary-button" data-flashcard-shuffle>↻ ${t("flashcards.shuffle")}</button><button type="button" class="ghost-button" data-flashcard-exit>${t("flashcards.changeSet")}</button></div>
+      </header>
+      ${review?`<section class="flashcard-review-banner"><span aria-hidden="true">↻</span><div><strong>${t("flashcards.reviewBannerTitle")}</strong><p>${t("flashcards.reviewBannerText")}</p></div></section>`:""}
+      <div class="flashcard-progress" aria-label="${escapeHtml(t("flashcards.progressText",{current:progress.current,total:progress.total}))}"><i style="width:${progress.percent}%"></i></div>
+      <button type="button" class="flashcard-card ${revealed?"is-revealed":""}" data-flashcard-reveal aria-pressed="${revealed}" aria-label="${escapeHtml(revealed?t("flashcards.showFront"):t("flashcards.reveal"))}">
+        <span class="flashcard-card-inner">
+          <span class="flashcard-face flashcard-front" aria-hidden="${revealed}">${flashcardFrontMarkup(kind,item)}<em>${t("flashcards.tapToReveal")}</em></span>
+          <span class="flashcard-face flashcard-back" aria-hidden="${!revealed}">${flashcardBackMarkup(kind,item)}<em>${t("flashcards.ratePrompt")}</em></span>
+        </span>
+      </button>
+      <p class="flashcard-side-status" aria-live="polite">${revealed?t("flashcards.backVisible"):t("flashcards.frontVisible")}</p>
+      ${revealed?`<section class="flashcard-rating" aria-labelledby="flashcardRatingTitle"><div><small>${t("flashcards.selfAssessment")}</small><strong id="flashcardRatingTitle">${t("flashcards.howWellKnown")}</strong></div><div>${QuizmonFlashcards.RATINGS.map(value=>`<button type="button" class="${value} ${rating===value?"selected":""}" data-flashcard-rating="${value}" aria-pressed="${rating===value}"><span aria-hidden="true">${value==="known"?"✓":value==="unsure"?"~":"?"}</span><strong>${t(`flashcards.rating.${value}`)}</strong><small>${t(`flashcards.ratingText.${value}`)}</small></button>`).join("")}</div></section>`:`<p class="flashcard-rating-wait">${t("flashcards.revealBeforeRating")}</p>`}
+      <nav class="flashcard-controls" aria-label="${escapeHtml(t("flashcards.controlsLabel"))}">
+        <button type="button" class="secondary-button" data-flashcard-previous ${progress.first?"disabled":""}>← ${t("flashcards.previous")}</button>
+        <button type="button" class="primary-button" data-flashcard-flip>${revealed?t("flashcards.showFront"):t("flashcards.reveal")}</button>
+        <button type="button" class="secondary-button" data-flashcard-next ${!rating||progress.last?"disabled":""}>${t("flashcards.next")} →</button>
+      </nav>
+      <p class="flashcard-keyboard-hint">${t("flashcards.keyboardHintAssessment")}</p>
+    </section>`;
+    const card=root.querySelector("[data-flashcard-reveal]");
+    card?.addEventListener("click",()=>{if(flashcardSwipeHandled){flashcardSwipeHandled=false;return;}flashcardToggleReveal();});
+    card?.addEventListener("pointerdown",event=>{flashcardSwipeStartX=event.clientX;});
+    card?.addEventListener("pointerup",event=>{
+      const action=QuizmonFlashcards.swipeAction(flashcardSwipeStartX,event.clientX);
+      flashcardSwipeStartX=null;
+      if(!action)return;
+      if(action==="next"&&rating&&!progress.last){flashcardSwipeHandled=true;flashcardMove(1);}
+      if(action==="previous"&&!progress.first){flashcardSwipeHandled=true;flashcardMove(-1);}
+      setTimeout(()=>{flashcardSwipeHandled=false;},120);
+    });
+    card?.addEventListener("pointercancel",()=>{flashcardSwipeStartX=null;});
+    root.querySelector("[data-flashcard-previous]")?.addEventListener("click",()=>flashcardMove(-1));
+    root.querySelector("[data-flashcard-next]")?.addEventListener("click",()=>flashcardMove(1));
+    root.querySelector("[data-flashcard-flip]")?.addEventListener("click",flashcardToggleReveal);
+    root.querySelectorAll("[data-flashcard-rating]").forEach(button=>button.addEventListener("click",()=>flashcardRate(button.dataset.flashcardRating)));
+    root.querySelector("[data-flashcard-shuffle]")?.addEventListener("click",flashcardShuffle);
+    root.querySelector("[data-flashcard-exit]")?.addEventListener("click",finishFlashcardSession);
   }
 
   function renderLearn() {
@@ -2234,35 +4211,358 @@
     const typeAnswers = TYPES.reduce((sum,type)=>sum+state.stats.types[type].total,0);
     const typeCorrect = TYPES.reduce((sum,type)=>sum+state.stats.types[type].correct,0);
     const knowledgeRate = percent(typeCorrect,typeAnswers);
+    const workspaceTitle = state.learnTab === "lab" ? t("learn.labTitle") : state.learnTab === "cards" ? t("flashcards.title") : t("path.title");
+    const flashcardReviewCount=state.learnTab==="cards"?flashcardReviewItems("types").length+flashcardReviewItems("pokemon").length+flashcardReviewItems("moves").length+flashcardReviewItems("abilities").length+flashcardReviewItems("items").length:0;
+    const metrics=state.learnTab==="lab"?`<div class="learn-hero-metrics"><article><small>${t("learn.allTypes")}</small><strong>${TYPES.length}</strong></article><article><small>${t("learn.explored")}</small><strong>${explored}</strong></article><article><small>${t("learn.mastered")}</small><strong>${mastered}</strong></article><article><small>${t("learn.knowledgeRate")}</small><strong>${knowledgeRate}%</strong></article></div>`:state.learnTab==="cards"?`<div class="learn-hero-metrics"><article><small>${t("flashcards.sets")}</small><strong>${QuizmonFlashcards.KINDS.length}</strong></article><article><small>${t("flashcards.availableCards")}</small><strong>${flashcardItems("types").length+flashcardItems("pokemon").length+flashcardItems("moves").length+flashcardItems("abilities").length+flashcardItems("items").length}</strong></article><article><small>${t("flashcards.personalSets")}</small><strong>${flashcardPersonalSourceCount()}</strong></article><article><small>${t("flashcards.reviewCards")}</small><strong>${flashcardReviewCount}</strong></article></div>`:"";
 
-    view.innerHTML=`<section class="learn-page">
+    view.innerHTML=`<section class="learn-page ${state.learnTab==="path"?"path-focused":""} ${state.learnTab==="cards"?"flashcards-focused":""}">
       <section class="learn-hero">
-        <div class="learn-hero-copy">
-          <p class="quiz-kicker">${t("learn.kicker")}</p>
-          <h1>${t("learn.title")}</h1>
-          <p>${t("learn.subtitle")}</p>
-        </div>
-        <div class="learn-hero-metrics">
-          <article><small>${t("learn.allTypes")}</small><strong>${TYPES.length}</strong></article>
-          <article><small>${t("learn.explored")}</small><strong>${explored}</strong></article>
-          <article><small>${t("learn.mastered")}</small><strong>${mastered}</strong></article>
-          <article><small>${t("learn.knowledgeRate")}</small><strong>${knowledgeRate}%</strong></article>
-        </div>
+        <div class="learn-hero-copy"><p class="quiz-kicker">${t("learn.kicker")}</p><h1>${t("learn.title")}</h1><p>${t("learn.subtitleFocused")}</p></div>
+        ${metrics}
       </section>
-
-      <section class="learn-workspace panel">
-        <div class="learn-workspace-head">
-          <div><p class="quiz-kicker">${t("learn.workspaceKicker")}</p><h2>${state.learnTab==="lab"?t("learn.labTitle"):t("learn.lexiconTitle")}</h2></div>
-          <div class="tabs learn-tabs" role="tablist" style="--tab-count:2">
-            <button class="tab-button ${state.learnTab==="lexicon"?"active":""}" role="tab" aria-selected="${state.learnTab==="lexicon"}" data-learn-tab="lexicon">${t("learn.lexicon")}</button>
-            <button class="tab-button ${state.learnTab==="lab"?"active":""}" role="tab" aria-selected="${state.learnTab==="lab"}" data-learn-tab="lab">${t("learn.lab")}</button>
-          </div>
-        </div>
-        <div id="learnContent"></div>
-      </section>
+      <section class="learn-workspace panel"><div class="learn-workspace-head"><div><p class="quiz-kicker">${t("learn.workspaceKicker")}</p><h2>${workspaceTitle}</h2></div><div class="tabs learn-tabs" role="tablist" style="--tab-count:3"><button class="tab-button ${state.learnTab==="path"?"active":""}" role="tab" aria-selected="${state.learnTab==="path"}" data-learn-tab="path">${t("path.tab")}</button><button class="tab-button ${state.learnTab==="lab"?"active":""}" role="tab" aria-selected="${state.learnTab==="lab"}" data-learn-tab="lab">${t("path.labTab")}</button><button class="tab-button ${state.learnTab==="cards"?"active":""}" role="tab" aria-selected="${state.learnTab==="cards"}" data-learn-tab="cards">${t("flashcards.tab")}</button></div></div><div id="learnContent"></div></section>
     </section>`;
     document.querySelectorAll("[data-learn-tab]").forEach(button=>button.addEventListener("click",()=>{state.learnTab=button.dataset.learnTab;saveState();renderLearn();}));
-    if(state.learnTab==="lab")renderTypeLab();else renderLexicon();
+    if(state.learnTab==="lab")renderTypeLab();
+    else if(state.learnTab==="cards"){if(flashcardSession)renderFlashcards();else renderFlashcardSetup();}
+    else renderLearningPath();
+  }
+
+  function pathImpactSpec(attackingType, defendingTypes, options = [0,.5,1,2]) {
+    const correctMultiplier = effectiveness(attackingType, defendingTypes);
+    const values = [...new Set([correctMultiplier, ...options])].filter(value => [0,.25,.5,1,2,4].includes(value)).slice(0,6);
+    return { kind:"impact", attackingType, defendingTypes:[...defendingTypes], options:shuffle(values), correctMultiplier, focusTypes:unique([attackingType,...defendingTypes]) };
+  }
+
+  function pathPokemonSpec(id, display = "both") {
+    const source=FALLBACK_POKEMON.find(item=>item.id===Number(id))||FALLBACK_POKEMON[0];
+    return {kind:"pokemon",pokemon:formatFallbackPokemon(source),display,focusTypes:[...source.types]};
+  }
+
+  function pathPokemonImpactSpec(id, attackingType, options = [0,.25,.5,1,2,4]) {
+    const source=FALLBACK_POKEMON.find(item=>item.id===Number(id))||FALLBACK_POKEMON[0];
+    return {...pathImpactSpec(attackingType,source.types,options),pokemon:formatFallbackPokemon(source),_pathPokemon:true};
+  }
+
+  function pathExamSpec(spec, area, sourceModule) {
+    return {...clone(spec),_pathExamArea:area,_pathSourceModule:sourceModule};
+  }
+
+  function learningPathModules() {
+    return QuizmonLearningPath.createModules({ TYPES, pathImpactSpec, pathPokemonSpec, pathPokemonImpactSpec, pathExamSpec });
+  }
+
+  function pathModuleById(id) { return learningPathModules().find(module => module.id === id) || null; }
+  function pathModuleProgress(id) { return state.learningPath.modules[id] || sanitizePathModuleProgress({}); }
+  function pathModuleDone(id) { const progress=pathModuleProgress(id); return Boolean(progress.completed || progress.validated); }
+  function pathModuleUnlocked(module) { return module.prerequisites.every(pathModuleDone); }
+  function pathCompletedCount() { return learningPathModules().filter(module => pathModuleDone(module.id)).length; }
+  function pathNextModule() { return learningPathModules().find(module => pathModuleUnlocked(module) && !pathModuleDone(module.id)) || null; }
+  function pathModuleStatus(module) {
+    const progress=pathModuleProgress(module.id);
+    if(progress.completed)return "completed";
+    if(progress.validated)return "validated";
+    if(!pathModuleUnlocked(module))return "locked";
+    if(progress.attempts>0)return "retry";
+    return "available";
+  }
+  function pathStatusLabel(status) { return t(`path.status.${status}`); }
+
+  function pathModuleCard(module) {
+    const status=pathModuleStatus(module);
+    const locked=status==="locked";
+    const action=status==="completed"||status==="validated"?t("path.repeat"):status==="retry"?t("path.retry"):t("path.openModule");
+    const typePreview=module.exam
+      ? `<b class="path-exam-question-count">${t("path.exam.questions",{count:module.questions.length})}</b>`
+      : module.types?.length?`${module.types.slice(0,3).map(type=>typeChip(type,"small")).join("")}${module.types.length>3?`<b class="path-more-types">+${module.types.length-3}</b>`:""}`:"";
+    return `<button class="path-module-card ${status} ${module.exam?"exam-card":""}" data-path-module="${module.id}" ${locked?"disabled":""}>
+      <span class="path-module-icon" aria-hidden="true">${locked?"⌁":status==="completed"||status==="validated"?"✓":module.icon}</span>
+      <span class="path-module-copy"><small>${escapeHtml(pathStatusLabel(status))}</small><strong>${escapeHtml(t(module.titleKey))}</strong><em>${escapeHtml(t(module.subtitleKey))}</em><span>${typePreview}</span></span>
+      <span class="path-module-result"><i>${locked?t("path.lockedShort"):action}</i><b aria-hidden="true">›</b></span>
+    </button>`;
+  }
+
+  const PATH_STAGE_ORDER=["basics","types","dual","pokemon","exam"];
+  const PATH_STAGE_NUMBERS={basics:"01",types:"02",dual:"03",pokemon:"04",exam:"05"};
+  const PATH_STAGE_ICONS={basics:"◎",types:"18",dual:"×",pokemon:"◉",exam:"★"};
+  function pathStageModules(stage) { return learningPathModules().filter(module=>module.stage===stage); }
+  function pathStageCompleted(stage) { const modules=pathStageModules(stage);return modules.length&&modules.every(module=>pathModuleDone(module.id)); }
+  function pathCurrentStage() { return PATH_STAGE_ORDER.find(stage=>!pathStageCompleted(stage))||"complete"; }
+
+  function pathStageMarkup(stage, modules) {
+    const completed=modules.filter(module=>pathModuleDone(module.id)).length;
+    const current=pathCurrentStage();
+    const done=completed===modules.length;
+    const active=stage===current||(current==="complete"&&stage==="exam");
+    const open=active;
+    const status=done?t("cleanup2.stageCompleted"):active?t("cleanup2.stageCurrent"):t("cleanup2.stageLater");
+    const progress=active&&!done?t("cleanup2.stageProgress",{completed,total:modules.length}):status;
+    return `<details class="path-stage ${stage} ${done?"is-complete":active?"is-current":"is-later"}" ${open?"open":""}>
+      <summary class="path-stage-heading"><span>${PATH_STAGE_ICONS[stage]}</span><div><small>${t(`path.stage.${stage}.kicker`)}</small><h3>${t(`path.stage.${stage}.title`)}</h3><p>${t(`path.stage.${stage}.text`)}</p></div><strong>${escapeHtml(progress)}</strong><i aria-hidden="true">⌄</i></summary>
+      <div class="path-module-list">${modules.map(pathModuleCard).join("")}</div>
+    </details>`;
+  }
+
+
+  function pathStageMapMarkup() {
+    const current=pathCurrentStage();
+    const stages=[...PATH_STAGE_ORDER];
+    return stages.map((stage,index)=>{
+      const done=stage!=="exam"&&pathStageCompleted(stage);
+      const active=stage===current;
+      const item=`<span class="${done?"done":active?"active":""}">${t(`path.stage.${stage}.short`)}</span>`;
+      return index<stages.length-1?`${item}<i></i>`:item;
+    }).join("");
+  }
+
+  function pathExamAreaLabel(key) {
+    const module=pathModuleById(key);if(module&&!module.exam)return t(module.titleKey);
+    return t(`path.exam.area.${key}`);
+  }
+
+  function pathExamAssessment(module) {
+    const areaResults=(module.examAreas||[]).map(key=>{const answers=session.answers.filter(answer=>answer.pathExamArea===key);const correct=answers.filter(answer=>answer.correct).length;const rate=percent(correct,answers.length);return {key,correct,total:answers.length,rate,passed:answers.length>0&&rate>=module.examArea};});
+    const rate=percent(session.correct,session.answers.length);
+    const passed=rate>=module.examOverall&&areaResults.every(area=>area.passed);
+    const recommendedModules=unique(areaResults.filter(area=>!area.passed).flatMap(area=>session.answers.filter(answer=>answer.pathExamArea===area.key&&!answer.correct).map(answer=>answer.pathSourceModule).filter(Boolean))).slice(0,4);
+    return {rate,passed,areaResults,recommendedModules,requirementsPassed:areaResults.every(area=>area.passed)};
+  }
+
+  function pathCompletionStatus() {
+    const completion=state.learningPath.completion;if(!completion?.completedAt)return null;
+    const days=Math.max(0,Math.floor((Date.now()-new Date(completion.completedAt).getTime())/86400000));
+    const profile=getLearningProfile();const concerns=[...profile.needs,...profile.declining].filter(area=>area.total>=3);
+    if(concerns.length>=3)return {kind:"attention",icon:"↻",title:t("path.refresh.attentionTitle"),text:t("path.refresh.attentionText"),target:pathModuleForLearningArea(concerns[0])||"exam-final"};
+    if(days>=30||concerns.length)return {kind:"refresh",icon:"◎",title:t("path.refresh.refreshTitle"),text:t("path.refresh.refreshText",{days}),target:pathModuleForLearningArea(concerns[0])||"exam-final"};
+    return {kind:"secure",icon:"✓",title:t("path.refresh.secureTitle"),text:t("path.refresh.secureText"),target:"exam-final"};
+  }
+
+  function pathModuleForLearningArea(area) {
+    if(!area)return null;if(area.role==="pokemon"||area.value==="pokemon")return "pokemon-apply";
+    if(area.value==="dual"||area.value==="multiplier")return "dual-mastery";
+    const type=area.type;if(!type)return null;
+    const groups={"types-elements":["fire","water","grass"],"types-energy":["normal","electric","ice"],"types-earth":["fighting","poison","ground"],"types-mind":["flying","psychic","ghost"],"types-material":["bug","rock","steel"],"types-myth":["dragon","dark","fairy"]};
+    return Object.entries(groups).find(([,types])=>types.includes(type))?.[0]||null;
+  }
+
+  function pathCompletionMarkup() {
+    const completion=state.learningPath.completion;if(!completion?.completedAt)return "";
+    const status=pathCompletionStatus();const areas=Object.entries(completion.areaRates||{});
+    return `<section class="path-completion-card ${status.kind}"><span>${status.icon}</span><div><p class="quiz-kicker">${t("path.completion.kicker")}</p><h3>${t("path.completion.title")}</h3><p>${t("path.completion.text",{rate:completion.finalRate})}</p><div class="path-completion-areas">${areas.map(([key,rate])=>`<b>${escapeHtml(pathExamAreaLabel(key))}<i>${rate}%</i></b>`).join("")}</div><section class="path-refresh-status"><strong>${escapeHtml(status.title)}</strong><p>${escapeHtml(status.text)}</p><button id="startPathRefresh" class="secondary-button">${t("path.refresh.button")}</button></section></div></section>`;
+  }
+
+  function renderLearningPath() {
+    const root=document.getElementById("learnContent");if(!root)return;
+    const modules=learningPathModules();
+    const completed=pathCompletedCount();
+    const percentDone=Math.round((completed/modules.length)*100);
+    const next=pathNextModule();
+    const placement=state.learningPath.placement;
+    root.innerHTML=`<section class="learning-path-shell cleanup-path">
+      <section class="path-overview-card" style="--path-progress:${percentDone}%">
+        <div class="path-overview-copy"><p class="quiz-kicker">${t("path.kicker")}</p><h2>${t("path.title")}</h2><p>${t("path.subtitle")}</p><span class="path-placement ${placement.source}">${placement.source==="history"?"✓":"◎"} ${t(placement.source==="history"?"path.placementHistory":"path.placementNew")}</span></div>
+        <div class="path-progress-summary"><div><strong>${completed}</strong><span>${t("path.ofModules",{total:modules.length})}</span></div><i><b></b></i></div>
+      </section>
+      <section class="learn-guide-strip path-multiplier-guide"><div class="learn-guide-icon" aria-hidden="true">×</div><div><p class="quiz-kicker">${t("learn.multiplierGuideKicker")}</p><h2>${t("learn.multiplierGuideTitle")}</h2><p>${t("learn.multiplierGuideText")}</p><div class="ruleset-line"><strong>${t("rules.badge")}</strong><span>${t("rules.mainSeries")}</span></div></div><button id="openMultiplierGuide" class="secondary-button">${t("learn.multiplierGuideButton")}</button></section>
+      <section class="path-next-card ${next?"":"complete"}"><span aria-hidden="true">${next?next.icon:"✓"}</span><div><small>${t("path.nextKicker")}</small><strong>${next?escapeHtml(t(next.titleKey)):t("path.currentComplete")}</strong><p>${next?escapeHtml(t(next.subtitleKey)):t("path.currentCompleteText")}</p></div>${next?`<button id="continuePath" class="primary-button">${t("path.continue")}</button>`:""}</section>
+      <div class="path-stage-map" aria-label="${escapeHtml(t("path.mapLabel"))}">${pathStageMapMarkup()}</div>
+      ${PATH_STAGE_ORDER.map(stage=>pathStageMarkup(stage,pathStageModules(stage))).join("")}
+      ${pathCompletionMarkup()}
+      <div class="path-free-note"><span>↗</span><div><strong>${t("path.freeTitle")}</strong><p>${t("path.freeText")}</p></div></div>
+    </section>`;
+    root.querySelectorAll("[data-path-module]").forEach(button=>button.addEventListener("click",()=>openLearningPathModule(button.dataset.pathModule)));
+    document.getElementById("openMultiplierGuide")?.addEventListener("click",showMultiplierGuide);
+    document.getElementById("continuePath")?.addEventListener("click",()=>next&&openLearningPathModule(next.id));
+    document.getElementById("startPathRefresh")?.addEventListener("click",()=>{const target=pathCompletionStatus()?.target||"exam-final";openLearningPathModule(target);});
+  }
+
+  function pathPokemonVisual(spec, revealTypes = true) {
+    return `<div class="path-pokemon-example"><div class="path-pokemon-art"><img src="${escapeHtml(spec.pokemon.image)}" alt="${escapeHtml(spec.pokemon.name)}"><span>?</span></div><div><small>${t("path.pokemonExample")}</small><strong>${escapeHtml(spec.pokemon.name)}</strong>${revealTypes?`<div>${spec.pokemon.types.map(type=>typeChip(type,"small")).join("")}</div>`:`<em>${t("path.typesHidden")}</em>`}</div></div>`;
+  }
+
+  function pathExampleMarkup(spec, practice = false) {
+    if(spec.kind==="pokemon")return pathPokemonVisual(spec,!practice);
+    const defender=spec.pokemon
+      ? `<div class="path-pokemon-matchup-defender">${pathPokemonVisual(spec,true)}</div>`
+      : `<div><small>${t("onboarding.defender")}</small>${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div>`;
+    const result=practice?"?":formatMultiplier(spec.correctMultiplier);
+    return `<div class="path-example-matchup"><div><small>${t("onboarding.attacker")}</small>${typeChip(spec.attackingType,"large")}</div><span aria-hidden="true">→</span>${defender}<strong>${result}</strong></div>`;
+  }
+
+  function samePathTypeSelection(a,b) {
+    const left=unique(a).sort();const right=unique(b).sort();
+    return left.length===right.length&&left.every((type,index)=>type===right[index]);
+  }
+
+  function pathPokemonPracticeOptions(spec) {
+    const correct=[...spec.pokemon.types];
+    const first=correct[0];const second=correct[1]||null;
+    const other=TYPES.find(type=>!correct.includes(type))||"normal";
+    const alternatives=second
+      ? [[first],[second],[first,other]]
+      : [[other],[first,other],[TYPES.find(type=>type!==first&&type!==other)||"water"]];
+    const map=new Map();[correct,...alternatives].forEach(types=>map.set(unique(types).sort().join("+"),unique(types)));
+    return shuffle([...map.values()]);
+  }
+
+  function pathGuidedPracticeMarkup(module) {
+    if(module.demo.kind==="pokemon"){
+      return `<section class="path-lesson-section path-guided-practice pokemon"><small>03 · ${t("path.guidedPractice")}</small><strong>${t("path.practicePokemonQuestion")}</strong>${pathExampleMarkup(module.demo,true)}<div class="path-pokemon-practice-options">${pathPokemonPracticeOptions(module.demo).map(types=>`<button data-path-pokemon-answer="${types.join("+")}">${types.map(type=>typeChip(type,"small")).join("")}</button>`).join("")}</div><p id="pathPracticeFeedback">${t("path.practicePokemonPrompt")}</p></section>`;
+    }
+    return `<section class="path-lesson-section path-guided-practice"><small>03 · ${t("path.guidedPractice")}</small><strong>${t("path.practiceQuestion")}</strong>${pathExampleMarkup(module.demo,true)}<div class="path-practice-options">${module.demo.options.map(value=>`<button data-path-answer="${value}">${formatMultiplier(value)}</button>`).join("")}</div><p id="pathPracticeFeedback">${t("path.practicePrompt")}</p></section>`;
+  }
+
+  function pathRelevantReviewArea(module) {
+    if(!["dual","pokemon"].includes(module.stage))return null;
+    const profile=getLearningProfile();
+    const pool=[...profile.needs,...profile.declining,...profile.developing];
+    return pool.find(area=>{
+      if(module.stage==="dual")return area.value==="dual"||area.value==="multiplier"||Boolean(area.type&&module.types.includes(area.type));
+      return area.role==="pokemon"||area.value==="pokemon"||Boolean(area.type&&module.types.includes(area.type));
+    })||null;
+  }
+
+  function pathPersonalReview(module) {
+    const area=pathRelevantReviewArea(module);if(!area)return null;
+    const random=seededRandom(`path-review-${module.id}-${area.key}-${state.stats.total}`);
+    const coreSignatures=new Set(module.questions.map(questionSignature));
+    for(let attempt=0;attempt<16;attempt+=1){
+      let spec;
+      if(module.stage==="pokemon"){
+        const usedIds=new Set(module.questions.filter(item=>item.kind==="pokemon").map(item=>item.pokemon?.id));
+        const matching=FALLBACK_POKEMON.filter(item=>(!area.type||item.types.includes(area.type))&&!usedIds.has(item.id));
+        const candidates=matching.length?matching:FALLBACK_POKEMON.filter(item=>!usedIds.has(item.id));
+        const source=randomItem(candidates.length?candidates:FALLBACK_POKEMON,random);
+        spec=pathPokemonSpec(source.id);
+      }else{
+        const type=area.type||randomItem(module.types,random);
+        spec=generateImpactSpec({focusType:type,defense:"dual",difficulty:"medium",random});
+      }
+      if(!coreSignatures.has(questionSignature(spec)))return {key:area.key,label:area.label,spec};
+    }
+    return null;
+  }
+
+  function buildPathModuleSequence(module) {
+    const questions=module.questions.map(clone);
+    const review=pathPersonalReview(module);
+    if(review){
+      const signature=questionSignature(review.spec);
+      if(!questions.some(item=>questionSignature(item)===signature))questions[questions.length-1]=review.spec;
+      else return {questions,review:null};
+    }
+    return {questions,review};
+  }
+
+  function openLearningPathModule(id) {
+    const module=pathModuleById(id);if(!module||!pathModuleUnlocked(module))return;
+    if(module.exam){openLearningPathExam(module);return;}
+    const progress=pathModuleProgress(id);
+    const review=buildPathModuleSequence(module).review;
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pathModuleTitle"><section class="modal-card path-module-modal" tabindex="-1">
+      <header class="path-module-modal-head"><span>${module.icon}</span><div><p class="quiz-kicker">${t("path.guidedUnit")}</p><h2 id="pathModuleTitle">${escapeHtml(t(module.titleKey))}</h2><p>${escapeHtml(t(module.introKey))}</p></div>${progress.attempts?`<b>${t("path.bestResult",{rate:progress.bestRate})}</b>`:""}</header>
+      <section class="path-lesson-section"><small>01 · ${t("path.introduction")}</small><strong>${escapeHtml(t(module.subtitleKey))}</strong><p>${escapeHtml(t(module.introKey))}</p><div class="path-module-types">${module.types.map(type=>typeChip(type)).join("")}</div></section>
+      <section class="path-lesson-section"><small>02 · ${t("path.example")}</small>${pathExampleMarkup(module.demo)}<p>${escapeHtml(t(module.exampleKey))}</p><div class="path-memory"><span>💡</span><p>${escapeHtml(t(module.memoryKey))}</p></div></section>
+      ${pathGuidedPracticeMarkup(module)}
+      ${review?`<section class="path-personal-review"><span>◎</span><div><small>${t("path.personalReviewKicker")}</small><strong>${t("path.personalReviewTitle")}</strong><p>${t("path.personalReviewText",{area:review.label})}</p></div></section>`:""}
+      <section class="path-check-preview"><span>04</span><div><small>${t("path.miniCheck")}</small><strong>${t("path.fiveQuestions")}</strong><p>${t("path.passRule")}</p></div></section>
+      <div class="modal-actions"><button id="closePathModule" class="secondary-button">${t("common.close")}</button><button id="startPathModule" class="primary-button" disabled>${progress.completed||progress.validated?t("path.repeatCheck"):t("path.startCheck")}</button></div>
+    </section></div>`,{initialFocus:module.demo.kind==="pokemon"?"[data-path-pokemon-answer]":"[data-path-answer]"});
+    const feedback=document.getElementById("pathPracticeFeedback");
+    const start=document.getElementById("startPathModule");
+    document.querySelectorAll("[data-path-answer]").forEach(button=>button.addEventListener("click",()=>{
+      const value=Number(button.dataset.pathAnswer);const correct=value===module.demo.correctMultiplier;
+      document.querySelectorAll("[data-path-answer]").forEach(item=>{const itemValue=Number(item.dataset.pathAnswer);item.classList.toggle("correct",itemValue===module.demo.correctMultiplier);item.classList.toggle("incorrect",item===button&&!correct);item.disabled=true;});
+      feedback.textContent=correct?t("path.practiceCorrect"):t("path.practiceWrong",{value:formatMultiplier(module.demo.correctMultiplier)});
+      feedback.className=correct?"success":"error";start.disabled=false;haptic(correct?"success":"error");
+    }));
+    document.querySelectorAll("[data-path-pokemon-answer]").forEach(button=>button.addEventListener("click",()=>{
+      const selected=button.dataset.pathPokemonAnswer.split("+").filter(Boolean);const correct=samePathTypeSelection(selected,module.demo.pokemon.types);
+      document.querySelectorAll("[data-path-pokemon-answer]").forEach(item=>{const itemTypes=item.dataset.pathPokemonAnswer.split("+").filter(Boolean);item.classList.toggle("correct",samePathTypeSelection(itemTypes,module.demo.pokemon.types));item.classList.toggle("incorrect",item===button&&!correct);item.disabled=true;});
+      feedback.textContent=correct?t("path.practiceCorrect"):t("path.practicePokemonWrong",{types:module.demo.pokemon.types.map(typeLabel).join(" + ")});
+      feedback.className=correct?"success":"error";start.disabled=false;haptic(correct?"success":"error");
+    }));
+    document.getElementById("closePathModule")?.addEventListener("click",()=>closeModal());
+    start?.addEventListener("click",()=>closeModal(()=>startLearningPathModule(id)));
+  }
+
+  function openLearningPathExam(module) {
+    const progress=pathModuleProgress(module.id);const areaRows=(module.examAreas||[]).map(key=>`<li><span>${escapeHtml(pathExamAreaLabel(key))}</span><b>${module.examArea}%</b></li>`).join("");
+    const previous=progress.attempts?`<section class="path-exam-previous"><span>${progress.completed?"✓":"↻"}</span><div><small>${t("path.exam.previous")}</small><strong>${t("path.exam.previousResult",{rate:progress.lastRate})}</strong><p>${progress.completed?t("path.exam.previousPassed"):t("path.exam.previousRetry")}</p></div></section>`:"";
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pathExamTitle"><section class="modal-card path-module-modal path-exam-modal" tabindex="-1"><header class="path-module-modal-head"><span>${module.icon}</span><div><p class="quiz-kicker">${t("path.exam.kicker")}</p><h2 id="pathExamTitle">${escapeHtml(t(module.titleKey))}</h2><p>${escapeHtml(t(module.introKey))}</p></div>${progress.bestRate?`<b>${t("path.bestResult",{rate:progress.bestRate})}</b>`:""}</header>${previous}<section class="path-exam-rules"><div><small>${t("path.exam.scope")}</small><strong>${t("path.exam.questionCount",{count:module.questions.length})}</strong><p>${t("path.exam.noHelp")}</p></div><div><small>${t("path.exam.passTitle")}</small><strong>${t("path.exam.passOverall",{rate:module.examOverall})}</strong><p>${t("path.exam.passAreas",{rate:module.examArea})}</p></div></section><section class="path-exam-areas"><small>${t("path.exam.requiredAreas")}</small><ul>${areaRows}</ul></section><div class="modal-actions"><button id="closePathExam" class="secondary-button">${t("common.close")}</button><button id="startPathExam" class="primary-button">${progress.completed?t("path.exam.repeat"):t("path.exam.start")}</button></div></section></div>`,{initialFocus:"#startPathExam"});
+    document.getElementById("closePathExam")?.addEventListener("click",()=>closeModal());
+    document.getElementById("startPathExam")?.addEventListener("click",()=>closeModal(()=>startLearningPathExam(module.id)));
+  }
+
+  function startLearningPathExam(id) {
+    const module=pathModuleById(id);if(!module?.exam||!pathModuleUnlocked(module))return;
+    session=newSession("path",{length:module.questions.length,difficulty:module.examKind==="final"?"hard":"medium"},shuffle(module.questions.map(clone)));
+    session.pathModuleId=id;session.pathExamId=id;session.pathModuleBefore=clone(pathModuleProgress(id));
+    prepareRouteMotion(state.route,"session","forward");state.route="session";saveState();updateNavigation();renderQuestion();
+  }
+
+  function startLearningPathModule(id) {
+    const module=pathModuleById(id);if(!module||!pathModuleUnlocked(module))return;
+    const planned=buildPathModuleSequence(module);
+    session=newSession("path",{length:planned.questions.length,difficulty:module.stage==="dual"?"medium":"easy"},shuffle(planned.questions));
+    session.pathModuleId=id;
+    session.pathModuleBefore=clone(pathModuleProgress(id));
+    session.pathReview=planned.review?{key:planned.review.key,label:planned.review.label}:null;
+    prepareRouteMotion(state.route,"session","forward");state.route="session";saveState();updateNavigation();renderQuestion();
+  }
+
+  function completeLearningPathModule(rate) {
+    const moduleId=session?.pathModuleId;if(!LEARNING_PATH_MODULE_IDS.includes(moduleId))return null;
+    const module=pathModuleById(moduleId);const progress=pathModuleProgress(moduleId);
+    progress.attempts+=1;progress.lastRate=rate;progress.bestRate=Math.max(progress.bestRate,rate);progress.lastAt=new Date().toISOString();
+    if(module?.exam){
+      const assessment=pathExamAssessment(module);const completedNow=assessment.passed&&!progress.completed;
+      progress.lastAreas=Object.fromEntries(assessment.areaResults.map(area=>[area.key,area.rate]));
+      progress.bestAreas={...progress.bestAreas,...Object.fromEntries(assessment.areaResults.map(area=>[area.key,Math.max(progress.bestAreas?.[area.key]||0,area.rate)]))};
+      progress.recommendedModules=assessment.recommendedModules;progress.lastRequirementsPassed=assessment.requirementsPassed;
+      if(assessment.passed){progress.completed=true;progress.completedAt=progress.completedAt||new Date().toISOString();}
+      let finalCompleted=false;
+      if(module.examKind==="final"){
+        state.learningPath.completion.attempts=finiteNonNegative(state.learningPath.completion.attempts)+1;
+        if(assessment.passed){state.learningPath.completion={completedAt:state.learningPath.completion.completedAt||new Date().toISOString(),finalRate:assessment.rate,attempts:state.learningPath.completion.attempts,areaRates:Object.fromEntries(assessment.areaResults.map(area=>[area.key,area.rate]))};finalCompleted=true;}
+      }
+      state.learningPath.modules[moduleId]=progress;
+      return {moduleId,exam:true,passed:assessment.passed,completedNow,rate:assessment.rate,areaResults:assessment.areaResults,recommendedModules:assessment.recommendedModules,requirementsPassed:assessment.requirementsPassed,finalCompleted,nextModuleId:pathNextModule()?.id||null};
+    }
+    const passed=rate>=80;const completedNow=passed&&!progress.completed;
+    if(passed){progress.completed=true;progress.completedAt=progress.completedAt||new Date().toISOString();}
+    state.learningPath.modules[moduleId]=progress;
+    return {moduleId,passed,completedNow,rate,nextModuleId:pathNextModule()?.id||null,reviewKey:session.pathReview?.key||null};
+  }
+
+  function learningPathSummaryMarkup() {
+    if(session?.mode!=="path"||!session.pathProgress)return "";
+    const module=pathModuleById(session.pathProgress.moduleId);if(!module)return "";
+    const next=session.pathProgress.nextModuleId?pathModuleById(session.pathProgress.nextModuleId):null;
+    if(session.pathProgress.exam){
+      const recommended=(session.pathProgress.recommendedModules||[]).map(pathModuleById).filter(Boolean);
+      return `<section class="summary-path-card path-exam-summary ${session.pathProgress.passed?"passed":"retry"}"><span>${session.pathProgress.passed?"✓":"↻"}</span><div><p class="quiz-kicker">${t("path.exam.summaryKicker")}</p><h2>${session.pathProgress.passed?t("path.exam.summaryPassed"):t("path.exam.summaryRetry")}</h2><p>${session.pathProgress.passed?t("path.exam.summaryPassedText",{exam:t(module.titleKey)}):t("path.exam.summaryRetryText",{exam:t(module.titleKey)})}</p><div class="path-exam-summary-areas">${session.pathProgress.areaResults.map(area=>`<b class="${area.passed?"passed":"attention"}">${escapeHtml(pathExamAreaLabel(area.key))}<i>${area.rate}%</i></b>`).join("")}</div>${recommended.length?`<section class="path-exam-prep"><strong>${t("path.exam.prepTitle")}</strong><p>${t("path.exam.prepText")}</p><div>${recommended.map(item=>`<b>${escapeHtml(t(item.titleKey))}</b>`).join("")}</div></section>`:""}${session.pathProgress.finalCompleted?`<section class="path-final-celebration"><span>★</span><div><strong>${t("path.exam.finalCompleteTitle")}</strong><p>${t("path.exam.finalCompleteText")}</p></div></section>`:""}</div></section>`;
+    }
+    return `<section class="summary-path-card ${session.pathProgress.passed?"passed":"retry"}"><span>${session.pathProgress.passed?"✓":"↻"}</span><div><p class="quiz-kicker">${t("path.summaryKicker")}</p><h2>${session.pathProgress.passed?t("path.summaryPassed"):t("path.summaryRetry")}</h2><p>${session.pathProgress.passed?t("path.summaryPassedText",{module:t(module.titleKey)}):t("path.summaryRetryText",{module:t(module.titleKey)})}</p><div>${session.pathProgress.reviewKey?`<b>${t("path.personalReviewCompleted")}</b>`:""}${next?`<b>${t("path.nextModule",{module:t(next.titleKey)})}</b>`:""}</div></div></section>`;
+  }
+
+  function multiplierGuideExample(attacker,defenders) {
+    const values=defenders.map(defender=>TYPE_CHART[attacker]?.[defender]??1);
+    const result=values.reduce((total,value)=>total*value,1);
+    return `<article class="multiplier-guide-example"><div class="multiplier-guide-matchup">${typeChip(attacker,"small")}<span aria-hidden="true">→</span><div>${defenders.map(type=>typeChip(type,"small")).join("")}</div></div><div class="multiplier-guide-equation"><span>${values.map(formatMultiplier).join(" × ")}</span><b>=</b><strong>${formatMultiplier(result)}</strong></div><small>${escapeHtml(multiplierMeaning(result))}</small></article>`;
+  }
+
+  function showMultiplierGuide() {
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="multiplierGuideTitle"><section class="modal-card multiplier-guide-modal" tabindex="-1">
+      <div class="multiplier-guide-modal-head"><div class="onboarding-visual">×</div><div><p class="quiz-kicker">${t("learn.multiplierGuideKicker")}</p><h2 id="multiplierGuideTitle">${t("learn.multiplierGuideTitle")}</h2><p>${t("guide.intro")}</p></div></div>
+      <section class="guide-direction-card"><div><small>${t("onboarding.attacker")}</small>${typeChip("water","large")}</div><span aria-hidden="true">→</span><div><small>${t("onboarding.defender")}</small>${typeChip("fire","large")}</div><strong>2×</strong></section>
+      <section class="guide-section"><h3>${t("guide.singleTitle")}</h3><p>${t("guide.singleText")}</p>${multiplierGuideExample("water",["fire"])}</section>
+      <section class="guide-section"><h3>${t("guide.dualTitle")}</h3><p>${t("guide.dualText")}</p><div class="multiplier-guide-examples">${multiplierGuideExample("water",["rock","ground"])}${multiplierGuideExample("fire",["water","dragon"])}${multiplierGuideExample("fire",["grass","dragon"])}${multiplierGuideExample("ground",["flying","steel"])}</div></section>
+      <div class="guide-memory-rule"><strong>${t("guide.memoryTitle")}</strong><span>${t("guide.memoryText")}</span></div>
+      <div class="ruleset-card"><strong>${t("rules.badge")}</strong><span>${t("rules.mainSeries")}</span></div>
+      <div class="actions stack"><button id="closeMultiplierGuide" class="primary-button">${t("common.understood")}</button></div>
+    </section></div>`,{initialFocus:"#closeMultiplierGuide"});
+    document.getElementById("closeMultiplierGuide")?.addEventListener("click",()=>closeModal());
   }
 
   function typeKnowledgeLabel(stats){
@@ -2273,33 +4573,1327 @@
     return t("learn.statusPractice");
   }
 
-  function renderLexicon() {
-    const content=document.getElementById("learnContent");
-    content.innerHTML=`
-      <div class="learn-content-intro"><div><h3>${t("learn.lexiconIntroTitle")}</h3><p>${t("learn.lexiconIntro")}</p></div><span>${TYPES.length} ${t("learn.typesLabel")}</span></div>
-      <div class="type-library-grid">${TYPES.map(type=>{
-        const s=state.stats.types[type];
-        const rate=percent(s.correct,s.total);
-        const attack=groupByMultiplier(TYPES,target=>effectiveness(type,[target]));
-        const defense=groupByMultiplier(TYPES,attacker=>effectiveness(attacker,[type]));
-        const meta=TYPE_META[type];
-        return `<button class="type-library-card" data-learn-type="${type}" style="--type-color:${meta.color}">
-          <span class="type-library-accent" aria-hidden="true"></span>
-          <span class="type-library-top">${typeChip(type)}<span class="type-library-arrow" aria-hidden="true">›</span></span>
-          <span class="type-library-status"><strong>${escapeHtml(typeKnowledgeLabel(s))}</strong><small>${s.total?t("learn.typeAccuracy",{rate,total:s.total}):t("learn.noData")}</small></span>
-          <span class="type-library-facts">
-            <span><small>${t("learn.strongAgainst")}</small><strong>${attack[2]?.length||0}</strong></span>
-            <span><small>${t("learn.vulnerable")}</small><strong>${defense[2]?.length||0}</strong></span>
-          </span>
-          <span class="type-library-progress"><i style="width:${s.total?rate:0}%"></i></span>
-        </button>`;
-      }).join("")}</div>`;
-    document.querySelectorAll("[data-learn-type]").forEach(button=>button.addEventListener("click",()=>{learnType=button.dataset.learnType;setRoute("learn-detail");}));
+  function knowledgePokemonById(id) {
+    return QuizmonKnowledgeData.BY_ID.get(Number(id)) || null;
   }
+
+  function knowledgePokemonName(item) { return QuizmonKnowledge.name(item, state.language); }
+  function knowledgeEntryName(item) { return QuizmonKnowledge.name(item, state.language); }
+  function knowledgeEntryEffect(item) { return QuizmonKnowledge.effect(item, state.language); }
+
+  function knowledgeRegionLabel(generation) {
+    return t(`knowledge.region.${QuizmonKnowledge.regionKey(generation)}`);
+  }
+
+  function knowledgeArtwork(item) { return artworkUrl(item.id); }
+  function knowledgeItemArtwork(item) { return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${encodeURIComponent(item.slug)}.png`; }
+
+  function favoritePokemonEntries() { return Array.isArray(state.favorites?.pokemon) ? state.favorites.pokemon : []; }
+  function favoriteTypeEntries() { return Array.isArray(state.favorites?.types) ? state.favorites.types : []; }
+  function isKnowledgePokemonFavorite(id) { return QuizmonFavorites.isFavorite(favoritePokemonEntries(), "id", Number(id)); }
+  function isKnowledgeTypeFavorite(type) { return QuizmonFavorites.isFavorite(favoriteTypeEntries(), "type", String(type)); }
+
+  function syncProfileFavoritesIntoCollection() {
+    state.favorites = QuizmonFavorites.sanitize(state.favorites, {
+      pokemonIds: new Set(QuizmonKnowledgeData.POKEMON.map(item => item.id)),
+      types: new Set(TYPES),
+      highlightedPokemonId: state.profile.favoritePokemonId,
+      highlightedType: state.profile.favoriteType
+    });
+  }
+
+  function knowledgeFavoriteButton(kind, id, extraClass = "") {
+    const active = kind === "pokemon" ? isKnowledgePokemonFavorite(id) : isKnowledgeTypeFavorite(id);
+    const itemName = kind === "pokemon" ? knowledgePokemonName(knowledgePokemonById(id)) : typeLabel(String(id));
+    const label = t(active ? "favorites.removeNamed" : "favorites.addNamed", { name:itemName });
+    return `<button type="button" class="knowledge-favorite-button ${active ? "active" : ""} ${extraClass}" data-favorite-kind="${kind}" data-favorite-id="${escapeHtml(String(id))}" aria-pressed="${active}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span aria-hidden="true">${active ? "♥" : "♡"}</span></button>`;
+  }
+
+  function toggleKnowledgeFavorite(kind, id) {
+    const now = new Date().toISOString();
+    let active = false;
+    let clearedProfile = false;
+    if (kind === "pokemon") {
+      const numericId = Number(id);
+      const wasFavorite = isKnowledgePokemonFavorite(numericId);
+      state.favorites.pokemon = QuizmonFavorites.toggle(favoritePokemonEntries(), "id", numericId, now);
+      active = !wasFavorite;
+      if (!active && Number(state.profile.favoritePokemonId) === numericId) {
+        state.profile.favoritePokemonId = null;
+        clearedProfile = true;
+      }
+    } else if (kind === "type" && TYPES.includes(String(id))) {
+      const type = String(id);
+      const wasFavorite = isKnowledgeTypeFavorite(type);
+      state.favorites.types = QuizmonFavorites.toggle(favoriteTypeEntries(), "type", type, now);
+      active = !wasFavorite;
+      if (!active && state.profile.favoriteType === type) {
+        state.profile.favoriteType = null;
+        clearedProfile = true;
+      }
+    } else return;
+    saveState();
+    const title = active ? t("favorites.added") : t("favorites.removed");
+    const hint = clearedProfile ? t("favorites.profileCleared") : (active ? t("favorites.addedHint") : t("favorites.removedHint"));
+    enqueueToast(active ? "♥" : "♡", title, hint, active ? "success" : "info");
+    const top=Math.max(0,window.scrollY||document.documentElement.scrollTop||0);
+    if (state.route === "knowledge") { renderKnowledge(); restoreKnowledgeScroll(top); }
+    else if (state.route === "learn-detail") { renderLearnDetail(); restoreKnowledgeScroll(top); }
+    else if (state.route === "profile") renderProfile();
+  }
+
+  function bindKnowledgeFavoriteButtons(root = document) {
+    root.querySelectorAll("[data-favorite-kind]").forEach(button => button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleKnowledgeFavorite(button.dataset.favoriteKind, button.dataset.favoriteId);
+    }));
+  }
+
+  function trainingListSanitizeOptions() {
+    return {
+      pokemonIds:new Set(QuizmonKnowledgeData.POKEMON.map(item=>item.id)),
+      types:new Set(TYPES),
+      fallbackName:(kind,index)=>kind==="pokemon"?t("trainingLists.defaultPokemonName",{count:index+1}):t("trainingLists.defaultTypeName",{count:index+1})
+    };
+  }
+
+  function syncTrainingLists() {
+    state.trainingLists=QuizmonTrainingLists.sanitize(state.trainingLists,trainingListSanitizeOptions());
+    return state.trainingLists;
+  }
+
+  function trainingLists() { return syncTrainingLists().lists; }
+  function trainingListById(id) { return QuizmonTrainingLists.get(syncTrainingLists(),String(id)); }
+  function trainingListKindForEntry(kind) { return kind==="pokemon"?"pokemon":kind==="type"?"types":null; }
+  function trainingListEntryName(kind,id) {
+    if(kind==="pokemon")return knowledgePokemonName(knowledgePokemonById(id));
+    return typeLabel(String(id));
+  }
+
+  function knowledgeTrainingListButton(kind,id,extraClass="") {
+    const listKind=trainingListKindForEntry(kind);
+    if(!listKind)return"";
+    const name=trainingListEntryName(kind,id);
+    const label=t("trainingLists.addNamed",{name});
+    return `<button type="button" class="knowledge-training-list-button ${extraClass}" data-training-list-kind="${kind}" data-training-list-entry="${escapeHtml(String(id))}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span aria-hidden="true">＋</span></button>`;
+  }
+
+  function bindKnowledgeTrainingListButtons(root=document) {
+    root.querySelectorAll("[data-training-list-kind][data-training-list-entry]").forEach(button=>button.addEventListener("click",event=>{
+      event.preventDefault();event.stopPropagation();
+      openTrainingListChooser(button.dataset.trainingListKind,button.dataset.trainingListEntry);
+    }));
+  }
+
+  function trainingListDraftDirty() {
+    return JSON.stringify(trainingListDraft||null)!==JSON.stringify(trainingListDraftOriginal||null);
+  }
+
+  function closeTrainingListEditor(backdrop) {
+    confirmDiscardChanges(trainingListDraftDirty(),backdrop,()=>{
+      trainingListDraft=null;trainingListDraftOriginal=null;trainingListPokemonQuery="";
+    });
+  }
+
+  function trainingListEntryMarkup(entry,index) {
+    if(trainingListDraft.kind==="pokemon"){
+      const item=knowledgePokemonById(entry);if(!item)return"";
+      return `<li><span class="training-list-entry-visual pokemon"><img loading="lazy" src="${escapeHtml(knowledgeArtwork(item))}" alt=""></span><span><strong>${escapeHtml(knowledgePokemonName(item))}</strong><small>#${String(item.id).padStart(4,"0")} · ${item.types.map(typeLabel).join(" / ")}</small></span><div>${index?`<button type="button" data-list-entry-up="${index}" aria-label="${escapeHtml(t("trainingLists.moveUp"))}">↑</button>`:""}${index<trainingListDraft.entries.length-1?`<button type="button" data-list-entry-down="${index}" aria-label="${escapeHtml(t("trainingLists.moveDown"))}">↓</button>`:""}<button type="button" data-list-entry-remove="${index}" aria-label="${escapeHtml(t("trainingLists.removeEntry"))}">×</button></div></li>`;
+    }
+    const type=String(entry);
+    return `<li><span class="training-list-entry-visual type" style="--entry-type-color:${TYPE_META[type]?.color||"var(--primary)"}">${TYPE_META[type]?.icon||"◆"}</span><span><strong>${escapeHtml(typeLabel(type))}</strong><small>${t("trainingLists.typeEntry")}</small></span><div>${index?`<button type="button" data-list-entry-up="${index}" aria-label="${escapeHtml(t("trainingLists.moveUp"))}">↑</button>`:""}${index<trainingListDraft.entries.length-1?`<button type="button" data-list-entry-down="${index}" aria-label="${escapeHtml(t("trainingLists.moveDown"))}">↓</button>`:""}<button type="button" data-list-entry-remove="${index}" aria-label="${escapeHtml(t("trainingLists.removeEntry"))}">×</button></div></li>`;
+  }
+
+  function trainingListAvailableEntriesMarkup() {
+    if(trainingListDraft.kind==="types"){
+      return `<div class="training-list-type-picker">${TYPES.map(type=>{const active=trainingListDraft.entries.includes(type);return `<button type="button" class="${active?"selected":""}" data-list-entry-toggle="${type}" aria-pressed="${active}">${typeChip(type,"small")}<span>${active?t("trainingLists.included"):t("trainingLists.add")}</span></button>`;}).join("")}</div>`;
+    }
+    const normalized=QuizmonKnowledgeSearch.normalize(trainingListPokemonQuery);
+    const items=QuizmonKnowledgeData.POKEMON.filter(item=>{
+      if(!normalized)return true;
+      return QuizmonKnowledgeSearch.normalize(`${item.id} ${item.names.de} ${item.names.en}`).includes(normalized);
+    }).slice(0,36);
+    return `<label class="training-list-pokemon-search"><span>${t("trainingLists.searchPokemon")}</span><input type="search" data-training-list-pokemon-search value="${escapeHtml(trainingListPokemonQuery)}" placeholder="${escapeHtml(t("trainingLists.searchPlaceholder"))}" autocomplete="off"></label><div class="training-list-pokemon-picker">${items.map(item=>{const active=trainingListDraft.entries.includes(item.id);return `<button type="button" class="${active?"selected":""}" data-list-entry-toggle="${item.id}" aria-pressed="${active}"><img loading="lazy" src="${escapeHtml(knowledgeArtwork(item))}" alt=""><span><strong>${escapeHtml(knowledgePokemonName(item))}</strong><small>#${String(item.id).padStart(4,"0")}</small></span><b>${active?"✓":"＋"}</b></button>`;}).join("")}</div>`;
+  }
+
+  function renderTrainingListEditorContent() {
+    const root=document.querySelector("[data-training-list-editor-content]");
+    if(!root||!trainingListDraft)return;
+    root.innerHTML=`<section class="training-list-editor-summary"><label><span>${t("trainingLists.nameLabel")}</span><input type="text" maxlength="40" data-training-list-name value="${escapeHtml(trainingListDraft.name)}"></label><div><small>${t("trainingLists.kindLabel")}</small><strong>${t(`trainingLists.kind.${trainingListDraft.kind}`)}</strong><span>${t("trainingLists.entryCount",{count:trainingListDraft.entries.length})}</span></div></section><section class="training-list-editor-columns"><div><div class="training-list-editor-heading"><h3>${t("trainingLists.currentEntries")}</h3><span>${trainingListDraft.entries.length}</span></div>${trainingListDraft.entries.length?`<ol class="training-list-entry-list">${trainingListDraft.entries.map(trainingListEntryMarkup).join("")}</ol>`:`<div class="training-list-editor-empty">${t("trainingLists.editorEmpty")}</div>`}</div><div><div class="training-list-editor-heading"><h3>${t("trainingLists.addEntries")}</h3><span>${trainingListDraft.kind==="types"?TYPES.length:QuizmonKnowledgeData.POKEMON.length}</span></div>${trainingListAvailableEntriesMarkup()}</div></section>`;
+    const nameInput=root.querySelector("[data-training-list-name]");
+    nameInput?.addEventListener("input",()=>{trainingListDraft.name=nameInput.value;updateTrainingListEditorSaveState();});
+    root.querySelector("[data-training-list-pokemon-search]")?.addEventListener("input",event=>{trainingListPokemonQuery=event.target.value;renderTrainingListEditorContent();requestAnimationFrame(()=>{const input=document.querySelector("[data-training-list-pokemon-search]");input?.focus();input?.setSelectionRange(input.value.length,input.value.length);});});
+    root.querySelectorAll("[data-list-entry-toggle]").forEach(button=>button.addEventListener("click",()=>{
+      const raw=button.dataset.listEntryToggle;
+      const value=trainingListDraft.kind==="pokemon"?Number(raw):String(raw);
+      if(trainingListDraft.entries.includes(value))trainingListDraft.entries=trainingListDraft.entries.filter(entry=>entry!==value);
+      else trainingListDraft.entries.push(value);
+      renderTrainingListEditorContent();updateTrainingListEditorSaveState();
+    }));
+    root.querySelectorAll("[data-list-entry-remove]").forEach(button=>button.addEventListener("click",()=>{trainingListDraft.entries.splice(Number(button.dataset.listEntryRemove),1);renderTrainingListEditorContent();updateTrainingListEditorSaveState();}));
+    root.querySelectorAll("[data-list-entry-up]").forEach(button=>button.addEventListener("click",()=>{const index=Number(button.dataset.listEntryUp);[trainingListDraft.entries[index-1],trainingListDraft.entries[index]]=[trainingListDraft.entries[index],trainingListDraft.entries[index-1]];renderTrainingListEditorContent();updateTrainingListEditorSaveState();}));
+    root.querySelectorAll("[data-list-entry-down]").forEach(button=>button.addEventListener("click",()=>{const index=Number(button.dataset.listEntryDown);[trainingListDraft.entries[index+1],trainingListDraft.entries[index]]=[trainingListDraft.entries[index],trainingListDraft.entries[index+1]];renderTrainingListEditorContent();updateTrainingListEditorSaveState();}));
+    updateTrainingListEditorSaveState();
+  }
+
+  function updateTrainingListEditorSaveState() {
+    const button=document.querySelector("[data-training-list-save]");
+    if(button)button.disabled=!trainingListDraft?.name?.trim()||!trainingListDraftDirty();
+  }
+
+  function saveTrainingListDraft() {
+    if(!trainingListDraft?.name?.trim())return;
+    const existing=trainingLists().filter(list=>list.id!==trainingListDraft.id);
+    state.trainingLists=QuizmonTrainingLists.sanitize({lists:[...existing,{...trainingListDraft,name:trainingListDraft.name.trim(),updatedAt:new Date().toISOString()}]},trainingListSanitizeOptions());
+    saveState();
+    const name=trainingListDraft.name.trim();
+    trainingListDraft=null;trainingListDraftOriginal=null;trainingListPokemonQuery="";
+    closeModal(()=>{
+      if(state.route==="knowledge"&&knowledgeView==="training-lists")renderKnowledgeTrainingLists();
+      enqueueToast("✓",t("trainingLists.saved"),t("trainingLists.savedHint",{name}),"success");
+    });
+  }
+
+  function openTrainingListEditor(listId=null,kind=null,initialEntry=null) {
+    const existing=listId?trainingListById(listId):null;
+    const date=new Date().toISOString();
+    const safeKind=existing?.kind||(kind==="pokemon"?"pokemon":"types");
+    const entry=initialEntry==null?null:(safeKind==="pokemon"?Number(initialEntry):String(initialEntry));
+    trainingListDraft=existing?clone(existing):{id:`list-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,kind:safeKind,name:safeKind==="pokemon"?t("trainingLists.newPokemonName"):t("trainingLists.newTypeName"),entries:[],createdAt:date,updatedAt:date};
+    if(entry!=null&&!trainingListDraft.entries.includes(entry))trainingListDraft.entries.push(entry);
+    trainingListDraftOriginal=existing?clone(trainingListDraft):null;trainingListPokemonQuery="";
+    setModalMarkup(`<div class="modal-backdrop training-list-editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="trainingListEditorTitle"><section class="modal-card training-list-editor-modal" tabindex="-1"><header><span aria-hidden="true">☷</span><div><p class="quiz-kicker">${t("trainingLists.kicker")}</p><h2 id="trainingListEditorTitle">${existing?t("trainingLists.editTitle"):t("trainingLists.createTitle")}</h2><p>${t("trainingLists.editorText")}</p></div></header><div data-training-list-editor-content></div><div class="modal-actions"><button type="button" class="secondary-button" data-training-list-cancel>${t("common.cancel")}</button><button type="button" class="primary-button" data-training-list-save>${t("common.save")}</button></div></section></div>`,{closeOnBackdrop:false,initialFocus:"[data-training-list-name]"});
+    const backdrop=document.querySelector(".training-list-editor-backdrop");
+    const context=modalStack.find(entry=>entry.backdrop===backdrop);
+    if(context)context.onRequestClose=()=>closeTrainingListEditor(backdrop);
+    backdrop.querySelector("[data-training-list-cancel]")?.addEventListener("click",()=>closeTrainingListEditor(backdrop));
+    backdrop.querySelector("[data-training-list-save]")?.addEventListener("click",saveTrainingListDraft);
+    renderTrainingListEditorContent();
+  }
+
+  function addEntryToTrainingList(listId,kind,id) {
+    const list=trainingListById(listId);if(!list)return;
+    const value=list.kind==="pokemon"?Number(id):String(id);
+    const already=QuizmonTrainingLists.contains(list,value);
+    state.trainingLists=already?QuizmonTrainingLists.removeEntry(state.trainingLists,list.id,value,trainingListSanitizeOptions()):QuizmonTrainingLists.addEntry(state.trainingLists,list.id,value,trainingListSanitizeOptions());
+    saveState();
+    enqueueToast(already?"−":"＋",already?t("trainingLists.removedFromList"):t("trainingLists.addedToList"),t("trainingLists.listChangedHint",{name:list.name}),already?"info":"success");
+  }
+
+  function openTrainingListChooser(kind,id) {
+    const listKind=trainingListKindForEntry(kind);if(!listKind)return;
+    const candidates=trainingLists().filter(list=>list.kind===listKind);
+    const entryName=trainingListEntryName(kind,id);
+    if(!candidates.length){openTrainingListEditor(null,listKind,id);return;}
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="trainingListChooserTitle"><section class="modal-card training-list-chooser-modal" tabindex="-1"><header><span aria-hidden="true">☷</span><div><p class="quiz-kicker">${t("trainingLists.kicker")}</p><h2 id="trainingListChooserTitle">${t("trainingLists.chooseList")}</h2><p>${t("trainingLists.chooseListText",{name:entryName})}</p></div></header><div class="training-list-chooser-grid">${candidates.map(list=>{const included=QuizmonTrainingLists.contains(list,listKind==="pokemon"?Number(id):String(id));return `<button type="button" data-list-choice="${escapeHtml(list.id)}" class="${included?"included":""}"><span aria-hidden="true">${list.kind==="pokemon"?"◉":"◆"}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><b>${included?t("trainingLists.remove"):t("trainingLists.add")}</b></button>`;}).join("")}</div><div class="modal-actions"><button type="button" class="secondary-button" data-list-choice-close>${t("common.close")}</button><button type="button" class="primary-button" data-list-choice-new>${t("trainingLists.createNew")}</button></div></section></div>`,{initialFocus:"[data-list-choice]"});
+    document.querySelector("[data-list-choice-close]")?.addEventListener("click",()=>closeModal());
+    document.querySelector("[data-list-choice-new]")?.addEventListener("click",()=>closeModal(()=>openTrainingListEditor(null,listKind,id)));
+    document.querySelectorAll("[data-list-choice]").forEach(button=>button.addEventListener("click",()=>{addEntryToTrainingList(button.dataset.listChoice,kind,id);closeModal();}));
+  }
+
+  function knowledgePokemonCard(item) {
+    const name = knowledgePokemonName(item);
+    return `<article class="knowledge-pokemon-card-shell">
+      <button class="knowledge-pokemon-card" data-knowledge-pokemon="${item.id}" aria-label="${escapeHtml(name)}">
+        <span class="knowledge-pokemon-art"><img loading="lazy" src="${escapeHtml(knowledgeArtwork(item))}" alt=""><i>#${String(item.id).padStart(4,"0")}</i></span>
+        <span class="knowledge-pokemon-copy"><strong>${escapeHtml(name)}</strong><small>${t("knowledge.generationShort",{generation:item.generation})} · ${escapeHtml(knowledgeRegionLabel(item.generation))}</small><span>${item.types.map(type=>typeChip(type,"small")).join("")}</span></span>
+        <span class="knowledge-card-arrow" aria-hidden="true">›</span>
+      </button>
+      <span class="knowledge-card-actions">${knowledgeFavoriteButton("pokemon",item.id,"card-favorite")}${knowledgeTrainingListButton("pokemon",item.id,"card-training-list")}</span>
+    </article>`;
+  }
+
+  function knowledgeSectionButton(section, icon, title, text, meta) {
+    return `<button class="knowledge-category-card ${section}" data-knowledge-section="${section}">
+      <span class="knowledge-category-icon" aria-hidden="true">${icon}</span>
+      <span><small>${escapeHtml(meta)}</small><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></span>
+      <i aria-hidden="true">›</i>
+    </button>`;
+  }
+
+  function knowledgeSearchFamilies() {
+    if(!knowledgeEvolutionFamiliesCache)knowledgeEvolutionFamiliesCache=QuizmonKnowledge.evolutionFamilies(QuizmonKnowledgeData.POKEMON);
+    return knowledgeEvolutionFamiliesCache;
+  }
+
+  function knowledgeSearchTypes() {
+    return TYPES.map(type=>({
+      id:type,
+      de:I18N.de[`type.${type}`]||type,
+      en:I18N.en[`type.${type}`]||type,
+      aliasesDe:[I18N.de[`knowledge.search.typeAlias.${type}`]||""].filter(Boolean),
+      aliasesEn:[I18N.en[`knowledge.search.typeAlias.${type}`]||""].filter(Boolean)
+    }));
+  }
+
+  function knowledgeSelectedGeneration() {
+    return QuizmonKnowledgeFilter.normalizeGeneration(knowledgeGenerationFilter);
+  }
+
+  function knowledgeGenerationFilterContext() {
+    return { regionById: QuizmonKnowledgeWorld.REGION_BY_ID };
+  }
+
+  function knowledgeFilteredItems(kind, items) {
+    return QuizmonKnowledgeFilter.filter(kind, items, knowledgeGenerationFilter, knowledgeGenerationFilterContext());
+  }
+
+
+  function knowledgeGenerationOptionsMarkup() {
+    return [`<option value="all" ${knowledgeSelectedGeneration()?"":"selected"}>${escapeHtml(t("knowledge.generationFilter.all"))}</option>`, ...QuizmonKnowledgeFilter.GENERATIONS.map(generation=>`<option value="${generation}" ${knowledgeSelectedGeneration()===generation?"selected":""}>${escapeHtml(t("knowledge.generationFilter.option",{generation}))}</option>`)].join("");
+  }
+
+  function knowledgeGenerationFilterMarkup(compact=false) {
+    const selected=knowledgeSelectedGeneration();
+    if(compact){
+      return `<label class="knowledge-generation-select compact"><span aria-hidden="true">${t("knowledge.generationFilter.short")}</span><span class="sr-only">${t("knowledge.generationFilter.label")}</span><select data-knowledge-generation-filter aria-label="${escapeHtml(t("knowledge.generationFilter.label"))}">${knowledgeGenerationOptionsMarkup()}</select></label>`;
+    }
+    return `<section class="knowledge-generation-filter" aria-label="${escapeHtml(t("knowledge.generationFilter.label"))}">
+      <div><p class="quiz-kicker">${t("knowledge.generationFilter.kicker")}</p><h3>${t("knowledge.generationFilter.title")}</h3><p>${selected?t("knowledge.generationFilter.activeText",{generation:selected}):t("knowledge.generationFilter.allText")}</p><small>${t("knowledge.generationFilter.typeRules")}</small></div>
+      <label class="knowledge-generation-select"><span>${t("knowledge.generationFilter.label")}</span><select data-knowledge-generation-filter>${knowledgeGenerationOptionsMarkup()}</select></label>
+      ${selected?`<button type="button" class="secondary-button knowledge-generation-reset" data-knowledge-generation-reset>${t("knowledge.generationFilter.reset")}</button>`:""}
+    </section>`;
+  }
+
+  function setKnowledgeGenerationFilter(value) {
+    const selected=QuizmonKnowledgeFilter.normalizeGeneration(value);
+    const next=selected||"all";
+    if(String(next)===String(knowledgeGenerationFilter))return;
+    knowledgeGenerationFilter=next;
+    try { localStorage.setItem(KNOWLEDGE_GENERATION_FILTER_KEY,String(next)); } catch {}
+    knowledgePokemonPage=0;
+    knowledgeContentPage=0;
+    knowledgeSearchVisibleCount=KNOWLEDGE_SEARCH_PAGE_SIZE;
+    if(state.route==="learn-detail")renderLearnDetail();
+    else if(state.route==="knowledge")renderKnowledgePage();
+    replaceBrowserHistorySnapshot();
+  }
+
+  function bindKnowledgeGenerationFilter(root) {
+    root.querySelectorAll("[data-knowledge-generation-filter]").forEach(select=>select.addEventListener("change",()=>setKnowledgeGenerationFilter(select.value)));
+    root.querySelectorAll("[data-knowledge-generation-reset]").forEach(button=>button.addEventListener("click",()=>setKnowledgeGenerationFilter("all")));
+  }
+
+  function knowledgeFilteredCount(kind, items) {
+    return knowledgeFilteredItems(kind, items).length;
+  }
+
+  function knowledgeHomeCounts() {
+    return {
+      types:TYPES.length,
+      pokemon:knowledgeFilteredCount("pokemon",QuizmonKnowledgeData.POKEMON),
+      moves:knowledgeFilteredCount("move",QuizmonKnowledgeContent.MOVES),
+      items:knowledgeFilteredCount("item",QuizmonKnowledgeContent.ITEMS),
+      regions:knowledgeFilteredCount("region",QuizmonKnowledgeWorld.REGIONS),
+      trainers:knowledgeFilteredCount("trainer",QuizmonKnowledgeWorld.TRAINERS.filter(knowledgeTrainerIsCore)),
+      competitive:QuizmonKnowledgeWorld.COMPETITIVE_TOPICS.length
+    };
+  }
+
+  function knowledgeGenerationEmptyMarkup() {
+    const selected=knowledgeSelectedGeneration();
+    return `<section class="knowledge-generation-empty"><span aria-hidden="true">⌁</span><div><strong>${t("knowledge.generationFilter.emptyTitle")}</strong><p>${selected?t("knowledge.generationFilter.emptyText",{generation:selected}):t("knowledge.search.emptyText")}</p></div><button type="button" class="secondary-button" data-knowledge-generation-reset>${t("knowledge.generationFilter.reset")}</button></section>`;
+  }
+
+  function knowledgeSearchGenerationSuffix() {
+    const selected=knowledgeSelectedGeneration();
+    return selected?` · ${t("knowledge.generationFilter.option",{generation:selected})}`:"";
+  }
+
+  function knowledgeSearchEmptyMarkup() {
+    const selected=knowledgeSelectedGeneration();
+    return `<section class="knowledge-search-empty"><span aria-hidden="true">⌕</span><div><strong>${t("knowledge.search.emptyTitle")}</strong><p>${selected?t("knowledge.generationFilter.searchEmptyText",{generation:selected}):t("knowledge.search.emptyText")}</p></div></section>`;
+  }
+
+  function getKnowledgeSearchIndex() {
+    if(knowledgeSearchIndex)return knowledgeSearchIndex;
+    knowledgeSearchIndex=QuizmonKnowledgeSearch.buildIndex({
+      types:knowledgeSearchTypes(),
+      pokemon:QuizmonKnowledgeData.POKEMON,
+      moves:QuizmonKnowledgeContent.MOVES,
+      abilities:QuizmonKnowledgeContent.ABILITIES,
+      items:QuizmonKnowledgeContent.ITEMS,
+      evolutions:knowledgeSearchFamilies(),
+      regions:QuizmonKnowledgeWorld.REGIONS,
+      trainers:QuizmonKnowledgeWorld.TRAINERS.filter(knowledgeTrainerIsCore),
+      competitive:QuizmonKnowledgeWorld.COMPETITIVE_TOPICS
+    });
+    return knowledgeSearchIndex;
+  }
+
+  function knowledgeSearchKindLabel(kind) { return t(`knowledge.search.kind.${kind}`); }
+  function knowledgeSearchIcon(result) {
+    if(result.kind==="type")return TYPE_META[result.id]?.icon||"◉";
+    if(result.kind==="pokemon")return "◉";
+    if(result.kind==="move")return TYPE_META[QuizmonKnowledgeContent.MOVE_BY_ID.get(Number(result.id))?.type]?.icon||"↗";
+    if(result.kind==="ability")return "✦";
+    if(result.kind==="item")return "◇";
+    if(result.kind==="evolution")return "↗";
+    if(result.kind==="region")return "⌘";
+    if(result.kind==="trainer")return knowledgeTrainerRoleIcon(knowledgeTrainerById(result.id));
+    return knowledgeCompetitiveIcon(knowledgeTopicById(result.id)?.group);
+  }
+
+  function knowledgeSearchVisual(result) {
+    if(result.kind==="pokemon"){
+      const item=knowledgePokemonById(result.id);
+      if(item)return {className:"pokemon-art",html:`<img loading="lazy" src="${escapeHtml(knowledgeArtwork(item))}" alt="">`};
+    }
+    if(result.kind==="item"){
+      const item=QuizmonKnowledgeContent.ITEM_BY_ID.get(Number(result.id));
+      if(item)return {className:"item-art",html:`<img loading="lazy" data-image-kind="item" src="${escapeHtml(knowledgeItemArtwork(item))}" alt="">`};
+    }
+    if(result.kind==="evolution"){
+      const family=knowledgeSearchFamilies().find(item=>Number(item.id)===Number(result.id));
+      if(family){
+        return {className:"evolution-art",html:`<span class="knowledge-search-family-art">${family.members.slice(0,3).map(item=>`<img loading="lazy" src="${escapeHtml(knowledgeArtwork(item))}" alt="">`).join("")}</span>`};
+      }
+    }
+    return {className:"",html:knowledgeSearchIcon(result)};
+  }
+
+  function knowledgeSearchResultSubtitle(result) {
+    if(result.kind==="type")return t("knowledge.search.typeResult");
+    if(result.kind==="pokemon"){
+      const item=knowledgePokemonById(result.id);if(!item)return "";
+      return `${item.types.map(typeLabel).join(" / ")} · ${t("knowledge.generation",{generation:item.generation})}`;
+    }
+    if(result.kind==="move"){
+      const item=QuizmonKnowledgeContent.MOVE_BY_ID.get(Number(result.id));if(!item)return "";
+      return `${typeLabel(item.type)} · ${knowledgeDamageClassLabel(item.damageClass)}`;
+    }
+    if(result.kind==="ability"){
+      const item=QuizmonKnowledgeContent.ABILITY_BY_ID.get(Number(result.id));
+      return item?t("knowledge.generation",{generation:item.generation}):"";
+    }
+    if(result.kind==="item"){
+      const item=QuizmonKnowledgeContent.ITEM_BY_ID.get(Number(result.id));
+      return item?`${t("knowledge.generation",{generation:item.generation})} · ${knowledgePocketLabel(item.pocket)}`:"";
+    }
+    if(result.kind==="evolution"){
+      const family=knowledgeSearchFamilies().find(item=>Number(item.id)===Number(result.id));
+      if(!family)return "";
+      const names=family.members.map(knowledgePokemonName);
+      return names.length>3?`${names.slice(0,3).join(" · ")} · +${names.length-3}`:names.join(" · ");
+    }
+    if(result.kind==="region"){
+      const item=knowledgeRegionById(result.id);if(!item)return "";
+      return `${t("knowledge.generation",{generation:item.generation})} · ${knowledgeWorldText(item.league)}`;
+    }
+    if(result.kind==="trainer"){
+      const item=knowledgeTrainerById(result.id);if(!item)return "";
+      return `${knowledgeRoleLabel(knowledgeTrainerPrimaryRole(item))} · ${knowledgeWorldText(knowledgeRegionById(item.region))}`;
+    }
+    const topic=knowledgeTopicById(result.id);
+    return topic?t(`knowledge.competitiveGroup.${topic.group}`):"";
+  }
+
+  function knowledgeSearchResultCard(result) {
+    const name=state.language==="en"?result.en:result.de;
+    const visual=knowledgeSearchVisual(result);
+    const personal = result.kind === "pokemon" || result.kind === "type" ? `<span class="knowledge-search-personal-actions">${knowledgeFavoriteButton(result.kind,result.id,"search-favorite")}${knowledgeTrainingListButton(result.kind,result.id,"search-training-list")}</span>` : "";
+    return `<article class="knowledge-search-result-shell ${personal ? "has-personal-actions" : ""}">
+      <button class="knowledge-search-result" data-search-kind="${result.kind}" data-search-id="${escapeHtml(String(result.id))}">
+        <span class="knowledge-search-result-icon ${visual.className}" aria-hidden="true">${visual.html}</span>
+        <span class="knowledge-search-result-copy"><small>${escapeHtml(knowledgeSearchKindLabel(result.kind))}</small><strong>${escapeHtml(name)}</strong><em>${escapeHtml(knowledgeSearchResultSubtitle(result))}</em></span>
+        <i aria-hidden="true">›</i>
+      </button>${personal}
+    </article>`;
+  }
+
+  function captureKnowledgeSearchOrigin() {
+    if(knowledgeView==="search"||knowledgeSearchOpenedResult)return;
+    knowledgeSearchOrigin={
+      route:state.route,
+      view:knowledgeView,
+      learnType,
+      pokemonId:knowledgePokemonId,
+      pokemonPage:knowledgePokemonPage,
+      pokemonTab:knowledgePokemonDetailTab,
+      contentKind:knowledgeContentKind,
+      contentId:knowledgeContentId,
+      contentPage:knowledgeContentPage,
+      scrollY:Math.max(0,window.scrollY||document.documentElement.scrollTop||0)
+    };
+  }
+
+  function restoreKnowledgeScroll(top) {
+    const value=Math.max(0,Number(top)||0);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:value,left:0,behavior:"auto"})));
+  }
+
+  function openKnowledgeSearchPage(options={}) {
+    if(knowledgeView!=="search")captureKnowledgeSearchOrigin();
+    knowledgeView="search";
+    knowledgeSearchOpenedResult=false;
+    knowledgeSearchVisibleCount=KNOWLEDGE_SEARCH_PAGE_SIZE;
+    knowledgeSearchFocusPending=options.focus!==false;
+    if(state.route==="knowledge"){
+      replaceBrowserHistorySnapshot();
+      renderKnowledgePage();
+      pushBrowserHistorySnapshot();
+    } else setRoute("knowledge");
+  }
+
+  function returnFromKnowledgeSearch() {
+    if(canUseBrowserBack()){ history.back(); return; }
+    const origin=knowledgeSearchOrigin;
+    knowledgeSearchOrigin=null;
+    knowledgeSearchOpenedResult=false;
+    if(!origin){knowledgeView="home";renderKnowledgePage();return;}
+    knowledgeView=origin.view||"home";
+    learnType=origin.learnType||null;
+    knowledgePokemonId=origin.pokemonId||null;
+    knowledgePokemonPage=Math.max(0,Number(origin.pokemonPage)||0);
+    knowledgePokemonDetailTab=origin.pokemonTab||"overview";
+    knowledgeContentKind=origin.contentKind||null;
+    knowledgeContentId=origin.contentId??null;
+    knowledgeContentPage=Math.max(0,Number(origin.contentPage)||0);
+    if(origin.route==="learn-detail")setRoute("learn-detail",{preserveScroll:true});
+    else if(state.route==="knowledge")renderKnowledgePage();
+    else setRoute("knowledge",{preserveScroll:true});
+    restoreKnowledgeScroll(origin.scrollY);
+  }
+
+  function returnToKnowledgeSearchResults() {
+    knowledgeSearchOpenedResult=false;
+    knowledgeView="search";
+    setRoute("knowledge",{preserveScroll:true});
+    restoreKnowledgeScroll(knowledgeSearchResultScrollY);
+  }
+
+  function openKnowledgeSearchResult(kind,id) {
+    if(knowledgeView!=="search")captureKnowledgeSearchOrigin();
+    knowledgeView="search";
+    knowledgeSearchOpenedResult=true;
+    knowledgeSearchResultScrollY=Math.max(0,window.scrollY||document.documentElement.scrollTop||0);
+    if(kind==="type"){
+      knowledgePokemonId=null;knowledgeContentKind=null;knowledgeContentId=null;learnType=String(id);setRoute("learn-detail");return;
+    }
+    if(kind==="pokemon"){openKnowledgePokemon(id);return;}
+    openKnowledgeEntry(kind,id);
+  }
+
+  function bindKnowledgeSearchResultButtons(root) {
+    root.querySelectorAll("[data-search-kind]").forEach(button=>button.addEventListener("click",()=>openKnowledgeSearchResult(button.dataset.searchKind,button.dataset.searchId)));
+    bindKnowledgeFavoriteButtons(root);
+    bindKnowledgeTrainingListButtons(root);
+  }
+
+  function renderKnowledgeSearchResults(root) {
+    const resultsRoot=root.querySelector("[data-knowledge-search-results]");
+    const status=root.querySelector("[data-knowledge-search-status]");
+    const clear=root.querySelector("[data-knowledge-search-clear]");
+    if(!resultsRoot||!status)return;
+    const query=knowledgeSearchQuery.trim();
+    clear?.toggleAttribute("hidden",!query);
+    if(!query){status.textContent=t("knowledge.search.hint");resultsRoot.innerHTML="";return;}
+    if(QuizmonKnowledgeSearch.normalize(query).length<2){status.textContent=t("knowledge.search.minimum");resultsRoot.innerHTML="";return;}
+    const result=QuizmonKnowledgeSearch.search(getKnowledgeSearchIndex(),query,{language:state.language,perKind:6,limit:54,generation:knowledgeSelectedGeneration()});
+    status.textContent=(result.total===1?t("knowledge.search.resultOne",{count:1}):t("knowledge.search.results",{count:result.total}))+knowledgeSearchGenerationSuffix();
+    if(!result.total){resultsRoot.innerHTML=knowledgeSearchEmptyMarkup();return;}
+    const groups=QuizmonKnowledgeSearch.KIND_ORDER.map(kind=>{
+      const items=result.items.filter(item=>item.kind===kind);
+      if(!items.length)return "";
+      const count=result.counts[kind]||items.length;
+      return `<section class="knowledge-search-group"><div class="knowledge-search-group-head"><h4>${escapeHtml(knowledgeSearchKindLabel(kind))}</h4><span>${count}</span></div><div class="knowledge-search-result-grid">${items.map(knowledgeSearchResultCard).join("")}</div>${count>items.length?`<button type="button" class="knowledge-search-more-button" data-search-filter-open="${kind}">${t("knowledge.search.more",{count:count-items.length})}</button>`:""}</section>`;
+    }).join("");
+    resultsRoot.innerHTML=`${groups}<button type="button" class="primary-button knowledge-search-all-button" data-open-search-page>${t("knowledge.search.openAll",{count:result.total})}</button>`;
+    bindKnowledgeSearchResultButtons(resultsRoot);
+    resultsRoot.querySelector("[data-open-search-page]")?.addEventListener("click",()=>openKnowledgeSearchPage({focus:false}));
+    resultsRoot.querySelectorAll("[data-search-filter-open]").forEach(button=>button.addEventListener("click",()=>{knowledgeSearchFilter=button.dataset.searchFilterOpen;openKnowledgeSearchPage({focus:false});}));
+  }
+
+  function knowledgeSearchMarkup() {
+    return `<section class="knowledge-search-panel" aria-labelledby="knowledgeSearchTitle">
+      <div class="knowledge-search-heading"><div><p class="quiz-kicker">${t("knowledge.search.kicker")}</p><h3 id="knowledgeSearchTitle">${t("knowledge.search.title")}</h3><p>${t("knowledge.search.text")}</p></div><span aria-hidden="true">${iconSvg("search")}</span></div>
+      <label class="sr-only" for="knowledgeSearchInput">${t("knowledge.search.title")}</label><div class="knowledge-search-field"><span aria-hidden="true">${iconSvg("search")}</span><input id="knowledgeSearchInput" type="search" value="${escapeHtml(knowledgeSearchQuery)}" placeholder="${escapeHtml(t("knowledge.search.placeholder"))}" autocomplete="off" spellcheck="false"><button type="button" data-knowledge-search-clear aria-label="${escapeHtml(t("knowledge.search.clear"))}" ${knowledgeSearchQuery?"":"hidden"}>×</button></div>
+      <p class="knowledge-search-status" data-knowledge-search-status aria-live="polite" aria-atomic="true"></p>
+      <div class="knowledge-search-results" data-knowledge-search-results></div>
+    </section>`;
+  }
+
+  function bindKnowledgeSearch(root) {
+    const input=root.querySelector("#knowledgeSearchInput");
+    if(!input)return;
+    input.addEventListener("input",()=>{knowledgeSearchQuery=input.value;knowledgeSearchVisibleCount=KNOWLEDGE_SEARCH_PAGE_SIZE;renderKnowledgeSearchResults(root);});
+    input.addEventListener("keydown",event=>{if(event.key==="Enter"&&QuizmonKnowledgeSearch.normalize(input.value).length>=2){event.preventDefault();openKnowledgeSearchPage({focus:false});}});
+    root.querySelector("[data-knowledge-search-clear]")?.addEventListener("click",()=>{knowledgeSearchQuery="";input.value="";renderKnowledgeSearchResults(root);input.focus();});
+    renderKnowledgeSearchResults(root);
+  }
+
+  function knowledgeSearchLauncherMarkup(compact=false) {
+    return `<button type="button" class="knowledge-search-launcher ${compact?"compact":""}" data-open-knowledge-search aria-label="${escapeHtml(t("knowledge.search.open"))}"><span aria-hidden="true">⌕</span><b>${t("knowledge.search.open")}</b><kbd>/</kbd></button>`;
+  }
+
+  function bindKnowledgeSearchLaunchers(root) {
+    root.querySelectorAll("[data-open-knowledge-search]").forEach(button=>button.addEventListener("click",()=>openKnowledgeSearchPage()));
+  }
+
+
+  function attachKnowledgeDetailSearchLauncher() {
+    const page=view.firstElementChild;
+    if(!page||page.querySelector("[data-knowledge-detail-search]"))return;
+    const favorite=knowledgePokemonId?knowledgeFavoriteButton("pokemon",knowledgePokemonId,"detail-favorite"):learnType?knowledgeFavoriteButton("type",learnType,"detail-favorite"):"";
+    const trainingList=knowledgePokemonId?knowledgeTrainingListButton("pokemon",knowledgePokemonId,"detail-training-list"):learnType?knowledgeTrainingListButton("type",learnType,"detail-training-list"):"";
+    page.insertAdjacentHTML("afterbegin",`<div class="knowledge-detail-search-row" data-knowledge-detail-search>${favorite}${trainingList}${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup()}</div>`);
+    bindKnowledgeSearchLaunchers(page);
+    bindKnowledgeGenerationFilter(page);
+    bindKnowledgeFavoriteButtons(page);
+    bindKnowledgeTrainingListButtons(page);
+  }
+
+  function knowledgeSearchFilterMarkup(result) {
+    const options=["all",...QuizmonKnowledgeSearch.KIND_ORDER];
+    return options.map(kind=>{
+      const count=kind==="all"?result.allTotal:(result.counts[kind]||0);
+      const label=kind==="all"?t("knowledge.search.filterAll"):knowledgeSearchKindLabel(kind);
+      const active=knowledgeSearchFilter===kind;
+      return `<button type="button" class="knowledge-search-filter ${active?"active":""}" data-search-filter="${kind}" aria-pressed="${active}" ${count?"":"disabled"}><span>${escapeHtml(label)}</span><b>${count}</b></button>`;
+    }).join("");
+  }
+
+  function renderKnowledgeSearchPageResults(root) {
+    const status=root.querySelector("[data-search-page-status]");
+    const filters=root.querySelector("[data-search-page-filters]");
+    const results=root.querySelector("[data-search-page-results]");
+    const clear=root.querySelector("[data-search-page-clear]");
+    if(!status||!filters||!results)return;
+    const query=knowledgeSearchQuery.trim();
+    clear?.toggleAttribute("hidden",!query);
+    if(!query){status.textContent=t("knowledge.search.hint");filters.innerHTML="";results.innerHTML=`<section class="knowledge-search-empty"><span aria-hidden="true">⌕</span><div><strong>${t("knowledge.search.startTitle")}</strong><p>${t("knowledge.search.startText")}</p></div></section>`;return;}
+    if(QuizmonKnowledgeSearch.normalize(query).length<2){status.textContent=t("knowledge.search.minimum");filters.innerHTML="";results.innerHTML="";return;}
+    const selectedKind=knowledgeSearchFilter==="all"?null:knowledgeSearchFilter;
+    const result=QuizmonKnowledgeSearch.search(getKnowledgeSearchIndex(),query,{language:state.language,kind:selectedKind,flat:true,limit:knowledgeSearchVisibleCount,generation:knowledgeSelectedGeneration()});
+    if(selectedKind&&!result.counts[selectedKind])knowledgeSearchFilter="all";
+    const finalKind=knowledgeSearchFilter==="all"?null:knowledgeSearchFilter;
+    const finalResult=finalKind===selectedKind?result:QuizmonKnowledgeSearch.search(getKnowledgeSearchIndex(),query,{language:state.language,flat:true,limit:knowledgeSearchVisibleCount,generation:knowledgeSelectedGeneration()});
+    filters.innerHTML=knowledgeSearchFilterMarkup(finalResult);
+    filters.querySelectorAll("[data-search-filter]").forEach(button=>button.addEventListener("click",()=>{knowledgeSearchFilter=button.dataset.searchFilter;knowledgeSearchVisibleCount=KNOWLEDGE_SEARCH_PAGE_SIZE;renderKnowledgeSearchPageResults(root);}));
+    const statusText=(finalResult.total===1?t("knowledge.search.resultOne",{count:1}):t("knowledge.search.results",{count:finalResult.total}))+knowledgeSearchGenerationSuffix();
+    status.textContent=finalResult.items.length&&finalResult.items.every(item=>item.fuzzy)?`${statusText} · ${t("knowledge.search.similar")}`:statusText;
+    if(!finalResult.total){results.innerHTML=knowledgeSearchEmptyMarkup();return;}
+    const remaining=Math.max(0,finalResult.total-finalResult.items.length);
+    results.innerHTML=`<div class="knowledge-search-page-grid">${finalResult.items.map(knowledgeSearchResultCard).join("")}</div>${remaining?`<button type="button" class="secondary-button knowledge-search-load-more" data-search-load-more>${t("knowledge.search.loadMore",{count:Math.min(KNOWLEDGE_SEARCH_PAGE_SIZE,remaining)})}</button>`:""}`;
+    bindKnowledgeSearchResultButtons(results);
+    results.querySelector("[data-search-load-more]")?.addEventListener("click",()=>{knowledgeSearchVisibleCount+=KNOWLEDGE_SEARCH_PAGE_SIZE;renderKnowledgeSearchPageResults(root);});
+  }
+
+  function renderKnowledgeSearchPage() {
+    const root=document.getElementById("learnContent");
+    root.innerHTML=`<section class="knowledge-search-page">
+      <header class="knowledge-search-page-head"><button type="button" class="knowledge-back-button" data-search-return aria-label="${escapeHtml(t("knowledge.search.back"))}">‹</button><div><p class="quiz-kicker">${t("knowledge.search.kicker")}</p><h3>${t("knowledge.search.pageTitle")}</h3><p>${t("knowledge.search.pageText")}</p></div><div class="knowledge-search-page-actions"><span>${t("knowledge.search.shortcut")}</span>${knowledgeGenerationFilterMarkup(true)}</div></header>
+      <section class="knowledge-search-page-panel">
+        <label class="sr-only" for="knowledgeSearchPageInput">${t("knowledge.search.title")}</label><div class="knowledge-search-field large"><span aria-hidden="true">${iconSvg("search")}</span><input id="knowledgeSearchPageInput" type="search" value="${escapeHtml(knowledgeSearchQuery)}" placeholder="${escapeHtml(t("knowledge.search.placeholder"))}" autocomplete="off" spellcheck="false"><button type="button" data-search-page-clear aria-label="${escapeHtml(t("knowledge.search.clear"))}" ${knowledgeSearchQuery?"":"hidden"}>×</button></div>
+        <p class="knowledge-search-status" data-search-page-status aria-live="polite" aria-atomic="true"></p>
+        <div class="knowledge-search-filters" data-search-page-filters aria-label="${escapeHtml(t("knowledge.search.filters"))}"></div>
+        <div class="knowledge-search-page-results" data-search-page-results></div>
+      </section>
+    </section>`;
+    const input=root.querySelector("#knowledgeSearchPageInput");
+    input?.addEventListener("input",()=>{knowledgeSearchQuery=input.value;knowledgeSearchVisibleCount=KNOWLEDGE_SEARCH_PAGE_SIZE;renderKnowledgeSearchPageResults(root);});
+    input?.addEventListener("keydown",event=>{if(event.key==="Escape"&&knowledgeSearchQuery){event.preventDefault();knowledgeSearchQuery="";input.value="";renderKnowledgeSearchPageResults(root);}});
+    root.querySelector("[data-search-page-clear]")?.addEventListener("click",()=>{knowledgeSearchQuery="";input.value="";knowledgeSearchVisibleCount=KNOWLEDGE_SEARCH_PAGE_SIZE;renderKnowledgeSearchPageResults(root);input.focus();});
+    root.querySelector("[data-search-return]")?.addEventListener("click",returnFromKnowledgeSearch);
+    bindKnowledgeGenerationFilter(root);
+    renderKnowledgeSearchPageResults(root);
+    if(knowledgeSearchFocusPending){knowledgeSearchFocusPending=false;requestAnimationFrame(()=>input?.focus({preventScroll:true}));}
+  }
+  function renderKnowledgeHome() {
+    const root=document.getElementById("learnContent");
+    const counts=knowledgeHomeCounts();
+    const compact=matchMedia("(max-width:620px)").matches;
+    root.innerHTML=`<section class="knowledge-home">
+      <section class="knowledge-welcome">
+        <div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${t("knowledge.homeTitle")}</h3><p>${t("knowledge.homeText")}</p></div>
+        <div class="knowledge-welcome-mark" aria-hidden="true">${iconSvg("pokemon")}</div>
+      </section>
+      ${knowledgeGenerationFilterMarkup()}
+      ${knowledgeSearchMarkup()}
+      <details class="knowledge-home-group knowledge-personal-hub" ${compact?"":"open"}>
+        <summary><span aria-hidden="true">${iconSvg("favorite")}</span><span><strong>${t("knowledge.personalHubTitle")}</strong><small>${t("knowledge.personalHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <section class="knowledge-personal-entry">
+          ${knowledgeSectionButton("favorites",iconSvg("favorite"),t("favorites.title"),t("favorites.homeText"),t("favorites.meta",{count:favoritePokemonEntries().length+favoriteTypeEntries().length}))}
+          ${knowledgeSectionButton("training-lists",iconSvg("list"),t("trainingLists.title"),t("trainingLists.homeText"),t("trainingLists.meta",{count:trainingLists().length}))}
+        </section>
+      </details>
+      <section class="knowledge-category-grid" aria-labelledby="knowledgeAvailableTitle">
+        <div class="knowledge-section-heading"><div><small>${t("knowledge.availableKicker")}</small><h3 id="knowledgeAvailableTitle">${t("knowledge.availableTitle")}</h3></div></div>
+        ${knowledgeSectionButton("types",TYPE_META.psychic.icon,t("knowledge.typesTitle"),t("knowledge.typesText"),t("knowledge.typesMeta",{count:counts.types}))}
+        ${knowledgeSectionButton("pokemon",iconSvg("pokemon"),t("knowledge.pokemonTitle"),t("knowledge.pokemonText"),t("knowledge.pokemonMeta",{count:counts.pokemon}))}
+        ${knowledgeSectionButton("moves",iconSvg("evolution"),t("knowledge.moves"),t("knowledge.movesText"),t("knowledge.movesMeta",{count:counts.moves}))}
+        ${knowledgeSectionButton("items",iconSvg("item"),t("knowledge.items"),t("knowledge.itemsText"),t("knowledge.itemsMeta",{count:counts.items}))}
+      </section>
+      <details class="knowledge-home-group knowledge-world-hub" ${compact?"":"open"}>
+        <summary><span aria-hidden="true">${iconSvg("region")}</span><span><strong>${t("knowledge.worldTitle")}</strong><small>${t("knowledge.worldHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <section class="knowledge-category-grid knowledge-world-grid" aria-labelledby="knowledgeWorldTitle">
+          <div class="knowledge-section-heading sr-only"><div><small>${t("knowledge.worldKicker")}</small><h3 id="knowledgeWorldTitle">${t("knowledge.worldTitle")}</h3></div></div>
+          ${knowledgeSectionButton("regions",iconSvg("region"),t("knowledge.regionsTitle"),t("knowledge.regionsText"),t("knowledge.regionsMeta",{count:counts.regions}))}
+          ${knowledgeSectionButton("trainers",iconSvg("trainer"),t("knowledge.trainersTitle"),t("knowledge.trainersText"),t("knowledge.trainersMeta",{count:counts.trainers}))}
+          ${knowledgeSectionButton("competitive",iconSvg("battle"),t("knowledge.competitiveTitle"),t("knowledge.competitiveText"),t("knowledge.competitiveMeta",{count:counts.competitive}))}
+        </section>
+      </details>
+    </section>`;
+    bindKnowledgeSearch(root);
+    bindKnowledgeGenerationFilter(root);
+    root.querySelectorAll("[data-knowledge-section]").forEach(button=>button.addEventListener("click",()=>{
+      replaceBrowserHistorySnapshot();
+      knowledgeView=button.dataset.knowledgeSection;knowledgePokemonPage=0;knowledgeContentPage=0;renderKnowledge();
+      pushBrowserHistorySnapshot();
+    }));
+  }
+
+  function knowledgeSubpageHeader(title, text, meta) {
+    return `<header class="knowledge-subpage-head"><button class="knowledge-back-button" data-knowledge-home aria-label="${escapeHtml(t("knowledge.backHome"))}">‹</button><div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div><div class="knowledge-subpage-actions"><span>${escapeHtml(meta)}</span>${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup(true)}</div></header>`;
+  }
+
+  function bindKnowledgeHome(root) {
+    root.querySelector("[data-knowledge-home]")?.addEventListener("click",()=>{if(canUseBrowserBack()){history.back();return;}knowledgeView="home";knowledgeContentPage=0;renderKnowledge();});
+    bindKnowledgeSearchLaunchers(root);
+    bindKnowledgeGenerationFilter(root);
+  }
+
+  function knowledgeTypeCard(type) {
+    const s=state.stats.types[type];
+    const attack=groupByMultiplier(TYPES,target=>effectiveness(type,[target]));
+    const defense=groupByMultiplier(TYPES,attacker=>effectiveness(attacker,[type]));
+    const memory=memoryAid(type,attack,defense);
+    return `<article class="knowledge-type-card-shell" style="--type-color:${TYPE_META[type].color}"><button class="knowledge-type-card" data-learn-type="${type}"><span class="knowledge-type-symbol">${TYPE_META[type].icon}</span><span><strong>${escapeHtml(typeLabel(type))}</strong><p>${escapeHtml(memory)}</p>${s.total?`<small>${escapeHtml(typeKnowledgeLabel(s))}</small>`:""}</span><i aria-hidden="true">›</i></button><span class="knowledge-card-actions">${knowledgeFavoriteButton("type",type,"card-favorite")}${knowledgeTrainingListButton("type",type,"card-training-list")}</span></article>`;
+  }
+
+  function renderKnowledgeTypes() {
+    const root=document.getElementById("learnContent");
+    const notice=knowledgeSelectedGeneration()?`<p class="knowledge-generation-type-notice">${t("knowledge.generationFilter.typeRules")}</p>`:"";
+    root.innerHTML=`<section class="knowledge-subpage knowledge-types-page">
+      ${knowledgeSubpageHeader(t("knowledge.typesTitle"),t("knowledge.typesText"),t("knowledge.typesMeta",{count:TYPES.length}))}
+      ${notice}
+      <div class="knowledge-type-grid">${TYPES.map(knowledgeTypeCard).join("")}</div>
+    </section>`;
+    bindKnowledgeHome(root);
+    root.querySelectorAll("[data-learn-type]").forEach(button=>button.addEventListener("click",()=>{knowledgePokemonId=null;knowledgeContentKind=null;learnType=button.dataset.learnType;setRoute("learn-detail");}));
+    bindKnowledgeFavoriteButtons(root);
+    bindKnowledgeTrainingListButtons(root);
+  }
+
+  function renderKnowledgePokemon() {
+    const root=document.getElementById("learnContent");
+    const pageSize=48;
+    const items=knowledgeFilteredItems("pokemon",QuizmonKnowledgeData.POKEMON);
+    const total=items.length;
+    const pageCount=Math.max(1,Math.ceil(total/pageSize));
+    knowledgePokemonPage=Math.min(Math.max(0,knowledgePokemonPage),pageCount-1);
+    const result=QuizmonKnowledge.listPokemon(items,{offset:knowledgePokemonPage*pageSize,limit:pageSize});
+    root.innerHTML=`<section class="knowledge-subpage knowledge-pokemon-page">
+      ${knowledgeSubpageHeader(t("knowledge.pokemonTitle"),t("knowledge.pokemonCatalogText"),t("knowledge.pokemonMeta",{count:total}))}
+      ${total?`<div class="knowledge-pokemon-grid">${result.items.map(knowledgePokemonCard).join("")}</div>${knowledgePaginationMarkup(knowledgePokemonPage,pageCount,"pokemon")}`:knowledgeGenerationEmptyMarkup()}
+    </section>`;
+    bindKnowledgeHome(root);
+    root.querySelectorAll("[data-knowledge-pokemon]").forEach(button=>button.addEventListener("click",()=>openKnowledgePokemon(button.dataset.knowledgePokemon)));
+    bindKnowledgeFavoriteButtons(root);
+    bindKnowledgeTrainingListButtons(root);
+    bindKnowledgePagination(root,"pokemon",pageCount);
+  }
+
+  function knowledgeExcerpt(value,max=118) {
+    const text=String(value||"").trim();
+    return text.length>max?`${text.slice(0,max-1).trim()}…`:text;
+  }
+
+  function knowledgeDamageClassLabel(value) { return t(`knowledge.damageClass.${value||"status"}`); }
+  function knowledgePocketLabel(value) { return t(`knowledge.pocket.${value||1}`); }
+
+  function knowledgeMoveCard(item) {
+    return `<button class="knowledge-content-card move-card" data-knowledge-entry="move" data-entry-id="${item.id}" style="--entry-color:${TYPE_META[item.type]?.color||"#66a9b8"}">
+      <span class="knowledge-content-icon">${TYPE_META[item.type]?.icon||"↗"}</span><span class="knowledge-content-copy"><strong>${escapeHtml(knowledgeEntryName(item))}</strong><small>${escapeHtml(typeLabel(item.type))} · ${escapeHtml(knowledgeDamageClassLabel(item.damageClass))}</small><p>${escapeHtml(knowledgeExcerpt(knowledgeEntryEffect(item)))}</p><span><b>${item.power==null?t("knowledge.noPower"):t("knowledge.powerShort",{value:item.power})}</b><b>${item.accuracy==null?t("knowledge.noAccuracy"):t("knowledge.accuracyShort",{value:item.accuracy})}</b><b>${t("knowledge.ppShort",{value:item.pp??"—"})}</b></span></span><i aria-hidden="true">›</i>
+    </button>`;
+  }
+
+  function knowledgeAbilityCard(item) {
+    return `<button class="knowledge-content-card ability-card" data-knowledge-entry="ability" data-entry-id="${item.id}">
+      <span class="knowledge-content-icon">✦</span><span class="knowledge-content-copy"><strong>${escapeHtml(knowledgeEntryName(item))}</strong><small>${t("knowledge.generation",{generation:item.generation})} · ${t("knowledge.pokemonLinked",{count:item.pokemonIds.length})}</small><p>${escapeHtml(knowledgeExcerpt(knowledgeEntryEffect(item)))}</p></span><i aria-hidden="true">›</i>
+    </button>`;
+  }
+
+  function knowledgeItemCard(item) {
+    return `<button class="knowledge-content-card item-card" data-knowledge-entry="item" data-entry-id="${item.id}">
+      <span class="knowledge-content-icon item-sprite"><img loading="lazy" data-image-kind="item" src="${escapeHtml(knowledgeItemArtwork(item))}" alt=""></span><span class="knowledge-content-copy"><strong>${escapeHtml(knowledgeEntryName(item))}</strong><small>${escapeHtml(knowledgePocketLabel(item.pocket))} · ${t("knowledge.generationShort",{generation:item.generation})}</small><p>${escapeHtml(knowledgeExcerpt(knowledgeEntryEffect(item)))}</p></span><i aria-hidden="true">›</i>
+    </button>`;
+  }
+
+  function knowledgeEvolutionFamilyCard(family) {
+    const names=family.members.slice(0,4).map(knowledgePokemonName);
+    const displayedGeneration=knowledgeSelectedGeneration()||family.generation;
+    return `<button class="knowledge-content-card evolution-family-card" data-knowledge-entry="evolution" data-entry-id="${family.id}">
+      <span class="knowledge-family-art">${family.members.slice(0,3).map(item=>`<img loading="lazy" src="${escapeHtml(knowledgeArtwork(item))}" alt="">`).join("")}</span><span class="knowledge-content-copy"><strong>${escapeHtml(knowledgePokemonName(family.root))}</strong><small>${t("knowledge.familyMembers",{count:family.size})} · ${t("knowledge.generationShort",{generation:displayedGeneration})}</small><p>${escapeHtml(names.join(" · "))}${family.size>4?` · +${family.size-4}`:""}</p></span><i aria-hidden="true">›</i>
+    </button>`;
+  }
+
+  function knowledgePaginationMarkup(page,pageCount,kind) {
+    if(pageCount<=1)return "";
+    return `<nav class="knowledge-pagination" aria-label="${escapeHtml(t("knowledge.paginationLabelGeneric"))}" data-pagination-kind="${kind}"><button data-page-action="prev" class="secondary-button" ${page===0?"disabled":""}>${t("knowledge.previousPage")}</button><span>${t("knowledge.pageStatus",{current:page+1,total:pageCount})}</span><button data-page-action="next" class="secondary-button" ${page>=pageCount-1?"disabled":""}>${t("knowledge.nextPage")}</button></nav>`;
+  }
+
+  function bindKnowledgePagination(root,kind,pageCount) {
+    root.querySelectorAll("[data-page-action]").forEach(button=>button.addEventListener("click",()=>{
+      const delta=button.dataset.pageAction==="next"?1:-1;
+      if(kind==="pokemon")knowledgePokemonPage=Math.min(pageCount-1,Math.max(0,knowledgePokemonPage+delta));
+      else knowledgeContentPage=Math.min(pageCount-1,Math.max(0,knowledgeContentPage+delta));
+      renderKnowledge();root.scrollIntoView({behavior:motionEnabled()?"smooth":"auto"});
+    }));
+  }
+
+  function knowledgeCatalogSpec(kind) {
+    if(kind==="moves"){
+      const items=knowledgeFilteredItems("move",QuizmonKnowledgeContent.MOVES);
+      return {items,pageSize:48,title:t("knowledge.moves"),text:t("knowledge.movesCatalogText"),meta:t("knowledge.movesMeta",{count:items.length}),card:knowledgeMoveCard};
+    }
+    if(kind==="abilities"){
+      const items=knowledgeFilteredItems("ability",QuizmonKnowledgeContent.ABILITIES);
+      return {items,pageSize:48,title:t("knowledge.abilities"),text:t("knowledge.abilitiesCatalogText"),meta:t("knowledge.abilitiesMeta",{count:items.length}),card:knowledgeAbilityCard};
+    }
+    if(kind==="items"){
+      const items=knowledgeFilteredItems("item",QuizmonKnowledgeContent.ITEMS);
+      return {items,pageSize:48,title:t("knowledge.items"),text:t("knowledge.itemsCatalogText"),meta:t("knowledge.itemsMeta",{count:items.length}),card:knowledgeItemCard};
+    }
+    const items=knowledgeFilteredItems("evolution",knowledgeSearchFamilies());
+    return {items,pageSize:36,title:t("knowledge.evolutions"),text:t("knowledge.evolutionsCatalogText"),meta:t("knowledge.evolutionsMeta",{count:items.length}),card:knowledgeEvolutionFamilyCard};
+  }
+
+  function renderKnowledgeContentCatalog(kind) {
+    const root=document.getElementById("learnContent");
+    const spec=knowledgeCatalogSpec(kind);
+    const pageCount=Math.max(1,Math.ceil(spec.items.length/spec.pageSize));
+    knowledgeContentPage=Math.min(Math.max(0,knowledgeContentPage),pageCount-1);
+    const result=QuizmonKnowledge.listEntries(spec.items,{offset:knowledgeContentPage*spec.pageSize,limit:spec.pageSize});
+    root.innerHTML=`<section class="knowledge-subpage knowledge-content-page ${kind}">${knowledgeSubpageHeader(spec.title,spec.text,spec.meta)}${spec.items.length?`<div class="knowledge-content-grid">${result.items.map(spec.card).join("")}</div>${knowledgePaginationMarkup(knowledgeContentPage,pageCount,kind)}`:knowledgeGenerationEmptyMarkup()}</section>`;
+    bindKnowledgeHome(root);bindKnowledgePagination(root,kind,pageCount);
+    root.querySelectorAll("[data-knowledge-entry]").forEach(button=>button.addEventListener("click",()=>openKnowledgeEntry(button.dataset.knowledgeEntry,button.dataset.entryId)));
+  }
+
+
+  function knowledgeWorldText(value) { return QuizmonKnowledgeWorld.text(value,state.language); }
+  function knowledgeRegionById(id) { return QuizmonKnowledgeWorld.REGION_BY_ID.get(String(id)) || null; }
+  function knowledgeTrainerById(id) { return QuizmonKnowledgeWorld.TRAINER_BY_ID.get(String(id)) || null; }
+  function knowledgeTopicById(id) { return QuizmonKnowledgeWorld.TOPIC_BY_ID.get(String(id)) || null; }
+
+  function knowledgeRoleLabel(role) { return t(`knowledge.trainerRole.${role}`); }
+  function knowledgeRoleMarkup(roles) { return (roles||[]).map(role=>`<span>${escapeHtml(knowledgeRoleLabel(role))}</span>`).join(""); }
+  const KNOWLEDGE_CORE_TRAINER_ROLES = new Set(["gym","elite","champion"]);
+  const KNOWLEDGE_TRAINER_ROLE_ICONS = Object.freeze({ gym:"◈", elite:"✦", champion:"♛" });
+  const KNOWLEDGE_TRAINER_LEVEL_CURVES = Object.freeze({
+    kanto: Object.freeze({ gym:[14,21,24,29,43,43,47,50], elite:[54,56,56,58], champion:[65] }),
+    johto: Object.freeze({ gym:[9,16,20,25,31,35,31,40], elite:[40,42,42,47], champion:[50] }),
+    hoenn: Object.freeze({ gym:[15,19,24,29,31,33,42,46], elite:[46,48,49,50], champion:[58] }),
+    sinnoh: Object.freeze({ gym:[14,22,30,37,41,44,49,52], elite:[53,55,57,59], champion:[66] }),
+    unova: Object.freeze({ gym:[14,20,24,27,31,35,39,43], elite:[48,48,50,50], champion:[54] }),
+    kalos: Object.freeze({ gym:[12,25,32,37,42,48,59,68], elite:[63,64,65,65], champion:[68] }),
+    alola: Object.freeze({ gym:[], elite:[54,55,56,57], champion:[58] }),
+    galar: Object.freeze({ gym:[20,24,36,38,42,46,48,55], elite:[54,55,55,56], champion:[65] }),
+    paldea: Object.freeze({ gym:[15,17,24,30,35,42,45,48], elite:[57,58,59,60], champion:[62] })
+  });
+  function knowledgeTrainerPrimaryRole(trainer) {
+    if (!trainer?.roles?.length) return null;
+    return trainer.roles.find(role=>KNOWLEDGE_CORE_TRAINER_ROLES.has(role)) || null;
+  }
+  function knowledgeTrainerIsCore(trainer) {
+    return !!knowledgeTrainerPrimaryRole(trainer);
+  }
+  function knowledgeTrainerRoleIcon(trainer) {
+    return KNOWLEDGE_TRAINER_ROLE_ICONS[knowledgeTrainerPrimaryRole(trainer)] || "◉";
+  }
+  function knowledgeTrainerRegionCoreList(regionId, role) {
+    return QuizmonKnowledgeWorld.TRAINERS.filter(item=>item.region===regionId && knowledgeTrainerPrimaryRole(item)===role);
+  }
+  function knowledgeTrainerAceLevel(trainer) {
+    const role=knowledgeTrainerPrimaryRole(trainer);
+    if (!role) return null;
+    const curve=KNOWLEDGE_TRAINER_LEVEL_CURVES[trainer.region]?.[role] || [];
+    const list=knowledgeTrainerRegionCoreList(trainer.region, role);
+    const index=Math.max(0, list.findIndex(item=>item.id===trainer.id));
+    if (curve[index] != null) return curve[index];
+    if (curve.length) return curve[Math.min(curve.length - 1, index)];
+    return role === "champion" ? 60 : role === "elite" ? 50 : 30;
+  }
+  function knowledgeTrainerTeam(trainer) {
+    const ids=Array.isArray(trainer?.pokemonIds) ? trainer.pokemonIds : [];
+    const explicit=Array.isArray(trainer?.pokemonTeam) ? trainer.pokemonTeam : [];
+    if (explicit.length) {
+      return explicit.map((entry,index)=>{
+        const pokemon=knowledgePokemonById(entry.id ?? entry.pokemonId ?? ids[index]);
+        if (!pokemon) return null;
+        return { pokemon, level: entry.level ?? null, form: entry.form || null };
+      }).filter(Boolean);
+    }
+    const aceLevel=knowledgeTrainerAceLevel(trainer);
+    const total=ids.length;
+    return ids.map((id,index)=>{
+      const pokemon=knowledgePokemonById(id);
+      if (!pokemon) return null;
+      const offset=total > 1 ? (total - 1 - index) * 2 : 0;
+      return { pokemon, level: aceLevel != null ? Math.max(1, aceLevel - offset) : null };
+    }).filter(Boolean);
+  }
+  function knowledgeTrainerPrimaryColor(trainer) {
+    const type=trainer?.types?.[0];
+    if(type && TYPE_META[type])return TYPE_META[type].color;
+    if(trainer?.roles?.includes("champion"))return "#d4a847";
+    if(trainer?.roles?.includes("elite"))return "#8a78be";
+    return "#66a9b8";
+  }
+  function knowledgeTrainerDescription(trainer) {
+    const name=knowledgeWorldText(trainer),region=knowledgeWorldText(knowledgeRegionById(trainer.region));
+    const types=(trainer.types||[]).map(typeLabel).join(state.language==="de"?" und ":" and ");
+    const location=knowledgeWorldText(trainer.location);
+    const vars={name,region,types,location};
+    if(trainer.roles.includes("gym"))return t(types?"knowledge.trainerDescription.gymType":"knowledge.trainerDescription.gym",vars);
+    if(trainer.roles.includes("elite"))return t(types?"knowledge.trainerDescription.eliteType":"knowledge.trainerDescription.elite",vars);
+    if(trainer.roles.includes("champion"))return t(types?"knowledge.trainerDescription.championType":"knowledge.trainerDescription.champion",vars);
+    if(trainer.roles.includes("captain"))return t("knowledge.trainerDescription.captain",vars);
+    if(trainer.roles.includes("kahuna"))return t("knowledge.trainerDescription.kahuna",vars);
+    if(trainer.roles.includes("professor"))return t("knowledge.trainerDescription.professor",vars);
+    if(trainer.roles.includes("rival"))return t("knowledge.trainerDescription.rival",vars);
+    return t("knowledge.trainerDescription.other",vars);
+  }
+
+  function knowledgeRegionCard(region) {
+    return `<button class="knowledge-region-card" data-knowledge-entry="region" data-entry-id="${region.id}" style="--region-color:${escapeHtml(region.accent)}"><span class="knowledge-region-number">${region.generation}</span><span class="knowledge-region-copy"><small>${t("knowledge.generation",{generation:region.generation})}</small><strong>${escapeHtml(knowledgeWorldText(region))}</strong><p>${escapeHtml(knowledgeExcerpt(knowledgeWorldText(region.summary),132))}</p><span class="knowledge-region-starters">${region.starters.map(id=>{const pokemon=knowledgePokemonById(id);return pokemon?`<img loading="lazy" src="${escapeHtml(knowledgeArtwork(pokemon))}" alt="${escapeHtml(knowledgePokemonName(pokemon))}">`:"";}).join("")}</span></span><i aria-hidden="true">›</i></button>`;
+  }
+
+  function knowledgeTrainerCard(trainer) {
+    const region=knowledgeRegionById(trainer.region);
+    const primaryRole=knowledgeTrainerPrimaryRole(trainer);
+    return `<button class="knowledge-trainer-card" data-knowledge-entry="trainer" data-entry-id="${trainer.id}" style="--trainer-color:${knowledgeTrainerPrimaryColor(trainer)}"><span class="knowledge-trainer-avatar" aria-hidden="true">${knowledgeTrainerRoleIcon(trainer)}</span><span class="knowledge-trainer-copy"><strong>${escapeHtml(knowledgeWorldText(trainer))}</strong><small>${escapeHtml(knowledgeWorldText(region))} · ${primaryRole ? knowledgeRoleLabel(primaryRole) : (trainer.roles||[]).map(knowledgeRoleLabel).join(" · ")}</small>${trainer.types?.length?`<span class="knowledge-trainer-types">${trainer.types.map(type=>typeChip(type,"small")).join("")}</span>`:""}</span><i aria-hidden="true">›</i></button>`;
+  }
+
+  function knowledgeCompetitiveIcon(group) { return ({battle:"↗",team:"◇",stats:"▥",field:"◎"})[group]||"⚔"; }
+  function knowledgeCompetitiveCard(topic) {
+    return `<button class="knowledge-topic-card" data-knowledge-entry="competitive" data-entry-id="${topic.id}"><span class="knowledge-topic-icon">${knowledgeCompetitiveIcon(topic.group)}</span><span><small>${t(`knowledge.competitiveGroup.${topic.group}`)}</small><strong>${escapeHtml(knowledgeWorldText(topic))}</strong><p>${escapeHtml(knowledgeWorldText(topic.summary))}</p></span><i aria-hidden="true">›</i></button>`;
+  }
+
+  function bindKnowledgeWorldCatalog(root) {
+    root.querySelectorAll("[data-knowledge-entry]").forEach(button=>button.addEventListener("click",()=>openKnowledgeEntry(button.dataset.knowledgeEntry,button.dataset.entryId)));
+  }
+
+  function favoritePokemonRows() {
+    const rows=QuizmonFavorites.sortPokemon(favoritePokemonEntries(),QuizmonKnowledgeData.BY_ID,state.language,state.favorites.sortPokemon);
+    const generation=knowledgeSelectedGeneration();
+    return generation?rows.filter(row=>Number(row.item.generation)===generation):rows;
+  }
+
+  function favoriteTypeRows() {
+    const labels=Object.fromEntries(TYPES.map(type=>[type,typeLabel(type)]));
+    return QuizmonFavorites.sortTypes(favoriteTypeEntries(),labels,state.language,state.favorites.sortTypes);
+  }
+
+  function knowledgeFavoritesEmptyMarkup() {
+    return `<section class="knowledge-favorites-empty"><span aria-hidden="true">♡</span><div><strong>${t("favorites.emptyTitle")}</strong><p>${t("favorites.emptyText")}</p></div><div><button type="button" class="primary-button" data-favorite-browse="pokemon">${t("favorites.browsePokemon")}</button><button type="button" class="secondary-button" data-favorite-browse="types">${t("favorites.browseTypes")}</button></div></section>`;
+  }
+
+  function renderKnowledgeFavorites() {
+    const root=document.getElementById("learnContent");
+    const pokemonRows=favoritePokemonRows();
+    const typeRows=favoriteTypeRows();
+    const total=favoritePokemonEntries().length+favoriteTypeEntries().length;
+    const highlightedPokemon=knowledgePokemonById(state.profile.favoritePokemonId);
+    const highlightedType=TYPES.includes(state.profile.favoriteType)?state.profile.favoriteType:null;
+    root.innerHTML=`<section class="knowledge-subpage knowledge-favorites-page">
+      ${knowledgeSubpageHeader(t("favorites.title"),t("favorites.subtitle"),t("favorites.meta",{count:total}))}
+      <section class="knowledge-favorites-summary">
+        <article><span aria-hidden="true">♥</span><div><small>${t("favorites.pokemonCount")}</small><strong>${favoritePokemonEntries().length}</strong></div></article>
+        <article><span aria-hidden="true">◆</span><div><small>${t("favorites.typeCount")}</small><strong>${favoriteTypeEntries().length}</strong></div></article>
+        <article class="profile-highlight"><span aria-hidden="true">◎</span><div><small>${t("favorites.profileHighlight")}</small><strong>${escapeHtml([highlightedPokemon?knowledgePokemonName(highlightedPokemon):"",highlightedType?typeLabel(highlightedType):""].filter(Boolean).join(" · ")||t("favorites.noProfileHighlight"))}</strong></div></article>
+      </section>
+      ${total?`<section class="knowledge-favorites-section" aria-labelledby="favoritePokemonTitle"><div class="knowledge-favorites-heading"><div><p class="quiz-kicker">${t("favorites.pokemonKicker")}</p><h3 id="favoritePokemonTitle">${t("favorites.pokemonTitle")}</h3><p>${t("favorites.pokemonText")}</p></div><label>${t("favorites.sortLabel")}<select data-favorite-sort="pokemon"><option value="recent" ${state.favorites.sortPokemon==="recent"?"selected":""}>${t("favorites.sortRecent")}</option><option value="name" ${state.favorites.sortPokemon==="name"?"selected":""}>${t("favorites.sortName")}</option><option value="number" ${state.favorites.sortPokemon==="number"?"selected":""}>${t("favorites.sortNumber")}</option></select></label></div>${pokemonRows.length?`<div class="knowledge-pokemon-grid favorites-grid">${pokemonRows.map(row=>knowledgePokemonCard(row.item)).join("")}</div>`:knowledgeGenerationEmptyMarkup()}</section>
+      <section class="knowledge-favorites-section" aria-labelledby="favoriteTypesTitle"><div class="knowledge-favorites-heading"><div><p class="quiz-kicker">${t("favorites.typeKicker")}</p><h3 id="favoriteTypesTitle">${t("favorites.typeTitle")}</h3><p>${t("favorites.typeText")}</p></div><label>${t("favorites.sortLabel")}<select data-favorite-sort="types"><option value="recent" ${state.favorites.sortTypes==="recent"?"selected":""}>${t("favorites.sortRecent")}</option><option value="name" ${state.favorites.sortTypes==="name"?"selected":""}>${t("favorites.sortName")}</option></select></label></div><div class="knowledge-type-grid favorites-grid">${typeRows.map(row=>knowledgeTypeCard(row.type)).join("")}</div></section>`:knowledgeFavoritesEmptyMarkup()}
+    </section>`;
+    bindKnowledgeHome(root);
+    root.querySelectorAll("[data-knowledge-pokemon]").forEach(button=>button.addEventListener("click",()=>openKnowledgePokemon(button.dataset.knowledgePokemon)));
+    root.querySelectorAll("[data-learn-type]").forEach(button=>button.addEventListener("click",()=>{knowledgePokemonId=null;knowledgeContentKind=null;learnType=button.dataset.learnType;setRoute("learn-detail");}));
+    root.querySelectorAll("[data-favorite-sort]").forEach(select=>select.addEventListener("change",()=>{if(select.dataset.favoriteSort==="pokemon")state.favorites.sortPokemon=select.value;else state.favorites.sortTypes=select.value;saveState();renderKnowledgeFavorites();}));
+    root.querySelectorAll("[data-favorite-browse]").forEach(button=>button.addEventListener("click",()=>{knowledgeView=button.dataset.favoriteBrowse;renderKnowledge();}));
+    bindKnowledgeFavoriteButtons(root);
+    bindKnowledgeTrainingListButtons(root);
+  }
+
+  function trainingListPreviewMarkup(list) {
+    const entries=list.entries.slice(0,4);
+    if(list.kind==="pokemon")return `<span class="training-list-preview pokemon">${entries.map(id=>{const item=knowledgePokemonById(id);return item?`<img loading="lazy" src="${escapeHtml(knowledgeArtwork(item))}" alt="">`:"";}).join("")}</span>`;
+    return `<span class="training-list-preview types">${entries.map(type=>`<i style="--preview-color:${TYPE_META[type]?.color||"var(--primary)"}">${TYPE_META[type]?.icon||"◆"}</i>`).join("")}</span>`;
+  }
+
+  function trainingListCard(list) {
+    const canStart=QuizmonTrainingLists.canStart(list);
+    return `<article class="training-list-card">${trainingListPreviewMarkup(list)}<div class="training-list-card-copy"><small>${t(`trainingLists.kind.${list.kind}`)}</small><strong>${escapeHtml(list.name)}</strong><p>${t("trainingLists.entryCount",{count:list.entries.length})}</p></div><div class="training-list-card-actions"><button type="button" class="primary-button" data-training-list-start="${escapeHtml(list.id)}" ${canStart?"":"disabled"}>${t("trainingLists.start")}</button><button type="button" class="secondary-button" data-training-list-edit="${escapeHtml(list.id)}">${t("common.edit")}</button><button type="button" class="ghost-button" data-training-list-duplicate="${escapeHtml(list.id)}">${t("trainingLists.duplicate")}</button><button type="button" class="ghost-button danger" data-training-list-delete="${escapeHtml(list.id)}">${t("trainingLists.delete")}</button></div>${canStart?"":`<p class="training-list-card-warning">${t("trainingLists.tooSmallShort")}</p>`}</article>`;
+  }
+
+  function createTrainingListFromFavorites(kind) {
+    const entries=kind==="pokemon"?favoritePokemonEntries().map(entry=>entry.id):favoriteTypeEntries().map(entry=>entry.type);
+    if(!entries.length){showMessageDialog({title:t("trainingLists.noFavoritesTitle"),message:t("trainingLists.noFavoritesText"),buttonLabel:t("common.understood"),kind:"info",icon:"♡"});return;}
+    openTrainingListEditor(null,kind,entries[0]);
+    trainingListDraft.entries=[...new Set(entries)];
+    renderTrainingListEditorContent();
+  }
+
+  function duplicateTrainingList(listId) {
+    const list=trainingListById(listId);if(!list)return;
+    state.trainingLists=QuizmonTrainingLists.duplicate(state.trainingLists,list.id,{name:t("trainingLists.copyName",{name:list.name})},trainingListSanitizeOptions());
+    saveState();renderKnowledgeTrainingLists();enqueueToast("⧉",t("trainingLists.duplicated"),t("trainingLists.duplicatedHint",{name:list.name}),"success");
+  }
+
+  function deleteTrainingList(listId) {
+    const list=trainingListById(listId);if(!list)return;
+    showConfirmDialog({title:t("trainingLists.deleteTitle"),message:t("trainingLists.deleteText",{name:list.name}),confirmLabel:t("trainingLists.delete"),cancelLabel:t("common.cancel"),kind:"danger",icon:"×",onConfirm:()=>{state.trainingLists=QuizmonTrainingLists.removeList(state.trainingLists,list.id,trainingListSanitizeOptions());if(state.lastConfig?.trainingListId===list.id){state.lastMode=null;state.lastConfig=null;}saveState();renderKnowledgeTrainingLists();enqueueToast("×",t("trainingLists.deleted"),t("trainingLists.deletedHint"),"info");}});
+  }
+
+  function renderKnowledgeTrainingLists() {
+    const root=document.getElementById("learnContent");
+    const lists=trainingLists();
+    root.innerHTML=`<section class="knowledge-subpage knowledge-training-lists-page">${knowledgeSubpageHeader(t("trainingLists.title"),t("trainingLists.subtitle"),t("trainingLists.meta",{count:lists.length}))}<section class="training-lists-intro"><div><p class="quiz-kicker">${t("trainingLists.kicker")}</p><h3>${t("trainingLists.introTitle")}</h3><p>${t("trainingLists.introText")}</p></div><div class="training-lists-create-actions"><button type="button" class="primary-button" data-create-training-list="types">${t("trainingLists.createTypes")}</button><button type="button" class="secondary-button" data-create-training-list="pokemon">${t("trainingLists.createPokemon")}</button></div></section><section class="training-lists-favorite-actions"><div><strong>${t("trainingLists.fromFavoritesTitle")}</strong><p>${t("trainingLists.fromFavoritesText")}</p></div><div><button type="button" class="ghost-button" data-create-from-favorites="types" ${favoriteTypeEntries().length?"":"disabled"}>${t("trainingLists.fromTypeFavorites",{count:favoriteTypeEntries().length})}</button><button type="button" class="ghost-button" data-create-from-favorites="pokemon" ${favoritePokemonEntries().length?"":"disabled"}>${t("trainingLists.fromPokemonFavorites",{count:favoritePokemonEntries().length})}</button></div></section>${lists.length?`<div class="training-lists-grid">${lists.map(trainingListCard).join("")}</div>`:`<section class="knowledge-favorites-empty training-lists-empty"><span aria-hidden="true">☷</span><div><strong>${t("trainingLists.emptyTitle")}</strong><p>${t("trainingLists.emptyText")}</p></div></section>`}</section>`;
+    bindKnowledgeHome(root);
+    root.querySelectorAll("[data-create-training-list]").forEach(button=>button.addEventListener("click",()=>openTrainingListEditor(null,button.dataset.createTrainingList)));
+    root.querySelectorAll("[data-create-from-favorites]").forEach(button=>button.addEventListener("click",()=>createTrainingListFromFavorites(button.dataset.createFromFavorites)));
+    root.querySelectorAll("[data-training-list-start]").forEach(button=>button.addEventListener("click",()=>openTrainingListLaunch(button.dataset.trainingListStart)));
+    root.querySelectorAll("[data-training-list-edit]").forEach(button=>button.addEventListener("click",()=>openTrainingListEditor(button.dataset.trainingListEdit)));
+    root.querySelectorAll("[data-training-list-duplicate]").forEach(button=>button.addEventListener("click",()=>duplicateTrainingList(button.dataset.trainingListDuplicate)));
+    root.querySelectorAll("[data-training-list-delete]").forEach(button=>button.addEventListener("click",()=>deleteTrainingList(button.dataset.trainingListDelete)));
+  }
+
+  function renderKnowledgeRegions() {
+    const root=document.getElementById("learnContent");
+    const regions=knowledgeFilteredItems("region",QuizmonKnowledgeWorld.REGIONS);
+    root.innerHTML=`<section class="knowledge-subpage knowledge-regions-page">${knowledgeSubpageHeader(t("knowledge.regionsTitle"),t("knowledge.regionsCatalogText"),t("knowledge.regionsMeta",{count:regions.length}))}${regions.length?`<div class="knowledge-region-grid">${regions.map(knowledgeRegionCard).join("")}</div>`:knowledgeGenerationEmptyMarkup()}</section>`;
+    bindKnowledgeHome(root);bindKnowledgeWorldCatalog(root);
+  }
+
+  function renderKnowledgeTrainers() {
+    const root=document.getElementById("learnContent");
+    const coreTrainers=knowledgeFilteredItems("trainer",QuizmonKnowledgeWorld.TRAINERS.filter(knowledgeTrainerIsCore));
+    const allowedIds=new Set(coreTrainers.map(item=>item.id));
+    const regions=knowledgeFilteredItems("region",QuizmonKnowledgeWorld.REGIONS);
+    const sections=regions.map((region,index)=>{const trainers=[...(QuizmonKnowledgeWorld.TRAINERS_BY_REGION.get(region.id)||[])].filter(item=>allowedIds.has(item.id)).sort(knowledgeTrainerSort);return trainers.length?`<details class="knowledge-trainer-region" ${index===0?"open":""}><summary><span><small>${t("knowledge.generation",{generation:region.generation})}</small><strong>${escapeHtml(knowledgeWorldText(region))}</strong></span><b>${trainers.length}</b></summary><div class="knowledge-trainer-grid">${trainers.map(knowledgeTrainerCard).join("")}</div></details>`:"";}).join("");
+    root.innerHTML=`<section class="knowledge-subpage knowledge-trainers-page">${knowledgeSubpageHeader(t("knowledge.trainersTitle"),t("knowledge.trainersCatalogText"),t("knowledge.trainersMeta",{count:coreTrainers.length}))}${coreTrainers.length?`<section class="knowledge-trainer-regions">${sections}</section>`:knowledgeGenerationEmptyMarkup()}</section>`;
+    bindKnowledgeHome(root);bindKnowledgeWorldCatalog(root);
+  }
+
+  function renderKnowledgeCompetitive() {
+    const root=document.getElementById("learnContent");
+    const groups=["battle","team","stats","field"].map(group=>{const topics=QuizmonKnowledgeWorld.TOPICS_BY_GROUP.get(group)||[];return `<section class="knowledge-topic-group"><div class="knowledge-section-heading"><div><small>${t("knowledge.competitiveBasics")}</small><h3>${t(`knowledge.competitiveGroup.${group}`)}</h3><p>${t(`knowledge.competitiveGroupText.${group}`)}</p></div></div><div class="knowledge-topic-grid">${topics.map(knowledgeCompetitiveCard).join("")}</div></section>`;}).join("");
+    root.innerHTML=`<section class="knowledge-subpage knowledge-competitive-page">${knowledgeSubpageHeader(t("knowledge.competitiveTitle"),t("knowledge.competitiveCatalogText"),t("knowledge.competitiveMeta",{count:QuizmonKnowledgeWorld.COMPETITIVE_TOPICS.length}))}${knowledgeSelectedGeneration()?`<p class="knowledge-generation-type-notice">${t("knowledge.generationFilter.timelessRules")}</p>`:""}${groups}</section>`;
+    bindKnowledgeHome(root);bindKnowledgeWorldCatalog(root);
+  }
+
+  function renderKnowledge() {
+    if(knowledgeView==="search")renderKnowledgeSearchPage();
+    else if(knowledgeView==="favorites")renderKnowledgeFavorites();
+    else if(knowledgeView==="training-lists")renderKnowledgeTrainingLists();
+    else if(knowledgeView==="types")renderKnowledgeTypes();
+    else if(knowledgeView==="pokemon")renderKnowledgePokemon();
+    else if(knowledgeView==="regions")renderKnowledgeRegions();
+    else if(knowledgeView==="trainers")renderKnowledgeTrainers();
+    else if(knowledgeView==="competitive")renderKnowledgeCompetitive();
+    else if(["moves","abilities","items","evolutions"].includes(knowledgeView))renderKnowledgeContentCatalog(knowledgeView);
+    else renderKnowledgeHome();
+  }
+
+  function openKnowledgePokemon(id) {
+    const item=knowledgePokemonById(id);if(!item)return;
+    knowledgePokemonId=item.id;knowledgePokemonDetailTab="overview";knowledgeContentKind=null;knowledgeContentId=null;learnType=null;setRoute("learn-detail");
+  }
+
+  function openKnowledgeEntry(kind,id) {
+    knowledgeContentKind=kind;
+    knowledgeContentId=["region","trainer","competitive"].includes(kind)?String(id):Number(id);
+    knowledgePokemonId=null;learnType=null;setRoute("learn-detail");
+  }
+
+  function knowledgeStatLabel(key) { return t(`knowledge.stat.${key}`); }
+
+  function knowledgeMetric(value, unit, decimals=1) {
+    const numeric=Number(value)||0;
+    return `${numeric.toLocaleString(state.language==="de"?"de-DE":"en-US",{minimumFractionDigits:decimals,maximumFractionDigits:decimals})} ${unit}`;
+  }
+
+  function knowledgePokemonDescription(item) {
+    const types=item.types.map(typeLabel).join(state.language==="de"?" und ":" and ");
+    return t(item.types.length>1?"knowledge.descriptionDual":"knowledge.descriptionSingle",{name:knowledgePokemonName(item),types,region:knowledgeRegionLabel(item.generation)});
+  }
+
+  function knowledgeItemName(id) { const item=QuizmonKnowledgeContent.ITEM_BY_ID.get(Number(id));return item?knowledgeEntryName(item):""; }
+  function knowledgeMoveName(id) { const item=QuizmonKnowledgeContent.MOVE_BY_ID.get(Number(id));return item?knowledgeEntryName(item):""; }
+
+  function knowledgeTypeByApiId(id) {
+    return ({1:"normal",2:"fighting",3:"flying",4:"poison",5:"ground",6:"rock",7:"bug",8:"ghost",9:"steel",10:"fire",11:"water",12:"grass",13:"electric",14:"psychic",15:"ice",16:"dragon",17:"dark",18:"fairy"})[Number(id)]||null;
+  }
+
+  function knowledgeEvolutionMethodText(method) {
+    const parts=[];const trigger=method.trigger||"other";
+    if(trigger==="use-item"&&method.trigger_item_id)parts.push(t("knowledge.evo.useItem",{item:knowledgeItemName(method.trigger_item_id)||t("knowledge.evo.item")}));
+    else parts.push(t(`knowledge.evo.trigger.${trigger}`));
+    if(method.minimum_level!=null)parts.push(t("knowledge.evo.level",{level:method.minimum_level}));
+    if(method.gender_id===1)parts.push(t("knowledge.evo.female"));
+    if(method.gender_id===2)parts.push(t("knowledge.evo.male"));
+    if(method.location)parts.push(t("knowledge.evo.location",{location:method.location[state.language]||method.location.en||method.location.de}));
+    if(method.held_item_id)parts.push(t("knowledge.evo.heldItem",{item:knowledgeItemName(method.held_item_id)||t("knowledge.evo.item")}));
+    if(method.time)parts.push(t(`knowledge.evo.time.${method.time}`));
+    if(method.known_move_id)parts.push(t("knowledge.evo.knownMove",{move:knowledgeMoveName(method.known_move_id)||t("knowledge.evo.move")}));
+    {const type=knowledgeTypeByApiId(method.known_move_type_id);if(type)parts.push(t("knowledge.evo.knownType",{type:typeLabel(type)}));}
+    if(method.minimum_happiness!=null)parts.push(t("knowledge.evo.friendship"));
+    if(method.minimum_beauty!=null)parts.push(t("knowledge.evo.beauty"));
+    if(method.minimum_affection!=null)parts.push(t("knowledge.evo.affection"));
+    if(method.relative_physical_stats===1)parts.push(t("knowledge.evo.attackHigher"));
+    if(method.relative_physical_stats===0)parts.push(t("knowledge.evo.statsEqual"));
+    if(method.relative_physical_stats===-1)parts.push(t("knowledge.evo.defenseHigher"));
+    if(method.party_species_id){const p=knowledgePokemonById(method.party_species_id);if(p)parts.push(t("knowledge.evo.partyPokemon",{pokemon:knowledgePokemonName(p)}));}
+    {const type=knowledgeTypeByApiId(method.party_type_id);if(type)parts.push(t("knowledge.evo.partyType",{type:typeLabel(type)}));}
+    if(method.trade_species_id){const p=knowledgePokemonById(method.trade_species_id);if(p)parts.push(t("knowledge.evo.tradePokemon",{pokemon:knowledgePokemonName(p)}));}
+    if(method.needs_overworld_rain)parts.push(t("knowledge.evo.rain"));
+    if(method.turn_upside_down)parts.push(t("knowledge.evo.upsideDown"));
+    if(method.needs_multiplayer)parts.push(t("knowledge.evo.multiplayer"));
+    if(method.near_special_rock)parts.push(t("knowledge.evo.specialRock"));
+    if(method.used_move_id)parts.push(t("knowledge.evo.useMove",{move:knowledgeMoveName(method.used_move_id)||t("knowledge.evo.move")}));
+    if(method.minimum_move_count!=null)parts.push(t("knowledge.evo.moveCount",{count:method.minimum_move_count}));
+    if(method.minimum_steps!=null)parts.push(t("knowledge.evo.steps",{count:method.minimum_steps}));
+    if(method.minimum_damage_taken!=null)parts.push(t("knowledge.evo.damage",{count:method.minimum_damage_taken}));
+    return parts.filter(Boolean).join(" · ");
+  }
+
+  function knowledgeEvolutionButton(node) {
+    const evolution=node.item;const evolutionName=knowledgePokemonName(evolution);
+    return `<button data-evolution-id="${evolution.id}" class="knowledge-evolution-entry ${evolution.id===knowledgePokemonId?"current":""}" aria-label="${escapeHtml(evolutionName)}"><img loading="lazy" src="${escapeHtml(knowledgeArtwork(evolution))}" alt=""><strong>${escapeHtml(evolutionName)}</strong><small>#${String(evolution.id).padStart(4,"0")}</small></button>`;
+  }
+
+  function knowledgeEvolutionEdgeMarkup(node) {
+    const methods=(node.methods||[]).map(knowledgeEvolutionMethodText).filter(Boolean);
+    return `<div class="knowledge-evolution-edge"><span aria-hidden="true">›</span>${methods.length?`<div>${methods.map(text=>`<small>${escapeHtml(text)}</small>`).join("")}</div>`:""}</div>`;
+  }
+
+  function knowledgeEvolutionNodeMarkup(node) {
+    const children=node.children||[];
+    return `<div class="knowledge-evolution-node ${children.length?"has-children":"is-leaf"}">${knowledgeEvolutionButton(node)}${children.length?`<div class="knowledge-evolution-branches ${children.length===1?"single-child":""}">${children.map(child=>`<div class="knowledge-evolution-branch">${knowledgeEvolutionEdgeMarkup(child)}${knowledgeEvolutionNodeMarkup(child)}</div>`).join("")}</div>`:""}</div>`;
+  }
+
+  function knowledgeEvolutionMarkup(item, options={}) {
+    const tree=QuizmonKnowledge.evolutionTree(item,QuizmonKnowledgeData.BY_ID,QuizmonKnowledgeContent.EVOLUTION_METHODS);
+    if(tree.size<=1)return "";
+    return `<section class="knowledge-evolution-card ${options.standalone?"standalone":""}"><div class="knowledge-card-head"><span aria-hidden="true">↗</span><div><small>${t("knowledge.evolutionKicker")}</small><h2>${t("knowledge.evolutionTitle")}</h2></div></div><div class="knowledge-evolution-tree">${tree.roots.map(knowledgeEvolutionNodeMarkup).join("")}</div></section>`;
+  }
+
+  function knowledgeLearnsetsReady() { return QuizmonKnowledgeLearnsetLoader.isLoaded(); }
+
+  function knowledgeLearnsetDeferredMarkup() {
+    const failed=knowledgeLearnsetLoadStatus==="error";
+    return `<section class="knowledge-learnset-deferred ${failed?"error":"loading"}" role="status"><span aria-hidden="true">${failed?"!":"↻"}</span><div><small>${t("knowledge.learnsetKicker")}</small><strong>${failed?t("knowledge.learnsetLoadErrorTitle"):t("knowledge.learnsetLoadingTitle")}</strong><p>${failed?t("knowledge.learnsetLoadErrorText"):t("knowledge.learnsetLoadingText")}</p></div>${failed?`<button type="button" class="secondary-button" data-learnset-retry>${t("common.retry")}</button>`:""}</section>`;
+  }
+
+  function rerenderLearnsetContext() {
+    if(state.route!=="learn-detail")return;
+    if(knowledgePokemonId)renderKnowledgePokemonDetail();
+    else if(knowledgeContentKind==="move")renderKnowledgeContentDetail();
+  }
+
+  function ensureKnowledgeLearnsets() {
+    if(knowledgeLearnsetsReady()){knowledgeLearnsetLoadStatus="ready";return Promise.resolve(QuizmonKnowledgeLearnsets);}
+    knowledgeLearnsetLoadStatus="loading";
+    return QuizmonKnowledgeLearnsetLoader.load().then(api=>{knowledgeLearnsetLoadStatus="ready";rerenderLearnsetContext();return api;}).catch(error=>{knowledgeLearnsetLoadStatus="error";logError(error,"learnsets.load");rerenderLearnsetContext();throw error;});
+  }
+
+  function rememberKnowledgeVersionGroup(groupId) {
+    const id=Number(groupId);
+    if(!QuizmonKnowledgeLearnsets.VERSION_GROUP_BY_ID.has(id))return;
+    knowledgeVersionGroupId=id;
+    try { sessionStorage.setItem(KNOWLEDGE_VERSION_SESSION_KEY,String(id)); } catch {}
+  }
+
+  function knowledgeVersionSelectorMarkup(groups,selectedId) {
+    if(!groups?.length)return "";
+    if(groups.length===1)return `<div class="knowledge-version-picker single"><span>${t("knowledge.gameLabel")}</span><strong>${escapeHtml(groups[0][state.language]||groups[0].en)}</strong></div>`;
+    return `<label class="knowledge-version-picker"><span>${t("knowledge.gameLabel")}</span><select data-knowledge-version aria-label="${escapeHtml(t("knowledge.gameSelectAria"))}">${groups.map(group=>`<option value="${group.id}" ${group.id===selectedId?"selected":""}>${escapeHtml(group[state.language]||group.en)}</option>`).join("")}</select></label>`;
+  }
+
+  function knowledgeLearnsetMethodLabel(entry) {
+    if(entry.method===QuizmonKnowledgeLearnsets.METHOD.LEVEL)return t("knowledge.learnsetLevelShort",{level:entry.level});
+    if(entry.method===QuizmonKnowledgeLearnsets.METHOD.MACHINE)return QuizmonKnowledgeLearnsets.machineLabel(entry.machine,state.language)||t("knowledge.learnsetMachineGeneric");
+    if(entry.method===QuizmonKnowledgeLearnsets.METHOD.EGG)return t("knowledge.learnsetEggShort");
+    if(entry.method===QuizmonKnowledgeLearnsets.METHOD.TUTOR)return t("knowledge.learnsetTutorShort");
+    return t("knowledge.learnsetOtherShort");
+  }
+
+  function knowledgeLearnsetMoveButton(entry) {
+    const move=QuizmonKnowledgeContent.MOVE_BY_ID.get(entry.moveId);if(!move)return "";
+    return `<button class="knowledge-learnset-move" data-open-move="${move.id}" style="--move-color:${TYPE_META[move.type]?.color||"#66a9b8"}"><span class="knowledge-learnset-method">${escapeHtml(knowledgeLearnsetMethodLabel(entry))}</span><span class="knowledge-learnset-name"><strong>${escapeHtml(knowledgeEntryName(move))}</strong><small>${escapeHtml(typeLabel(move.type))} · ${escapeHtml(knowledgeDamageClassLabel(move.damageClass))}</small></span><i aria-hidden="true">›</i></button>`;
+  }
+
+  function knowledgeLearnsetGroup(key,items,icon,initialLimit=18) {
+    if(!items.length)return "";
+    const first=items.slice(0,initialLimit),rest=items.slice(initialLimit);
+    const list=entries=>`<div class="knowledge-learnset-list">${entries.map(knowledgeLearnsetMoveButton).join("")}</div>`;
+    return `<section class="knowledge-learnset-group"><div class="knowledge-card-head"><span aria-hidden="true">${icon}</span><div><small>${t(`knowledge.learnset.${key}.kicker`)}</small><h2>${t(`knowledge.learnset.${key}.title`)}</h2></div><strong>${items.length}</strong></div>${list(first)}${rest.length?`<details class="knowledge-learnset-more"><summary>${t("knowledge.showMoreMoves",{count:rest.length})}</summary>${list(rest)}</details>`:""}</section>`;
+  }
+
+  function knowledgePokemonMovesMarkup(item) {
+    if(!knowledgeLearnsetsReady()){if(knowledgeLearnsetLoadStatus!=="loading")ensureKnowledgeLearnsets().catch(()=>{});return knowledgeLearnsetDeferredMarkup();}
+    const versionGroups=QuizmonKnowledgeLearnsets.availableGroupsForPokemon(item.id);
+    const groupId=QuizmonKnowledgeLearnsets.resolveGroupForPokemon(item.id,knowledgeVersionGroupId);
+    if(groupId==null)return "";
+    if(groupId!==knowledgeVersionGroupId)rememberKnowledgeVersionGroup(groupId);
+    const groups=QuizmonKnowledgeLearnsets.groupPokemonEntries(item.id,groupId);
+    return `<section class="knowledge-pokemon-moves"><section class="knowledge-learnset-intro"><div><p class="quiz-kicker">${t("knowledge.learnsetKicker")}</p><h2>${t("knowledge.learnsetTitle")}</h2><p>${t("knowledge.learnsetText")}</p></div>${knowledgeVersionSelectorMarkup(versionGroups,groupId)}</section>${knowledgeLearnsetGroup("level",groups.level,"↗",30)}${knowledgeLearnsetGroup("machine",groups.machine,"TM",12)}${knowledgeLearnsetGroup("egg",groups.egg,"◌",24)}${knowledgeLearnsetGroup("tutor",groups.tutor,"✦",24)}${knowledgeLearnsetGroup("other",groups.other,"＋",24)}</section>`;
+  }
+
+  function knowledgeMovePokemonMethods(entries) {
+    const labels=[];
+    const seen=new Set();
+    for(const entry of entries){const label=knowledgeLearnsetMethodLabel({method:entry[1],level:entry[2],machine:entry[3]});if(!seen.has(label)){seen.add(label);labels.push(label);}}
+    return labels;
+  }
+
+  function knowledgeMovePokemonMarkup(moveId) {
+    if(!knowledgeLearnsetsReady()){if(knowledgeLearnsetLoadStatus!=="loading")ensureKnowledgeLearnsets().catch(()=>{});return knowledgeLearnsetDeferredMarkup();}
+    const versionGroups=QuizmonKnowledgeLearnsets.availableGroupsForMove(moveId);
+    const groupId=QuizmonKnowledgeLearnsets.resolveGroupForMove(moveId,knowledgeVersionGroupId);
+    if(groupId==null)return "";
+    if(groupId!==knowledgeVersionGroupId)rememberKnowledgeVersionGroup(groupId);
+    const grouped=new Map();
+    for(const entry of QuizmonKnowledgeLearnsets.entriesForMove(moveId,groupId)){
+      const pokemonId=entry[0];if(!grouped.has(pokemonId))grouped.set(pokemonId,[]);grouped.get(pokemonId).push(entry);
+    }
+    const rows=[...grouped.entries()].map(([pokemonId,entries])=>({pokemon:knowledgePokemonById(pokemonId),methods:knowledgeMovePokemonMethods(entries)})).filter(row=>row.pokemon).sort((a,b)=>a.pokemon.id-b.pokemon.id);
+    if(!rows.length)return "";
+    const markup=list=>`<div class="knowledge-move-pokemon-list">${list.map(row=>`<button data-open-pokemon="${row.pokemon.id}"><img loading="lazy" src="${escapeHtml(knowledgeArtwork(row.pokemon))}" alt=""><span><strong>${escapeHtml(knowledgePokemonName(row.pokemon))}</strong><small>${row.methods.map(method=>escapeHtml(method)).join(" · ")}</small></span><i aria-hidden="true">›</i></button>`).join("")}</div>`;
+    const first=rows.slice(0,18),rest=rows.slice(18);
+    return `<section class="knowledge-related-card knowledge-move-pokemon-card"><div class="knowledge-card-head"><span>◉</span><div><small>${t("knowledge.relatedKicker")}</small><h2>${t("knowledge.movePokemonTitle")}</h2><p>${t("knowledge.movePokemonText",{game:QuizmonKnowledgeLearnsets.groupLabel(groupId,state.language)})}</p></div><strong>${rows.length}</strong></div><div class="knowledge-move-version-row">${knowledgeVersionSelectorMarkup(versionGroups,groupId)}</div>${markup(first)}${rest.length?`<details class="knowledge-related-more"><summary>${t("knowledge.morePokemon",{count:rest.length})}</summary>${markup(rest)}</details>`:""}</section>`;
+  }
+
+  function knowledgePokemonTabMarkup(item,hasMoves,hasEvolution) {
+    const tabs=[{key:"overview",label:t("knowledge.detailTabOverview")}];
+    if(hasMoves)tabs.push({key:"moves",label:t("knowledge.detailTabMoves")});
+    if(hasEvolution)tabs.push({key:"evolution",label:t("knowledge.detailTabEvolution")});
+    if(tabs.length<=1)return "";
+    if(!tabs.some(tab=>tab.key===knowledgePokemonDetailTab))knowledgePokemonDetailTab="overview";
+    return `<nav class="knowledge-pokemon-tabs" aria-label="${escapeHtml(t("knowledge.detailTabsLabel"))}" style="--tab-count:${tabs.length}">${tabs.map(tab=>`<button class="${knowledgePokemonDetailTab===tab.key?"active":""}" data-pokemon-detail-tab="${tab.key}" aria-current="${knowledgePokemonDetailTab===tab.key?"page":"false"}">${escapeHtml(tab.label)}</button>`).join("")}</nav>`;
+  }
+
+  function bindKnowledgeDetailLinks() {
+    document.querySelectorAll("[data-detail-type]").forEach(button=>button.addEventListener("click",()=>{learnType=button.dataset.detailType;knowledgePokemonId=null;knowledgeContentKind=null;knowledgeView="types";setRoute("learn-detail");}));
+    document.querySelectorAll("[data-evolution-id]").forEach(button=>button.addEventListener("click",()=>{replaceBrowserHistorySnapshot();knowledgePokemonId=Number(button.dataset.evolutionId);knowledgeContentKind=null;knowledgePokemonDetailTab="evolution";renderKnowledgePokemonDetail();pushBrowserHistorySnapshot();view.focus({preventScroll:true});scrollTo({top:0,behavior:motionEnabled()?"smooth":"auto"});}));
+    document.querySelectorAll("[data-open-ability]").forEach(button=>button.addEventListener("click",()=>openKnowledgeEntry("ability",button.dataset.openAbility)));
+    document.querySelectorAll("[data-open-move]").forEach(button=>button.addEventListener("click",()=>openKnowledgeEntry("move",button.dataset.openMove)));
+    document.querySelectorAll("[data-open-pokemon]").forEach(button=>button.addEventListener("click",()=>openKnowledgePokemon(button.dataset.openPokemon)));
+    document.querySelectorAll("[data-open-region]").forEach(button=>button.addEventListener("click",()=>openKnowledgeEntry("region",button.dataset.openRegion)));
+    document.querySelectorAll("[data-open-trainer]").forEach(button=>button.addEventListener("click",()=>openKnowledgeEntry("trainer",button.dataset.openTrainer)));
+    document.querySelectorAll("[data-open-topic]").forEach(button=>button.addEventListener("click",()=>openKnowledgeEntry("competitive",button.dataset.openTopic)));
+    document.querySelectorAll("[data-pokemon-detail-tab]").forEach(button=>button.addEventListener("click",()=>{replaceBrowserHistorySnapshot();knowledgePokemonDetailTab=button.dataset.pokemonDetailTab;renderKnowledgePokemonDetail();pushBrowserHistorySnapshot();view.focus({preventScroll:true});}));
+    document.querySelectorAll("[data-learnset-retry]").forEach(button=>button.addEventListener("click",()=>{knowledgeLearnsetLoadStatus="idle";button.disabled=true;ensureKnowledgeLearnsets().catch(()=>{});}));
+    document.querySelectorAll("[data-knowledge-version]").forEach(select=>select.addEventListener("change",()=>{
+      rememberKnowledgeVersionGroup(select.value);
+      const y=scrollY;
+      if(knowledgePokemonId)renderKnowledgePokemonDetail();
+      else if(knowledgeContentKind==="move")renderKnowledgeContentDetail();
+      requestAnimationFrame(()=>{scrollTo({top:y,behavior:"auto"});document.querySelector("[data-knowledge-version]")?.focus({preventScroll:true});});
+    }));
+  }
+
+  function renderKnowledgePokemonDetail() {
+    const item=knowledgePokemonById(knowledgePokemonId);if(!item){knowledgePokemonId=null;setRoute("knowledge");return;}
+    const name=knowledgePokemonName(item);const evolutionTree=QuizmonKnowledge.evolutionTree(item,QuizmonKnowledgeData.BY_ID,QuizmonKnowledgeContent.EVOLUTION_METHODS);const hasEvolution=evolutionTree.size>1;const hasMoves=QuizmonKnowledgeLearnsets.hasPokemon(item.id);const total=QuizmonKnowledge.baseStatTotal(item);const maxStat=Math.max(180,...QuizmonKnowledge.STAT_KEYS.map(key=>item.stats[key]||0));
+    const tabs=knowledgePokemonTabMarkup(item,hasMoves,hasEvolution);
+    let content="";
+    if(knowledgePokemonDetailTab==="moves"&&hasMoves)content=knowledgePokemonMovesMarkup(item);
+    else if(knowledgePokemonDetailTab==="evolution"&&hasEvolution)content=knowledgeEvolutionMarkup(item);
+    else {knowledgePokemonDetailTab="overview";content=`<section class="knowledge-detail-grid"><article class="knowledge-fact-card"><div class="knowledge-card-head"><span aria-hidden="true">◇</span><div><small>${t("knowledge.profileKicker")}</small><h2>${t("knowledge.profileTitle")}</h2></div></div><dl><div><dt>${t("knowledge.height")}</dt><dd>${knowledgeMetric(item.height/10,t("knowledge.meter"))}</dd></div><div><dt>${t("knowledge.weight")}</dt><dd>${knowledgeMetric(item.weight/10,t("knowledge.kilogram"))}</dd></div><div><dt>${t("knowledge.region")}</dt><dd>${escapeHtml(knowledgeRegionLabel(item.generation))}</dd></div><div><dt>${t("knowledge.baseTotal")}</dt><dd>${total}</dd></div></dl></article><article class="knowledge-ability-card"><div class="knowledge-card-head"><span aria-hidden="true">✦</span><div><small>${t("knowledge.abilitiesKicker")}</small><h2>${t("knowledge.abilitiesTitle")}</h2></div></div><div class="knowledge-ability-list">${item.abilities.map(ability=>`<button data-open-ability="${ability.id}"><strong>${escapeHtml(ability[state.language]||ability.en||ability.de)}</strong>${ability.hidden?`<small>${t("knowledge.hiddenAbility")}</small>`:""}<i aria-hidden="true">›</i></button>`).join("")||`<p>${t("knowledge.noAbilities")}</p>`}</div></article></section><section class="knowledge-stats-card"><div class="knowledge-card-head"><span aria-hidden="true">▥</span><div><small>${t("knowledge.statsKicker")}</small><h2>${t("knowledge.statsTitle")}</h2></div><strong>${total}</strong></div><div class="knowledge-stat-list">${QuizmonKnowledge.STAT_KEYS.map(key=>`<div><span>${escapeHtml(knowledgeStatLabel(key))}</span><i><b style="width:${Math.min(100,Math.round((item.stats[key]/maxStat)*100))}%"></b></i><strong>${item.stats[key]}</strong></div>`).join("")}</div></section>`;}
+    view.innerHTML=`<section class="knowledge-detail-page"><section class="knowledge-pokemon-hero" style="--pokemon-color:${TYPE_META[item.types[0]]?.color||"#66a9b8"}"><div class="knowledge-detail-art"><img src="${escapeHtml(knowledgeArtwork(item))}" alt="${escapeHtml(name)}"><span>#${String(item.id).padStart(4,"0")}</span></div><div class="knowledge-detail-copy"><p class="quiz-kicker">${t("knowledge.pokemonEntry")}</p><h1>${escapeHtml(name)}</h1><div class="knowledge-detail-types">${item.types.map(type=>`<button data-detail-type="${type}">${typeChip(type)}</button>`).join("")}</div><p>${escapeHtml(knowledgePokemonDescription(item))}</p><div class="knowledge-detail-badges"><span>${t("knowledge.generation",{generation:item.generation})}</span><span>${escapeHtml(knowledgeRegionLabel(item.generation))}</span>${item.legendary?`<span>${t("knowledge.legendary")}</span>`:""}${item.mythical?`<span>${t("knowledge.mythical")}</span>`:""}</div></div></section>${tabs}${content}</section>`;
+    bindKnowledgeDetailLinks();
+  }
+
+  function knowledgeDetailHero(kind,item,icon,accent,extra="") {
+    return `<section class="knowledge-entry-hero ${kind}" style="--entry-color:${accent||"#66a9b8"}"><span class="knowledge-entry-hero-icon">${icon}</span><div><p class="quiz-kicker">${t(`knowledge.${kind}Entry`)}</p><h1>${escapeHtml(knowledgeEntryName(item))}</h1>${extra}<p>${escapeHtml(knowledgeEntryEffect(item))}</p><div class="knowledge-detail-badges"><span>${t("knowledge.generation",{generation:item.generation})}</span></div></div></section>`;
+  }
+
+  function renderKnowledgeMoveDetail(item) {
+    view.innerHTML=`<section class="knowledge-detail-page knowledge-entry-detail">${knowledgeDetailHero("move",item,TYPE_META[item.type]?.icon||"↗",TYPE_META[item.type]?.color,`<button data-detail-type="${item.type}">${typeChip(item.type)}</button>`)}<section class="knowledge-entry-facts"><article><small>${t("knowledge.damageClass")}</small><strong>${escapeHtml(knowledgeDamageClassLabel(item.damageClass))}</strong></article><article><small>${t("knowledge.power")}</small><strong>${item.power??"—"}</strong></article><article><small>${t("knowledge.accuracy")}</small><strong>${item.accuracy==null?"—":`${item.accuracy}%`}</strong></article><article><small>${t("knowledge.pp")}</small><strong>${item.pp??"—"}</strong></article><article><small>${t("knowledge.priority")}</small><strong>${item.priority>0?`+${item.priority}`:item.priority}</strong></article></section><section class="knowledge-effect-card"><div class="knowledge-card-head"><span>◎</span><div><small>${t("knowledge.effectKicker")}</small><h2>${t("knowledge.effectTitle")}</h2></div></div><p>${escapeHtml(knowledgeEntryEffect(item))}</p></section>${knowledgeMovePokemonMarkup(item.id)}</section>`;
+    bindKnowledgeDetailLinks();
+  }
+
+  function knowledgePokemonLinks(ids,limit=12) {
+    const items=(ids||[]).map(knowledgePokemonById).filter(Boolean);const first=items.slice(0,limit),rest=items.slice(limit);
+    const markup=list=>`<div class="knowledge-related-pokemon">${list.map(p=>`<button data-open-pokemon="${p.id}"><img loading="lazy" src="${escapeHtml(knowledgeArtwork(p))}" alt=""><strong>${escapeHtml(knowledgePokemonName(p))}</strong></button>`).join("")}</div>`;
+    return `${markup(first)}${rest.length?`<details class="knowledge-related-more"><summary>${t("knowledge.morePokemon",{count:rest.length})}</summary>${markup(rest)}</details>`:""}`;
+  }
+
+  function renderKnowledgeAbilityDetail(item) {
+    view.innerHTML=`<section class="knowledge-detail-page knowledge-entry-detail">${knowledgeDetailHero("ability",item,"✦","#67a9b8")}<section class="knowledge-effect-card"><div class="knowledge-card-head"><span>✦</span><div><small>${t("knowledge.effectKicker")}</small><h2>${t("knowledge.effectTitle")}</h2></div></div><p>${escapeHtml(knowledgeEntryEffect(item))}</p></section><section class="knowledge-related-card"><div class="knowledge-card-head"><span>◉</span><div><small>${t("knowledge.relatedKicker")}</small><h2>${t("knowledge.abilityPokemonTitle")}</h2></div></div>${item.pokemonIds.length?knowledgePokemonLinks(item.pokemonIds):`<p>${t("knowledge.noLinkedPokemon")}</p>`}</section></section>`;
+    bindKnowledgeDetailLinks();
+  }
+
+  function renderKnowledgeItemDetail(item) {
+    const heroIcon=`<img data-image-kind="item" src="${escapeHtml(knowledgeItemArtwork(item))}" alt="">`;
+    view.innerHTML=`<section class="knowledge-detail-page knowledge-entry-detail">${knowledgeDetailHero("item",item,heroIcon,"#a78a55")}<section class="knowledge-entry-facts"><article><small>${t("knowledge.category")}</small><strong>${escapeHtml(knowledgePocketLabel(item.pocket))}</strong></article><article><small>${t("knowledge.generationLabel")}</small><strong>${t("knowledge.generation",{generation:item.generation})}</strong></article>${item.flingPower!=null?`<article><small>${t("knowledge.flingPower")}</small><strong>${item.flingPower}</strong></article>`:""}</section><section class="knowledge-effect-card"><div class="knowledge-card-head"><span>◇</span><div><small>${t("knowledge.effectKicker")}</small><h2>${t("knowledge.itemEffectTitle")}</h2></div></div><p>${escapeHtml(knowledgeEntryEffect(item))}</p></section></section>`;
+  }
+
+  function renderKnowledgeEvolutionDetail(rootId) {
+    const item=knowledgePokemonById(rootId);if(!item){knowledgeContentKind=null;setRoute("knowledge");return;}
+    const tree=knowledgeEvolutionMarkup(item,{standalone:true});
+    view.innerHTML=`<section class="knowledge-detail-page knowledge-entry-detail"><section class="knowledge-entry-hero evolution" style="--entry-color:#70a28b"><span class="knowledge-entry-hero-icon">⑂</span><div><p class="quiz-kicker">${t("knowledge.evolutionEntry")}</p><h1>${escapeHtml(t("knowledge.familyTitle",{pokemon:knowledgePokemonName(item)}))}</h1><p>${t("knowledge.familyText")}</p><div class="knowledge-detail-badges"><span>${t("knowledge.familyMembers",{count:item.evolutionIds.length})}</span></div></div></section>${tree}</section>`;
+    bindKnowledgeDetailLinks();
+  }
+
+
+  function knowledgeRoleOrder(role) { return ({gym:1,captain:1,kahuna:1,elite:2,champion:3,league:4,professor:5,rival:6,legend:7,villain:8})[role]||9; }
+  function knowledgeTrainerSort(a,b) {
+    const roleDifference=knowledgeRoleOrder(knowledgeTrainerPrimaryRole(a))-knowledgeRoleOrder(knowledgeTrainerPrimaryRole(b));
+    if(roleDifference)return roleDifference;
+    const orderDifference=(Number.isInteger(a.order)?a.order:999)-(Number.isInteger(b.order)?b.order:999);
+    if(orderDifference)return orderDifference;
+    const variantDifference=(Number.isInteger(a.orderVariant)?a.orderVariant:0)-(Number.isInteger(b.orderVariant)?b.orderVariant:0);
+    return variantDifference || knowledgeWorldText(a).localeCompare(knowledgeWorldText(b),state.language);
+  }
+  function knowledgeTrainerMiniList(trainers,limit=12) {
+    const sorted=[...(trainers||[])].filter(knowledgeTrainerIsCore).sort(knowledgeTrainerSort);const first=sorted.slice(0,limit),rest=sorted.slice(limit);
+    const markup=list=>`<div class="knowledge-trainer-grid compact">${list.map(trainer=>{const primaryRole=knowledgeTrainerPrimaryRole(trainer);return `<button class="knowledge-trainer-card" data-open-trainer="${trainer.id}" style="--trainer-color:${knowledgeTrainerPrimaryColor(trainer)}"><span class="knowledge-trainer-avatar" aria-hidden="true">${knowledgeTrainerRoleIcon(trainer)}</span><span class="knowledge-trainer-copy"><strong>${escapeHtml(knowledgeWorldText(trainer))}</strong><small>${primaryRole ? knowledgeRoleLabel(primaryRole) : trainer.roles.map(knowledgeRoleLabel).join(" · ")}</small>${trainer.types?.length?`<span class="knowledge-trainer-types">${trainer.types.map(type=>typeChip(type,"small")).join("")}</span>`:""}</span><i aria-hidden="true">›</i></button>`;}).join("")}</div>`;
+    return `${markup(first)}${rest.length?`<details class="knowledge-related-more"><summary>${t("knowledge.moreTrainers",{count:rest.length})}</summary>${markup(rest)}</details>`:""}`;
+  }
+
+  function renderKnowledgeRegionDetail(region) {
+    const trainers=(QuizmonKnowledgeWorld.TRAINERS_BY_REGION.get(region.id)||[]).filter(knowledgeTrainerIsCore);
+    const starters=region.starters.map(knowledgePokemonById).filter(Boolean);
+    view.innerHTML=`<section class="knowledge-detail-page knowledge-world-detail"><section class="knowledge-region-hero" style="--region-color:${escapeHtml(region.accent)}"><span class="knowledge-region-emblem">${region.generation}</span><div><p class="quiz-kicker">${t("knowledge.regionEntry")}</p><h1>${escapeHtml(knowledgeWorldText(region))}</h1><p>${escapeHtml(knowledgeWorldText(region.summary))}</p><div class="knowledge-detail-badges"><span>${t("knowledge.generation",{generation:region.generation})}</span><span>${t("knowledge.leagueLabel")}: ${escapeHtml(knowledgeWorldText(region.league))}</span></div></div></section><section class="knowledge-world-two-column"><article class="knowledge-world-card"><div class="knowledge-card-head"><span>◉</span><div><small>${t("knowledge.regionStarterKicker")}</small><h2>${t("knowledge.regionStarterTitle")}</h2></div></div>${knowledgePokemonLinks(starters.map(item=>item.id),3)}</article><article class="knowledge-world-card"><div class="knowledge-card-head"><span>⌖</span><div><small>${t("knowledge.regionPlacesKicker")}</small><h2>${t("knowledge.regionPlacesTitle")}</h2></div></div><ul class="knowledge-place-list">${region.locations.map(place=>`<li>${escapeHtml(knowledgeWorldText(place))}</li>`).join("")}</ul></article></section><section class="knowledge-world-card"><div class="knowledge-card-head"><span>✦</span><div><small>${t("knowledge.regionTraitsKicker")}</small><h2>${t("knowledge.regionTraitsTitle")}</h2></div></div><ul class="knowledge-trait-list">${(region.traits?.[state.language]||region.traits?.de||[]).map(value=>`<li>${escapeHtml(value)}</li>`).join("")}</ul></section><section class="knowledge-world-card"><div class="knowledge-card-head"><span>♛</span><div><small>${t("knowledge.regionTrainersKicker")}</small><h2>${t("knowledge.regionTrainersTitle")}</h2></div><strong>${trainers.length}</strong></div>${knowledgeTrainerMiniList(trainers,12)}</section></section>`;
+    bindKnowledgeDetailLinks();
+  }
+
+  function renderKnowledgeTrainerDetail(trainer) {
+    const region=knowledgeRegionById(trainer.region);const team=knowledgeTrainerTeam(trainer);
+    const specialty=trainer.types?.length?trainer.types.map(typeLabel).join(state.language==="de"?" · ":" · "):t("knowledge.noFixedType");
+    const primaryRole=knowledgeTrainerPrimaryRole(trainer);
+    const teamMarkup=team.length?`<div class="knowledge-related-pokemon trainer-team">${team.map(entry=>`<button data-open-pokemon="${entry.pokemon.id}"><img loading="lazy" src="${escapeHtml(knowledgeArtwork(entry.pokemon))}" alt=""><strong>${escapeHtml(knowledgePokemonName(entry.pokemon))}</strong>${entry.form ? `<span>${escapeHtml(knowledgeWorldText(entry.form))}</span>` : ""}${entry.level != null ? `<small>${escapeHtml(t("knowledge.learnsetLevelShort",{level:entry.level}))}</small>` : ""}</button>`).join("")}</div>`:"";
+    const teamSource=knowledgeWorldText(trainer.teamSource);
+    view.innerHTML=`<section class="knowledge-detail-page knowledge-world-detail"><section class="knowledge-trainer-hero" style="--trainer-color:${knowledgeTrainerPrimaryColor(trainer)}"><span class="knowledge-trainer-hero-avatar" aria-hidden="true">${knowledgeTrainerRoleIcon(trainer)}</span><div><p class="quiz-kicker">${t("knowledge.trainerEntry")}</p><h1>${escapeHtml(knowledgeWorldText(trainer))}</h1><div class="knowledge-trainer-role-row">${knowledgeRoleMarkup(primaryRole ? [primaryRole] : trainer.roles)}</div><p>${escapeHtml(knowledgeTrainerDescription(trainer))}</p>${trainer.types?.length?`<div class="knowledge-detail-types">${trainer.types.map(type=>`<button data-detail-type="${type}">${typeChip(type)}</button>`).join("")}</div>`:""}</div></section><section class="knowledge-entry-facts"><article><small>${t("knowledge.region")}</small><strong>${escapeHtml(knowledgeWorldText(region))}</strong></article><article><small>${t("knowledge.trainerRole")}</small><strong>${escapeHtml(primaryRole ? knowledgeRoleLabel(primaryRole) : trainer.roles.map(knowledgeRoleLabel).join(" · "))}</strong></article><article><small>${t("knowledge.location")}</small><strong>${escapeHtml(knowledgeWorldText(trainer.location)||knowledgeWorldText(region))}</strong></article><article><small>${t("knowledge.specialty")}</small><strong>${escapeHtml(specialty)}</strong></article></section>${team.length?`<section class="knowledge-world-card"><div class="knowledge-card-head"><span>◉</span><div><small>${t("knowledge.signaturePokemonKicker")}</small><h2>${t("knowledge.signaturePokemonTitle")}</h2></div><strong>${team.length}</strong></div>${teamSource?`<p class="knowledge-team-source">${escapeHtml(t("knowledge.teamSourceLabel",{source:teamSource}))}</p>`:""}${teamMarkup}</section>`:""}<section class="knowledge-world-link-card"><button data-open-region="${region.id}"><span>⌘</span><div><small>${t("knowledge.relatedRegion")}</small><strong>${escapeHtml(knowledgeWorldText(region))}</strong></div><i>›</i></button></section></section>`;
+    bindKnowledgeDetailLinks();
+  }
+
+  function renderKnowledgeCompetitiveDetail(topic) {
+    const related=(topic.related||[]).map(knowledgeTopicById).filter(Boolean);
+    view.innerHTML=`<section class="knowledge-detail-page knowledge-world-detail"><section class="knowledge-topic-hero"><span>${knowledgeCompetitiveIcon(topic.group)}</span><div><p class="quiz-kicker">${t(`knowledge.competitiveGroup.${topic.group}`)}</p><h1>${escapeHtml(knowledgeWorldText(topic))}</h1><p>${escapeHtml(knowledgeWorldText(topic.summary))}</p></div></section><section class="knowledge-world-card knowledge-topic-why"><div class="knowledge-card-head"><span>?</span><div><small>${t("knowledge.competitiveWhyKicker")}</small><h2>${t("knowledge.competitiveWhyTitle")}</h2></div></div><p>${escapeHtml(knowledgeWorldText(topic.why))}</p></section><section class="knowledge-world-card"><div class="knowledge-card-head"><span>✓</span><div><small>${t("knowledge.competitiveStepsKicker")}</small><h2>${t("knowledge.competitiveStepsTitle")}</h2></div></div><ol class="knowledge-topic-steps">${(topic.steps?.[state.language]||topic.steps?.de||[]).map(step=>`<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="knowledge-topic-example"><small>${t("knowledge.competitiveExampleKicker")}</small><strong>${t("knowledge.competitiveExampleTitle")}</strong><p>${escapeHtml(knowledgeWorldText(topic.example))}</p></section>${related.length?`<section class="knowledge-world-card"><div class="knowledge-card-head"><span>↗</span><div><small>${t("knowledge.relatedKicker")}</small><h2>${t("knowledge.relatedTopics")}</h2></div></div><div class="knowledge-related-topics">${related.map(item=>`<button data-open-topic="${item.id}"><span>${knowledgeCompetitiveIcon(item.group)}</span><strong>${escapeHtml(knowledgeWorldText(item))}</strong><i>›</i></button>`).join("")}</div></section>`:""}</section>`;
+    bindKnowledgeDetailLinks();
+  }
+
+  function renderKnowledgeContentDetail() {
+    if(knowledgeContentKind==="move"){const item=QuizmonKnowledgeContent.MOVE_BY_ID.get(knowledgeContentId);if(item)return renderKnowledgeMoveDetail(item);}
+    if(knowledgeContentKind==="ability"){const item=QuizmonKnowledgeContent.ABILITY_BY_ID.get(knowledgeContentId);if(item)return renderKnowledgeAbilityDetail(item);}
+    if(knowledgeContentKind==="item"){const item=QuizmonKnowledgeContent.ITEM_BY_ID.get(knowledgeContentId);if(item)return renderKnowledgeItemDetail(item);}
+    if(knowledgeContentKind==="evolution")return renderKnowledgeEvolutionDetail(knowledgeContentId);
+    if(knowledgeContentKind==="region"){const item=knowledgeRegionById(knowledgeContentId);if(item)return renderKnowledgeRegionDetail(item);}
+    if(knowledgeContentKind==="trainer"){const item=knowledgeTrainerById(knowledgeContentId);if(item)return renderKnowledgeTrainerDetail(item);}
+    if(knowledgeContentKind==="competitive"){const item=knowledgeTopicById(knowledgeContentId);if(item)return renderKnowledgeCompetitiveDetail(item);}
+    knowledgeContentKind=null;setRoute("knowledge");
+  }
+
 
   function groupByMultiplier(types,resolver){const groups={0:[],0.5:[],1:[],2:[]};types.forEach(type=>{const value=resolver(type);if(!groups[value])groups[value]=[];groups[value].push(type);});return groups;}
   function renderLearnDetail() {
-    if(!learnType){setRoute("learn");return;}
+    if(knowledgeContentKind){renderKnowledgeContentDetail();attachKnowledgeDetailSearchLauncher();return;}
+    if(knowledgePokemonId){renderKnowledgePokemonDetail();attachKnowledgeDetailSearchLauncher();return;}
+    if(!learnType){setRoute("knowledge");return;}
     const attack=groupByMultiplier(TYPES,target=>effectiveness(learnType,[target]));
     const defense=groupByMultiplier(TYPES,attacker=>effectiveness(attacker,[learnType]));
     const s=state.stats.types[learnType];
@@ -2334,6 +5928,7 @@
         </article>
       </section>
     </section>`;
+    attachKnowledgeDetailSearchLauncher();
   }
   function learnMultiplierGroup(multiplier,title,types,tone){return `<div class="matchup-group ${tone}"><div class="matchup-group-label"><span>${multiplier}</span><strong>${escapeHtml(title)}</strong><small>${types?.length||0}</small></div><div class="chip-wrap">${types?.length?types.map(type=>typeChip(type,"small")).join(""):`<span class="empty-matchup">${t("learn.none")}</span>`}</div></div>`;}
   function memoryAid(type,attack,defense){
@@ -2370,29 +5965,834 @@
       <div class="lab-matchup-visual"><span>${typeChip(attack)}</span><b aria-hidden="true">→</b><span>${defenders.map(type=>typeChip(type)).join(" ")}</span></div>
       <div class="lab-formula-row"><span>${t("learn.breakdown")}</span><strong>${values.map(formatMultiplier).join(" × ")} = ${formatMultiplier(result)}</strong></div>`;
   }
+  function learningAreaMeta(key) {
+    const [role, value] = String(key).split(":");
+    if (role === "skill") {
+      const skillKeys = {
+        effectiveness: "learning.skill.effectiveness",
+        multiplier: "learning.skill.multiplier",
+        impact: "learning.skill.impact",
+        pokemon: "learning.skill.pokemon",
+        dual: "learning.skill.dual"
+      };
+      return { key, role, value, label: t(skillKeys[value] || "learning.skill.effectiveness"), type: null };
+    }
+    const roleKeys = {
+      attack: "learning.role.attack",
+      defense: "learning.role.defense",
+      pokemon: "learning.role.pokemon",
+      type: "learning.role.overall"
+    };
+    return { key, role, value, label: `${typeLabel(value)} · ${t(roleKeys[role])}`, type: value };
+  }
+
+  function learningMistakeMatchesKey(item, key) {
+    const [role, value] = String(key).split(":");
+    const spec = item?.spec || {};
+    if (role === "skill") {
+      if (value === "dual") return (spec.defendingTypes || spec.pokemon?.types || []).length === 2;
+      return spec.kind === value;
+    }
+    if (role === "attack") return spec.attackingType === value || (spec.kind === "multiplier" && (item?.lastAnswer?.[value] != null));
+    if (role === "defense") return (spec.defendingTypes || []).includes(value) || (spec.kind === "effectiveness" && (spec.options || []).includes(value));
+    if (role === "pokemon") return (spec.pokemon?.types || []).includes(value);
+    return (spec.focusTypes || []).includes(value) || spec.attackingType === value || (spec.defendingTypes || []).includes(value) || (spec.pokemon?.types || []).includes(value);
+  }
+
+  function learningOpenMistakesFor(key) {
+    return state.stats.mistakes.filter(item => item.status !== "resolved" && learningMistakeMatchesKey(item, key)).length;
+  }
+
+  function learningResolvedMistakesFor(key) {
+    return state.stats.mistakes.filter(item => item.status === "resolved" && learningMistakeMatchesKey(item, key)).length;
+  }
+
+  function learningDaysSince(value) {
+    const timestamp = new Date(value || "").getTime();
+    if (!Number.isFinite(timestamp)) return Infinity;
+    return Math.max(0, Math.floor((Date.now() - timestamp) / 86400000));
+  }
+
+  function learningConfidence(total, legacy = false) {
+    const id = QuizmonLearning.confidenceId(total, legacy);
+    return { id, rank: QuizmonLearning.confidenceRank(id), label: t(`learning.confidence.${id}`) };
+  }
+
+  function learningStatus(score, total, trend, openMistakes) {
+    return QuizmonLearning.status(score, total, trend, openMistakes);
+  }
+
+  function summarizeDetailedLearningArea(key, entries) {
+    const sorted = [...entries].sort((a, b) => new Date(a.at) - new Date(b.at));
+    const now = Date.now();
+    let weightedTotal = 0;
+    let weightedScore = 0;
+    sorted.forEach(entry => {
+      const ageDays = Math.max(0, (now - new Date(entry.at).getTime()) / 86400000);
+      const ageWeight = ageDays <= 14 ? 1 : ageDays <= 45 ? .86 : .72;
+      const reviewWeight = entry.review ? .82 : 1;
+      const weight = ageWeight * reviewWeight;
+      weightedTotal += weight;
+      weightedScore += entry.score * weight;
+    });
+    const score = weightedTotal ? weightedScore / weightedTotal : 0;
+    const windowSize = Math.min(6, Math.floor(sorted.length / 2));
+    let trend = "same";
+    let recentScore = score;
+    let previousScore = score;
+    if (windowSize >= 3) {
+      const recent = sorted.slice(-windowSize);
+      const previous = sorted.slice(-(windowSize * 2), -windowSize);
+      recentScore = recent.reduce((sum, item) => sum + item.score, 0) / recent.length;
+      previousScore = previous.reduce((sum, item) => sum + item.score, 0) / previous.length;
+      if (recentScore >= previousScore + .10) trend = "up";
+      else if (recentScore <= previousScore - .10) trend = "down";
+    }
+    const openMistakes = learningOpenMistakesFor(key);
+    const resolvedMistakes = learningResolvedMistakesFor(key);
+    const confidence = learningConfidence(sorted.length, false);
+    const lastSeen = sorted.at(-1)?.at || null;
+    return {
+      ...learningAreaMeta(key),
+      total: sorted.length,
+      score,
+      rate: Math.round(score * 100),
+      recentScore,
+      previousScore,
+      trendDelta: Math.round((recentScore - previousScore) * 100),
+      trend,
+      openMistakes,
+      resolvedMistakes,
+      confidence,
+      status: learningStatus(score, sorted.length, trend, openMistakes),
+      lastSeen,
+      daysSince: learningDaysSince(lastSeen),
+      recentExposure: sorted.filter(item => now - new Date(item.at).getTime() <= 14 * 86400000).length,
+      legacy: false
+    };
+  }
+
+  function summarizeLegacyLearningArea(key, stats, recent = []) {
+    const total = finiteNonNegative(stats?.total);
+    const rate = percent(finiteNonNegative(stats?.correct), total);
+    const recentValues = Array.isArray(recent) ? recent.map(Boolean) : [];
+    const recentRate = recentValues.length ? percent(recentValues.filter(Boolean).length, recentValues.length) : rate;
+    const trend = recentValues.length >= 5 && recentRate >= rate + 10 ? "up" : recentValues.length >= 5 && recentRate <= rate - 10 ? "down" : "same";
+    const score = rate / 100;
+    const openMistakes = learningOpenMistakesFor(key);
+    const resolvedMistakes = learningResolvedMistakesFor(key);
+    const lastSeen = stats?.lastSeen || null;
+    return {
+      ...learningAreaMeta(key),
+      total,
+      score,
+      rate,
+      recentScore: recentRate / 100,
+      previousScore: score,
+      trendDelta: recentRate - rate,
+      trend,
+      openMistakes,
+      resolvedMistakes,
+      confidence: learningConfidence(total, true),
+      status: learningStatus(score, total, trend, openMistakes),
+      lastSeen,
+      daysSince: learningDaysSince(lastSeen),
+      recentExposure: recentValues.length,
+      legacy: true
+    };
+  }
+
+  function getLearningProfile() {
+    const buckets = new Map();
+    const events = sanitizeLearningEvents(state.stats.learning?.events);
+    events.forEach(event => event.observations.forEach(observation => {
+      if (!buckets.has(observation.key)) buckets.set(observation.key, []);
+      buckets.get(observation.key).push({ score: observation.score, at: event.at, review: event.review });
+    }));
+    const detailedAreas = [...buckets.entries()].map(([key, entries]) => summarizeDetailedLearningArea(key, entries));
+    const detailedByKey = new Map(detailedAreas.map(area => [area.key, area]));
+    const areas = [...detailedAreas];
+
+    TYPES.forEach(type => {
+      const hasDetailedRole = ["attack", "defense", "pokemon"].some(role => (detailedByKey.get(`${role}:${type}`)?.total || 0) >= 3);
+      const stats = state.stats.types[type];
+      if (!hasDetailedRole && stats.total >= 3) areas.push(summarizeLegacyLearningArea(`type:${type}`, stats, stats.recent));
+    });
+
+    const legacySkills = {
+      effectiveness: state.stats.modes.effectiveness,
+      multiplier: state.stats.modes.multiplier,
+      impact: state.stats.modes.impact,
+      pokemon: state.stats.modes.pokemon
+    };
+    Object.entries(legacySkills).forEach(([skill, stats]) => {
+      if ((detailedByKey.get(`skill:${skill}`)?.total || 0) < 3 && stats.total >= 3) {
+        areas.push(summarizeLegacyLearningArea(`skill:${skill}`, stats));
+      }
+    });
+
+    const evaluated = areas.filter(area => area.total >= 3);
+    const strengths = evaluated.filter(area => ["strong", "stable"].includes(area.status))
+      .sort((a, b) => b.score - a.score || b.confidence.rank - a.confidence.rank || b.total - a.total);
+    const needs = evaluated.filter(area => area.status === "need")
+      .map(area => ({ ...area, priority: QuizmonLearning.recommendationPriority(area) }))
+      .sort((a, b) => b.priority - a.priority || a.score - b.score || b.total - a.total);
+    const improving = evaluated.filter(area => area.trend === "up")
+      .sort((a, b) => b.trendDelta - a.trendDelta || b.total - a.total)
+      .map(area => ({ ...area, displayStatus: "improving" }));
+    const declining = evaluated.filter(area => area.trend === "down")
+      .sort((a, b) => a.trendDelta - b.trendDelta || a.score - b.score);
+    const developing = evaluated.filter(area => area.trend === "up" || ["improving", "developing"].includes(area.status))
+      .sort((a, b) => (a.trend === "up" ? -1 : 1) - (b.trend === "up" ? -1 : 1) || b.total - a.total)
+      .map(area => area.trend === "up" ? { ...area, displayStatus: "improving" } : area);
+    const staleStrengths = strengths.filter(area => area.daysSince >= 14)
+      .sort((a, b) => b.daysSince - a.daysSince || b.score - a.score);
+    const assessedTypes = TYPES.filter(type => areas.some(area => area.type === type && area.total >= 3)).length;
+    const unassessedTypeList = TYPES.filter(type => !areas.some(area => area.type === type && area.total >= 3));
+    const detailedCount = events.length;
+    const stage = detailedCount < 5 ? "initial" : detailedCount < 15 ? "growing" : detailedCount < 40 ? "solid" : "reliable";
+    return {
+      events,
+      areas,
+      evaluated,
+      strengths,
+      needs,
+      improving,
+      declining,
+      developing,
+      staleStrengths,
+      assessedTypes,
+      unassessedTypes: Math.max(0, TYPES.length - assessedTypes),
+      unassessedTypeList,
+      detailedCount,
+      stage,
+      legacyUsed: areas.some(area => area.legacy)
+    };
+  }
+
+  function learningAreaForKey(profile, key) {
+    return profile?.areas?.find(area => area.key === key) || null;
+  }
+
+  function learningAreaFallback(key) {
+    const meta = learningAreaMeta(key);
+    return { ...meta, total:0, score:0, rate:0, trend:"same", trendDelta:0, openMistakes:learningOpenMistakesFor(key), resolvedMistakes:learningResolvedMistakesFor(key), daysSince:Infinity, recentExposure:0, confidence:learningConfidence(0), status:"unassessed", legacy:false };
+  }
+
+  const ADAPTIVE_DIFFICULTIES = ["easy","medium","hard"];
+  const DIFFICULTY_TIME_BENCHMARKS = Object.freeze({ effectiveness:12000, multiplier:50000, impact:12000, pokemon:12000 });
+
+  function difficultyKindForArea(area) {
+    if (area?.role === "pokemon" || area?.value === "pokemon") return "pokemon";
+    if (area?.role === "defense" || area?.value === "multiplier" || area?.value === "dual") return "multiplier";
+    if (area?.value === "impact") return "impact";
+    return "effectiveness";
+  }
+
+  function difficultyEventsFor(key, kind) {
+    return sanitizeLearningEvents(state.stats.learning?.events).filter(event => {
+      if (kind && event.kind !== kind) return false;
+      return event.observations.some(observation => observation.key === key);
+    }).slice(-10);
+  }
+
+  function difficultySpeedSignal(key, kind) {
+    const durations = difficultyEventsFor(key,kind).map(event => Number(event.duration || 0));
+    return QuizmonDifficulty.speedSignal(durations, DIFFICULTY_TIME_BENCHMARKS[kind] || 15000);
+  }
+
+  function personalDifficultyForArea(area, kind = difficultyKindForArea(area)) {
+    const safeArea = area || learningAreaFallback("skill:effectiveness");
+    const total = Math.max(0,Number(safeArea.total || 0));
+    const confidenceRank = Math.max(0,Number(safeArea.confidence?.rank || 0));
+    const longScore = clampScore(safeArea.score);
+    const recentScore = Number.isFinite(safeArea.recentScore) ? clampScore(safeArea.recentScore) : longScore;
+    const speed = difficultySpeedSignal(safeArea.key,kind);
+    let modelScore = longScore * .62 + recentScore * .28 + speed.value * .10;
+    if (safeArea.trend === "up") modelScore += .04;
+    if (safeArea.trend === "down") modelScore -= .08;
+    modelScore -= Math.min(.16,Math.max(0,Number(safeArea.openMistakes || 0)) * .055);
+    modelScore = clampScore(modelScore);
+
+    let level = "medium";
+    let reason = "developing";
+    let calibrating = confidenceRank < 2 || total < 6;
+    const complexKind = ["multiplier","impact"].includes(kind);
+    const hardThreshold = complexKind ? .87 : .84;
+
+    if (total < 3) {
+      level = "easy";
+      reason = "insufficient";
+      calibrating = true;
+    } else if (safeArea.trend === "down" && modelScore < .74) {
+      level = "easy";
+      reason = "declining";
+    } else if (Number(safeArea.openMistakes || 0) >= 2 || modelScore < .60) {
+      level = "easy";
+      reason = Number(safeArea.openMistakes || 0) >= 2 ? "mistakes" : "practice";
+    } else if (total >= 8 && confidenceRank >= 2 && modelScore >= hardThreshold && Number(safeArea.openMistakes || 0) === 0 && safeArea.trend !== "down") {
+      level = "hard";
+      reason = speed.known && speed.value >= .78 ? "secureFast" : "secure";
+      calibrating = false;
+    } else {
+      level = "medium";
+      reason = safeArea.trend === "up" ? "improving" : safeArea.status === "stable" ? "stable" : "developing";
+    }
+
+    if (safeArea.legacy && level === "hard") {
+      level = "medium";
+      reason = "legacy";
+      calibrating = true;
+    }
+    if (total < 6 && level === "hard") level = "medium";
+    return { level, reason, calibrating, modelScore, speedKnown:speed.known, speedAverage:speed.average, total, confidenceRank, kind };
+  }
+
+  function adaptiveDifficultyProfile(profile = getLearningProfile()) {
+    const entries = profile.evaluated.map(area => ({ area, ...personalDifficultyForArea(area) }));
+    const counts = { easy:0, medium:0, hard:0 };
+    entries.forEach(item => { counts[item.level] += 1; });
+    return { entries, counts, calibrating:entries.filter(item => item.calibrating).length, unassessed:profile.unassessedTypes };
+  }
+
+  function smartDifficultyForSpec(area, kind) {
+    return personalDifficultyForArea(area || learningAreaFallback(`skill:${kind === "pokemon" ? "pokemon" : kind}`),kind);
+  }
+
+  function smartDefenseForDifficulty(area, level, random = Math.random) {
+    if (area?.value === "dual") return "dual";
+    if (level === "easy") return "single";
+    if (level === "hard") return "dual";
+    return random() < .55 ? "single" : "dual";
+  }
+
+  function shiftedDifficulty(level, offset = 0) { return QuizmonDifficulty.shiftedDifficulty(level, offset, ADAPTIVE_DIFFICULTIES); }
+
+  function smartActualDifficultyCounts(answers = []) {
+    const counts = { easy:0, medium:0, hard:0 };
+    (Array.isArray(answers)?answers:[]).forEach(answer=>{
+      if (Object.hasOwn(counts,answer?.difficulty)) counts[answer.difficulty]+=1;
+    });
+    return counts;
+  }
+
+  function smartAdjustmentCounts(adjustments = []) {
+    const counts = { up:0, down:0, steady:0 };
+    (Array.isArray(adjustments)?adjustments:[]).forEach(item=>{
+      if (Object.hasOwn(counts,item?.direction)) counts[item.direction]+=1;
+    });
+    return counts;
+  }
+
+  function smartAnswerQuality(answer) {
+    let quality=clampScore(Number.isFinite(answer?.focusScore)?answer.focusScore:Number(Boolean(answer?.correct)));
+    if (!answer?.correct) return quality;
+    const benchmark=DIFFICULTY_TIME_BENCHMARKS[answer.kind]||15000;
+    const duration=Number(answer.duration||0);
+    if (duration>benchmark*1.65) quality=Math.min(quality,.68);
+    else if (duration>benchmark*1.20) quality=Math.min(quality,.82);
+    return quality;
+  }
+
+  function smartSpecAtDifficulty(original, level, attempt = 0, random = Math.random) {
+    const profile=getLearningProfile();
+    const focusKey=original?._smartFocusKey||smartFocusKeyForSpec(original);
+    const area=learningAreaForKey(profile,focusKey)||learningAreaFallback(focusKey);
+    const type=area?.type||(TYPES.includes(area?.value)?area.value:null);
+    const kind=original?.kind||difficultyKindForArea(area);
+    const defense=smartDefenseForDifficulty(area,level,random);
+    let spec;
+    if(kind==="effectiveness")spec=generateEffectivenessSpec({focusType:type,difficulty:level,kind:original?.questionKind||"mixed",random});
+    else if(kind==="multiplier")spec=generateMultiplierSpec({focusType:type,difficulty:level,defense,random});
+    else if(kind==="impact")spec=generateImpactSpec({focusType:type,difficulty:level,defense,random});
+    else spec=smartPokemonSpec(type,random,level);
+    const decorated=decorateSmartSpec(spec,area,original?._smartSource||"balance");
+    return {
+      ...decorated,
+      _smartFocusKey:focusKey,
+      _smartLabel:original?._smartLabel||decorated._smartLabel,
+      _smartSource:original?._smartSource||decorated._smartSource,
+      _smartBaseDifficulty:original?._smartBaseDifficulty||original?._smartDifficulty||level,
+      _smartDifficulty:level,
+      _smartDifficultyReason:original?._smartDifficultyReason||decorated._smartDifficultyReason,
+      _smartDifficultyCalibrating:Boolean(original?._smartDifficultyCalibrating),
+      _smartSessionAdjustment:null,
+      _smartRegeneratedAttempt:attempt
+    };
+  }
+
+  function regenerateSmartUpcomingBlock(offset, direction) {
+    if(!["weak","problem"].includes(session?.mode)||!Array.isArray(session.sequence))return 0;
+    const start=session.index+1;
+    const end=Math.min(session.sequence.length,start+3);
+    if(start>=end)return 0;
+    const reserved=new Set(session.sequence.map((spec,index)=>index<start||index>=end?questionSignature(spec):null).filter(Boolean));
+    session.usedSignatures.forEach(signature=>reserved.add(signature));
+    let changed=0;
+    for(let index=start;index<end;index+=1){
+      const original=session.sequence[index];
+      if(!original||original._smartSource==="mistake")continue;
+      const base=original._smartBaseDifficulty||original._smartDifficulty||"medium";
+      const target=shiftedDifficulty(base,offset);
+      if(target===original._smartDifficulty&&original._smartSessionAdjustment===(offset>0?"up":offset<0?"down":null))continue;
+      let replacement=null;
+      for(let attempt=0;attempt<36;attempt+=1){
+        const pattern=session.mode==="problem"?errorPatternByKey(session.problemPlan?.patternKey):null;
+        const candidate=pattern?problemSpecForPattern(pattern,target,index,Math.random):smartSpecAtDifficulty(original,target,attempt,Math.random);
+        candidate._smartBaseDifficulty=original?._smartBaseDifficulty||original?._smartDifficulty||target;
+        candidate._smartSessionAdjustment=offset>0?"up":offset<0?"down":null;
+        const signature=questionSignature(candidate);
+        if(!reserved.has(signature)){replacement=candidate;reserved.add(signature);break;}
+      }
+      if(replacement){session.sequence[index]=replacement;changed+=1;}
+    }
+    const counts={easy:0,medium:0,hard:0};
+    session.sequence.forEach(spec=>{if(Object.hasOwn(counts,spec?._smartDifficulty))counts[spec._smartDifficulty]+=1;});
+    if(session.smartPlan){session.smartPlan.difficultyCounts=counts;session.smartPlan.primaryDifficulty=ADAPTIVE_DIFFICULTIES.reduce((best,level)=>counts[level]>counts[best]?level:best,"medium");}
+    if(session.problemPlan)session.problemPlan.difficultyCounts=counts;
+    return changed;
+  }
+
+  function maybeAdjustSmartTrainingDuringSession() {
+    if(!ADAPTIVE_SESSION_MODES.includes(session?.mode)||!session.adaptiveFlow||!Array.isArray(session.sequence))return null;
+    const flow=session.adaptiveFlow;
+    if(session.answers.length-flow.lastChecked<3)return null;
+    const window=session.answers.slice(flow.lastChecked,flow.lastChecked+3);
+    flow.lastChecked+=window.length;
+    if(window.length<3)return null;
+    const qualities=window.map(smartAnswerQuality);
+    const average=qualities.reduce((sum,value)=>sum+value,0)/qualities.length;
+    const weakAnswers=qualities.filter(value=>value<.5).length;
+    let direction="steady";
+    if(average>=.88&&weakAnswers===0)direction="up";
+    else if(average<=.50||weakAnswers>=2)direction="down";
+    const previousOffset=Number(flow.offset||0);
+    const nextOffset=direction==="up"?Math.min(1,previousOffset+1):direction==="down"?Math.max(-1,previousOffset-1):previousOffset;
+    const changed=nextOffset!==previousOffset;
+    flow.offset=nextOffset;
+    const changedQuestions=(nextOffset!==0||changed)?regenerateSmartUpcomingBlock(nextOffset,direction):0;
+    const adjustment={
+      atQuestion:session.answers.length,
+      direction:changed?direction:"steady",
+      signal:direction,
+      average:Math.round(average*100),
+      fromOffset:previousOffset,
+      toOffset:nextOffset,
+      changedQuestions
+    };
+    flow.adjustments.push(adjustment);
+    flow.adjustments=flow.adjustments.slice(-8);
+    return changed&&changedQuestions?adjustment:null;
+  }
+
+  function adaptiveUpdateMarkup(update) {
+    if(!update||!["up","down"].includes(update.direction))return"";
+    const up=update.direction==="up";
+    return `<div class="adaptive-live-update ${update.direction}"><span aria-hidden="true">${up?"↗":"↘"}</span><div><strong>${t(up?"difficulty.liveRaisedTitle":"difficulty.liveLoweredTitle")}</strong><p>${t(up?"difficulty.liveRaisedText":"difficulty.liveLoweredText")}</p></div></div>`;
+  }
+
+  function adaptiveSessionSummaryMarkup() {
+    if(!ADAPTIVE_SESSION_MODES.includes(session?.mode))return"";
+    const adjustments=session.adaptiveFlow?.adjustments||[];
+    const counts=smartAdjustmentCounts(adjustments);
+    const changed=counts.up+counts.down;
+    if(!changed)return"";
+    const kind=counts.up&&counts.down?"mixed":counts.up?"up":"down";
+    const title=t(kind==="up"?"difficulty.summaryRaisedTitle":kind==="down"?"difficulty.summaryLoweredTitle":"difficulty.summaryMixedTitle");
+    const text=t(kind==="up"?"difficulty.summaryRaisedText":kind==="down"?"difficulty.summaryLoweredText":"difficulty.summaryMixedText");
+    return `<section class="summary-adaptive-card compact ${kind}"><div class="summary-adaptive-head"><span aria-hidden="true">${kind==="up"?"↗":kind==="down"?"↘":"↕"}</span><div><p class="quiz-kicker">${t("difficulty.summaryKicker")}</p><h2>${escapeHtml(title)}</h2><p>${escapeHtml(text)}</p></div></div></section>`;
+  }
+
+  function smartRecommendation(profile = getLearningProfile()) {
+    const openMistakes = state.stats.mistakes.filter(item => item?.status !== "resolved" && item?.spec).length;
+    if (profile.detailedCount < 8 || profile.evaluated.length < 2) {
+      return { kind:"discovery", icon:"◎", area:null, title:t("smart.discoveryTitle"), text:t("smart.discoveryText"), shortText:t("smart.discoveryShort") };
+    }
+    if (profile.needs[0]) {
+      const area = profile.needs[0];
+      return { kind:"need", icon:"↗", area, title:t("smart.needTitle",{area:area.label}), text:t("smart.needText",{area:area.label}), shortText:t("smart.needShort",{area:area.label}) };
+    }
+    if (openMistakes) {
+      return { kind:"mistakes", icon:"↻", area:null, title:t("smart.mistakeTitle",{count:openMistakes}), text:t("smart.mistakeText"), shortText:t("smart.mistakeShort",{count:openMistakes}) };
+    }
+    if (profile.declining[0]) {
+      const area = profile.declining[0];
+      return { kind:"declining", icon:"◇", area, title:t("smart.decliningTitle",{area:area.label}), text:t("smart.decliningText",{area:area.label}), shortText:t("smart.decliningShort",{area:area.label}) };
+    }
+    if (profile.improving[0]) {
+      const area = profile.improving[0];
+      return { kind:"confirm", icon:"↑", area, title:t("smart.confirmTitle",{area:area.label}), text:t("smart.confirmText",{area:area.label}), shortText:t("smart.confirmShort",{area:area.label}) };
+    }
+    if (profile.staleStrengths[0]) {
+      const area = profile.staleStrengths[0];
+      return { kind:"refresh", icon:"◷", area, title:t("smart.refreshTitle",{area:area.label}), text:t("smart.refreshText",{area:area.label}), shortText:t("smart.refreshShort",{area:area.label}) };
+    }
+    if (profile.unassessedTypeList[0]) {
+      const type = profile.unassessedTypeList[0];
+      return { kind:"explore", icon:"◇", area:learningAreaFallback(`type:${type}`), title:t("smart.exploreTitle",{type:typeLabel(type)}), text:t("smart.exploreText",{type:typeLabel(type)}), shortText:t("smart.exploreShort",{type:typeLabel(type)}) };
+    }
+    return { kind:"balanced", icon:"✓", area:profile.strengths[0] || null, title:t("smart.balancedTitle"), text:t("smart.balancedText"), shortText:t("smart.balancedShort") };
+  }
+
+  function smartFocusKeyForSpec(spec) {
+    if (!spec) return "skill:effectiveness";
+    if (spec._smartFocusKey && validLearningKey(spec._smartFocusKey)) return spec._smartFocusKey;
+    if (spec.kind === "effectiveness") return `attack:${spec.attackingType}`;
+    if (spec.kind === "multiplier") return `defense:${spec.defendingTypes?.[0] || "normal"}`;
+    if (spec.kind === "impact") return `attack:${spec.attackingType}`;
+    if (spec.kind === "pokemon") return `pokemon:${spec.pokemon?.types?.[0] || "normal"}`;
+    return "skill:effectiveness";
+  }
+
+  function smartPokemonSpec(focusType, random = Math.random, difficulty = "medium") {
+    const typed = focusType ? FALLBACK_POKEMON.filter(pokemon => pokemon.types.includes(focusType)) : FALLBACK_POKEMON;
+    const complexityFiltered = difficulty === "easy"
+      ? typed.filter(pokemon => pokemon.types.length === 1)
+      : difficulty === "hard"
+        ? typed.filter(pokemon => pokemon.types.length === 2)
+        : typed;
+    const candidates = complexityFiltered.length ? complexityFiltered : (typed.length ? typed : FALLBACK_POKEMON);
+    const source = clone(randomItem(candidates, random));
+    return { kind:"pokemon", pokemon:formatFallbackPokemon(source), display:difficulty === "hard" ? "image" : "both", focusTypes:[...source.types], _smartDifficulty:difficulty };
+  }
+
+  function smartSpecForArea(area, index = 0, random = Math.random) {
+    const role = area?.role || "skill";
+    const type = area?.type || (TYPES.includes(area?.value) ? area.value : null);
+    let kind = "effectiveness";
+    if (role === "pokemon" || area?.value === "pokemon") kind = "pokemon";
+    else if (role === "defense" || area?.value === "multiplier" || area?.value === "dual") kind = index % 2 ? "impact" : "multiplier";
+    else if (area?.value === "impact") kind = "impact";
+    else if (role === "attack") kind = index % 2 ? "impact" : "effectiveness";
+    else if (role === "type") kind = index % 3 === 0 ? "effectiveness" : index % 3 === 1 ? "multiplier" : "pokemon";
+
+    const difficultyInfo = smartDifficultyForSpec(area,kind);
+    const difficulty = difficultyInfo.level;
+    const defense = smartDefenseForDifficulty(area,difficulty,random);
+    let spec;
+    if (kind === "effectiveness") spec = generateEffectivenessSpec({ focusType:type, difficulty, kind:"mixed", random });
+    else if (kind === "multiplier") spec = generateMultiplierSpec({ focusType:type, difficulty, defense, random });
+    else if (kind === "impact") spec = generateImpactSpec({ focusType:type, difficulty, defense, random });
+    else spec = smartPokemonSpec(type,random,difficulty);
+    return { ...spec, _smartDifficulty:difficulty, _smartDifficultyReason:difficultyInfo.reason, _smartDifficultyCalibrating:difficultyInfo.calibrating };
+  }
+
+  function decorateSmartSpec(spec, area, source) {
+    const focusKey = area?.role === "type" ? smartFocusKeyForSpec(spec) : area?.key || smartFocusKeyForSpec(spec);
+    const difficultyInfo = spec?._smartDifficulty ? { level:spec._smartDifficulty, reason:spec._smartDifficultyReason || "developing", calibrating:Boolean(spec._smartDifficultyCalibrating) } : smartDifficultyForSpec(area,spec?.kind || "effectiveness");
+    return { ...spec, _smartFocusKey:focusKey, _smartSource:source, _smartLabel:learningAreaMeta(focusKey).label, _smartBaseDifficulty:spec?._smartBaseDifficulty||difficultyInfo.level, _smartDifficulty:difficultyInfo.level, _smartDifficultyReason:difficultyInfo.reason, _smartDifficultyCalibrating:Boolean(difficultyInfo.calibrating), _smartSessionAdjustment:spec?._smartSessionAdjustment||null };
+  }
+
+  function smartPlanReason(source, area, count = 1) {
+    const label = area?.label || "";
+    const keys = {
+      need:"smart.reason.need", declining:"smart.reason.declining", improving:"smart.reason.improving",
+      refresh:"smart.reason.refresh", explore:"smart.reason.explore", mistake:"smart.reason.mistake",
+      resolved:"smart.reason.resolved", balance:"smart.reason.balance", discovery:"smart.reason.discovery"
+    };
+    return t(keys[source] || keys.balance, { area:label, count });
+  }
+
+  function buildSmartTrainingPlan() {
+    const profile = getLearningProfile();
+    const recommendation = smartRecommendation(profile);
+    const random = Math.random;
+    const sequence = [];
+    const signatures = new Set();
+    const reasons = [];
+    const addReason = (source, area, count = 1) => {
+      const text = smartPlanReason(source, area, count);
+      if (!reasons.some(item => item.text === text)) reasons.push({ source, areaKey:area?.key || null, text });
+    };
+    const addSpec = (spec, area, source) => {
+      if (!spec || sequence.length >= 10) return false;
+      const decorated = decorateSmartSpec(spec, area, source);
+      const signature = questionSignature(decorated);
+      if (signatures.has(signature)) return false;
+      signatures.add(signature);
+      sequence.push(decorated);
+      addReason(source, area);
+      return true;
+    };
+    const addArea = (area, count, source) => {
+      if (!area) return;
+      let added = 0;
+      for (let attempt = 0; attempt < count * 10 && added < count && sequence.length < 10; attempt += 1) {
+        if (addSpec(smartSpecForArea(area, attempt, random), area, source)) added += 1;
+      }
+    };
+
+    const discovery = recommendation.kind === "discovery";
+    if (discovery) {
+      const types = shuffle(profile.unassessedTypeList.length ? profile.unassessedTypeList : TYPES, random);
+      const kinds = ["effectiveness","effectiveness","effectiveness","multiplier","multiplier","impact","impact","pokemon","pokemon","pokemon"];
+      kinds.forEach((kind, index) => {
+        const type = types[index % types.length];
+        const area = learningAreaFallback(`type:${type}`);
+        const difficultyInfo = smartDifficultyForSpec(area,kind);
+        const difficulty = difficultyInfo.level;
+        const defense = smartDefenseForDifficulty(area,difficulty,random);
+        let spec;
+        if (kind === "effectiveness") spec = generateEffectivenessSpec({ focusType:type, difficulty, kind:"mixed", random });
+        else if (kind === "multiplier") spec = generateMultiplierSpec({ focusType:type, difficulty, defense, random });
+        else if (kind === "impact") spec = generateImpactSpec({ focusType:type, difficulty, defense, random });
+        else spec = smartPokemonSpec(type,random,difficulty);
+        addSpec({ ...spec, _smartDifficulty:difficulty, _smartDifficultyReason:difficultyInfo.reason, _smartDifficultyCalibrating:difficultyInfo.calibrating }, area, "discovery");
+      });
+    } else {
+      const openMistakes = state.stats.mistakes.filter(item => item?.status !== "resolved" && item?.spec)
+        .sort((a,b) => Number(b.wrongCount || 0) - Number(a.wrongCount || 0) || new Date(b.lastSeen) - new Date(a.lastSeen)).slice(0,2);
+      openMistakes.forEach(item => {
+        const key = smartFocusKeyForSpec(item.spec);
+        addSpec(clone(item.spec), learningAreaForKey(profile,key) || learningAreaFallback(key), "mistake");
+      });
+
+      profile.needs.slice(0,2).forEach((area,index) => addArea(area, area.recentExposure >= 8 && index > 0 ? 1 : 2, "need"));
+      const decline = profile.declining.find(area => !profile.needs.some(item => item.key === area.key));
+      if (decline && decline.recentExposure < 10) addArea(decline,1,"declining");
+      const improving = profile.improving.find(area => !profile.needs.some(item => item.key === area.key));
+      if (improving && improving.recentExposure < 9) addArea(improving,1,"improving");
+      const stale = profile.staleStrengths[0];
+      if (stale) addArea(stale,1,"refresh");
+
+      const dueResolved = state.stats.mistakes.filter(item => item?.status === "resolved" && item?.spec && learningDaysSince(item.lastSeen) >= 7)
+        .sort((a,b) => learningDaysSince(b.lastSeen) - learningDaysSince(a.lastSeen))[0];
+      if (dueResolved && sequence.length < 9) {
+        const key = smartFocusKeyForSpec(dueResolved.spec);
+        addSpec(clone(dueResolved.spec), learningAreaForKey(profile,key) || learningAreaFallback(key), "resolved");
+      }
+
+      if (profile.unassessedTypeList.length && sequence.length < 9) {
+        const type = randomItem(profile.unassessedTypeList, random);
+        addArea(learningAreaFallback(`type:${type}`),1,"explore");
+      }
+    }
+
+    const fallbackAreas = [recommendation.area, ...profile.needs, ...profile.improving, ...profile.strengths, ...TYPES.map(type => learningAreaFallback(`type:${type}`))].filter(Boolean);
+    for (let attempt = 0; sequence.length < 10 && attempt < 180; attempt += 1) {
+      const area = fallbackAreas[attempt % fallbackAreas.length] || learningAreaFallback(`type:${TYPES[attempt % TYPES.length]}`);
+      const source = discovery ? "discovery" : "balance";
+      addSpec(smartSpecForArea(area, attempt, random), area, source);
+    }
+
+    const modeCounts = { effectiveness:0, multiplier:0, impact:0, pokemon:0 };
+    const difficultyCounts = { easy:0, medium:0, hard:0 };
+    sequence.forEach(spec => {
+      if (Object.hasOwn(modeCounts,spec.kind)) modeCounts[spec.kind] += 1;
+      if (Object.hasOwn(difficultyCounts,spec._smartDifficulty)) difficultyCounts[spec._smartDifficulty] += 1;
+    });
+    const focusKeys = unique(sequence.map(spec => spec._smartFocusKey).filter(validLearningKey));
+    const focusAreas = focusKeys.map(key => learningAreaForKey(profile,key) || learningAreaFallback(key));
+    const primaryDifficulty = ADAPTIVE_DIFFICULTIES.reduce((best,level) => difficultyCounts[level] > difficultyCounts[best] ? level : best,"medium");
+    return {
+      kind:discovery ? "discovery" : "personal",
+      recommendation,
+      sequence,
+      modeCounts,
+      difficultyCounts,
+      primaryDifficulty,
+      calibratingCount:sequence.filter(spec => spec._smartDifficultyCalibrating).length,
+      focusKeys,
+      focusAreas,
+      reasons:reasons.slice(0,5),
+      openMistakes:sequence.filter(spec => spec._smartSource === "mistake").length
+    };
+  }
+
+  function smartLearningSnapshot(keys, profile = getLearningProfile()) {
+    return Object.fromEntries(unique(keys || []).map(key => {
+      const area = learningAreaForKey(profile,key) || learningAreaFallback(key);
+      return [key,{ key, label:area.label, rate:area.rate, score:area.score, total:area.total, status:area.status, trend:area.trend }];
+    }));
+  }
+
+  function smartStatusRank(status) {
+    return ({ unassessed:0, need:1, developing:2, improving:3, stable:4, strong:5 })[status] || 0;
+  }
+
+  function smartSessionProgress() {
+    if (!session?.smartPlan) return null;
+    const afterProfile = getLearningProfile();
+    const groups = new Map();
+    session.answers.forEach(answer => {
+      if (!answer.focusKey) return;
+      if (!groups.has(answer.focusKey)) groups.set(answer.focusKey,[]);
+      groups.get(answer.focusKey).push(Number.isFinite(answer.focusScore) ? answer.focusScore : Number(Boolean(answer.correct)));
+    });
+    const trained = [];
+    const improved = [];
+    const attention = [];
+    groups.forEach((scores,key) => {
+      const before = session.learningBefore?.[key] || learningAreaFallback(key);
+      const after = learningAreaForKey(afterProfile,key) || learningAreaFallback(key);
+      const sessionScore = scores.reduce((sum,value)=>sum+value,0) / scores.length;
+      const item = { key, label:after.label || before.label, count:scores.length, sessionRate:Math.round(sessionScore*100), beforeRate:Number(before.rate||0), afterRate:Number(after.rate||0), beforeStatus:before.status || "unassessed", afterStatus:after.status || "unassessed", trend:after.trend };
+      trained.push(item);
+      const statusGain = smartStatusRank(item.afterStatus) > smartStatusRank(item.beforeStatus);
+      if (scores.length >= 2 && ((before.total >= 3 && sessionScore >= Number(before.score || 0) + .12) || statusGain || after.trend === "up")) improved.push(item);
+      if (scores.length >= 2 && (sessionScore < .6 || after.status === "need" || after.trend === "down")) attention.push(item);
+    });
+    return { trained, improved, attention, next:smartRecommendation(afterProfile) };
+  }
+
+  function smartModePreviewRows(plan) {
+    return ["effectiveness","multiplier","impact","pokemon"].filter(kind => plan.modeCounts[kind]).map(kind => `<span><b>${plan.modeCounts[kind]}×</b>${escapeHtml(modeName(kind))}</span>`).join("");
+  }
+
+  function smartDifficultyPreviewRows(plan) {
+    return ADAPTIVE_DIFFICULTIES.filter(level => plan.difficultyCounts[level]).map(level => `<span class="difficulty-level ${level}"><b>${plan.difficultyCounts[level]}×</b>${escapeHtml(difficultyLabel(level))}</span>`).join("");
+  }
+
+  function adaptiveDifficultyOverviewMarkup(profile = getLearningProfile()) {
+    const model = adaptiveDifficultyProfile(profile);
+    const total = model.entries.length;
+    return `<section class="adaptive-difficulty-overview">
+      <div class="adaptive-difficulty-overview-head"><span>◫</span><div><p class="quiz-kicker">${t("difficulty.kicker")}</p><h2>${t("difficulty.profileTitle")}</h2><p>${t("difficulty.profileText")}</p></div></div>
+      <div class="adaptive-difficulty-cards">
+        ${ADAPTIVE_DIFFICULTIES.map(level => `<article class="${level}"><small>${escapeHtml(difficultyLabel(level))}</small><strong>${model.counts[level]}</strong><span>${t("difficulty.areaCount",{count:model.counts[level]})}</span></article>`).join("")}
+      </div>
+      <p class="adaptive-difficulty-note">${total ? (model.calibrating ? t("difficulty.profileNote",{count:model.calibrating}) : t("difficulty.profileReady")) : t("difficulty.profileEmpty")}</p>
+    </section>`;
+  }
+
+  function showSmartTrainingPreview() {
+    const plan = buildSmartTrainingPlan();
+    const title = plan.kind === "discovery" ? t("smart.previewDiscoveryTitle") : t("smart.previewTitle");
+    const intro = plan.kind === "discovery" ? t("smart.previewDiscoveryText") : t("smart.previewText");
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="smartTrainingTitle"><section class="modal-card smart-training-modal" tabindex="-1">
+      <header class="smart-training-head"><span>${plan.recommendation.icon}</span><div><p class="quiz-kicker">${t("smart.kicker")}</p><h2 id="smartTrainingTitle">${escapeHtml(title)}</h2><p>${escapeHtml(intro)}</p></div></header>
+      <section class="smart-training-recommendation"><small>${t("smart.todayFocus")}</small><strong>${escapeHtml(plan.recommendation.title)}</strong><p>${escapeHtml(plan.recommendation.text)}</p></section>
+      <section class="smart-training-focus"><div class="smart-training-section-title"><strong>${t("smart.focusAreas")}</strong><span>${tp("smart.questionCountOne","smart.questionCount",plan.sequence.length)}</span></div><div>${plan.focusAreas.slice(0,5).map(area => `<span class="smart-focus-chip" ${area.type ? `style="--smart-color:${TYPE_META[area.type].color}"` : ""}>${area.type ? `<i>${TYPE_META[area.type].icon}</i>` : ""}${escapeHtml(area.label)}</span>`).join("")}</div></section>
+      <section class="smart-training-reasons"><strong>${t("smart.whySelected")}</strong><ul>${plan.reasons.map(reason => `<li><span>✓</span>${escapeHtml(reason.text)}</li>`).join("")}</ul></section>
+      <section class="smart-training-modes"><strong>${t("smart.includedModes")}</strong><div>${smartModePreviewRows(plan)}</div></section>
+      <section class="smart-training-difficulty"><div class="smart-training-section-title"><strong>${t("difficulty.adjustedTitle")}</strong><span>${escapeHtml(difficultyLabel(plan.primaryDifficulty))}</span></div><p>${t("difficulty.adjustedText")}</p><div>${smartDifficultyPreviewRows(plan)}</div>${plan.calibratingCount ? `<small>${t("difficulty.calibrationNote",{count:plan.calibratingCount})}</small>` : ""}</section>
+      <p class="smart-training-boundary">${t("difficulty.fixedForSession")}</p>
+      <div class="modal-actions"><button id="cancelSmartTraining" class="secondary-button">${t("common.cancel")}</button><button id="startSmartTraining" class="primary-button">${t("smart.start")}</button></div>
+    </section></div>`, { initialFocus:"#startSmartTraining" });
+    document.getElementById("cancelSmartTraining")?.addEventListener("click",()=>closeModal());
+    document.getElementById("startSmartTraining")?.addEventListener("click",()=>closeModal(()=>launchSmartTraining(plan)));
+  }
+
+  function launchSmartTraining(plan) {
+    session = newSession("weak", { length:10, difficulty:"adaptive" }, plan.sequence);
+    session.smartPlan = { kind:plan.kind, focusKeys:[...plan.focusKeys], reasons:plan.reasons.map(item=>item.text), modeCounts:{...plan.modeCounts}, difficultyCounts:{...plan.difficultyCounts}, primaryDifficulty:plan.primaryDifficulty, calibratingCount:plan.calibratingCount, recommendationKind:plan.recommendation.kind };
+    session.adaptiveFlow = { offset:0, lastChecked:0, adjustments:[], initialDifficultyCounts:{...plan.difficultyCounts} };
+    session.learningBefore = smartLearningSnapshot(plan.focusKeys);
+    prepareRouteMotion(state.route,"session","forward");
+    state.route="session";
+    saveState();
+    updateNavigation();
+    renderQuestion();
+  }
+
+  function smartRecommendationCardMarkup(id = "startRecommendation") {
+    const recommendation = smartRecommendation();
+    return `<button class="recommendation-card interactive progress-recommendation smart-central-recommendation" id="${id}"><span class="recommendation-icon">${recommendation.icon}</span><div><small>${t("stats.recommended")}</small><strong>${escapeHtml(recommendation.title)}</strong><p>${escapeHtml(recommendation.text)}</p></div><span class="arrow">›</span></button>`;
+  }
+
+  function smartLearningSummaryMarkup() {
+    if (session?.mode !== "weak") return "";
+    const progress = session.learningProgress || smartSessionProgress();
+    if (!progress) return "";
+    const improved = progress.improved.slice(0,3);
+    const attention = progress.attention.slice(0,3);
+    const trained = progress.trained.slice(0,3);
+    const focus=improved.length?improved:attention.length?attention:trained;
+    const stateKey=improved.length?"improved":attention.length?"attention":"trained";
+    const title=stateKey==="improved"?t("cleanup2.learningImproved"):stateKey==="attention"?t("cleanup2.learningAttention"):t("cleanup2.learningRecorded");
+    return `<section class="summary-learning-card compact ${stateKey}">
+      <div class="summary-learning-head"><span>${stateKey==="improved"?"↗":stateKey==="attention"?"◎":"✓"}</span><div><p class="quiz-kicker">${t("smart.summaryKicker")}</p><h2>${escapeHtml(title)}</h2><p>${escapeHtml(progress.next.text)}</p></div></div>
+      ${focus.length?`<div class="summary-learning-tags">${focus.map(item=>`<span>${escapeHtml(item.label)}</span>`).join("")}</div>`:""}
+    </section>`;
+  }
+
+  function learningStatusLabel(area) {
+    return t(`learning.status.${area.displayStatus || area.status}`);
+  }
+
+  function learningAreaScore(area) {
+    if (area.total < 6) return t("learning.firstTrend");
+    return `${area.rate}%`;
+  }
+
+  function learningAreaDescription(area) {
+    if (area.openMistakes > 0) return t("learning.card.openMistakes", { count: area.openMistakes });
+    if (area.trend === "up") return t("learning.card.improving");
+    if (area.trend === "down") return t("learning.card.declining");
+    if (area.legacy) return t("learning.card.legacy");
+    if (area.status === "strong") return t("learning.card.strong");
+    if (area.status === "stable") return t("learning.card.stable");
+    if (area.status === "need") return t("learning.card.need");
+    return t("learning.card.developing");
+  }
+
+  function learningAreaCard(area) {
+    return `<article class="learning-area-card ${area.displayStatus || area.status}" ${area.type ? `style="--learning-type-color:${TYPE_META[area.type].color}"` : ""}>
+      <div class="learning-area-card-head"><span class="learning-area-icon">${area.type ? TYPE_META[area.type].icon : area.role === "skill" ? "◎" : "◇"}</span><div><strong>${escapeHtml(area.label)}</strong><small>${escapeHtml(learningStatusLabel(area))}</small></div><b>${escapeHtml(learningAreaScore(area))}</b></div>
+      <p>${escapeHtml(learningAreaDescription(area))}</p>
+      <div class="learning-area-meta"><span>${t("learning.evidence", { count: area.total })}</span><span class="trend ${area.trend}">${escapeHtml(area.confidence.label)}</span></div>
+    </article>`;
+  }
+
+  function learningEmptyGroup(icon, title, text) {
+    return `<div class="learning-empty-group"><span>${icon}</span><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`;
+  }
+
+  function renderLearningGroup(title, hint, items, emptyIcon, emptyTitle, emptyText) {
+    return `<section class="learning-profile-group"><div class="section-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(hint)}</p></div><div class="learning-area-grid">${items.length ? items.slice(0, 6).map(learningAreaCard).join("") : learningEmptyGroup(emptyIcon, emptyTitle, emptyText)}</div></section>`;
+  }
+
+  function learningProfileEntryMarkup(profile = getLearningProfile()) {
+    const focus = profile.needs[0] || profile.developing[0] || profile.strengths[0];
+    return `<button id="openLearningProfile" class="learning-profile-entry" type="button"><span class="learning-profile-entry-icon">◎</span><span><small>${t("learning.kicker")}</small><strong>${t("learning.title")}</strong><em>${focus ? t("learning.entryFocus", { area: focus.label }) : t("learning.entryEmpty")}</em></span><b>${profile.assessedTypes}/18</b><i aria-hidden="true">›</i></button>`;
+  }
+
+  function renderLearningProfile() {
+    const content = document.getElementById("statsContent");
+    const profile = getLearningProfile();
+    const stageLabel = t(`learning.stage.${profile.stage}`);
+    content.innerHTML = `
+      <section class="learning-profile-hero">
+        <div class="learning-profile-hero-copy"><p class="quiz-kicker">${t("learning.kicker")}</p><h2>${t("learning.title")}</h2><p>${t("learning.subtitle")}</p><span class="learning-model-stage ${profile.stage}"><i></i>${escapeHtml(stageLabel)}</span></div>
+        <div class="learning-profile-score"><strong>${profile.assessedTypes}</strong><small>${t("learning.typesAssessed")}</small><span>${t("learning.ofTypes")}</span></div>
+      </section>
+      <section class="learning-profile-metrics">
+        ${progressKpi("◎", t("learning.detailedAnswers"), profile.detailedCount, t("learning.detailedAnswersHint"))}
+        ${progressKpi("★", t("learning.strongAreas"), profile.strengths.length, t("learning.strongAreasHint"))}
+        ${progressKpi("↗", t("learning.practiceAreas"), profile.needs.length, t("learning.practiceAreasHint"))}
+        ${progressKpi("◇", t("learning.unassessedTypes"), profile.unassessedTypes, t("learning.unassessedTypesHint"))}
+      </section>
+      ${adaptiveDifficultyOverviewMarkup(profile)}
+      ${smartRecommendationCardMarkup("learningSmartTraining")}
+      ${renderLearningGroup(t("learning.strengths"), t("learning.strengthsHint"), profile.strengths, "★", t("learning.noStrengths"), t("learning.noStrengthsHint"))}
+      ${renderLearningGroup(t("learning.needs"), t("learning.needsHint"), profile.needs, "✓", t("learning.noNeeds"), t("learning.noNeedsHint"))}
+      ${renderLearningGroup(t("learning.developing"), t("learning.developingHint"), profile.developing, "◎", t("learning.noDeveloping"), t("learning.noDevelopingHint"))}
+      <section class="learning-profile-explainer">
+        <span>i</span><div><strong>${t("learning.howTitle")}</strong><p>${t("learning.howText")}</p>${profile.legacyUsed ? `<small>${t("learning.legacyNote")}</small>` : ""}</div>
+      </section>`;
+    document.getElementById("learningSmartTraining")?.addEventListener("click",startWeakSession);
+  }
+
   function renderStats() {
-    const tabs=[["overview",t("stats.overview")],["types",t("stats.types")],["errors",t("stats.errors")],["achievements",t("stats.achievements")]];
+    const tabs=[["overview",t("stats.overview")],["learning",t("learning.tab")],["types",t("stats.types")],["errors",t("stats.errors")],["achievements",t("stats.achievements")]];
     const level=getLevelInfo();
     const accuracy=percent(state.stats.correct,state.stats.total);
     const openErrors=state.stats.mistakes.filter(item=>item.status!=="resolved").length;
-    view.innerHTML=`<section class="progress-page">
+    const heroMetrics=state.statsTab==="overview"?`<div class="progress-hero-metrics"><span><small>${t("stats.accuracy")}</small><strong>${accuracy}%</strong></span><span><small>${t("stats.bestStreak")}</small><strong>${state.stats.bestStreak}</strong></span><span><small>${t("stats.openErrors")}</small><strong>${openErrors}</strong></span></div>`:"";
+    view.innerHTML=`<section class="progress-page ${state.statsTab==="overview"?"overview-focused":"detail-focused"}">
       <section class="progress-hero">
         <div class="progress-hero-copy"><p class="quiz-kicker">${t("stats.hubKicker")}</p><h1>${t("stats.hubTitle")}</h1><p>${t("stats.hubSubtitle")}</p></div>
         <div class="progress-level-card">
           <span class="progress-level-orb">${level.current.level}</span>
           <div><small>${t("stats.level")}</small><strong>${escapeHtml(t(level.current.key))}</strong><span>${state.stats.xp} XP${level.next?` · ${level.next.xp-state.stats.xp} XP ${t("stats.untilNext")}`:""}</span><div class="progress-track"><div class="progress-fill" style="width:${level.progress}%"></div></div></div>
         </div>
-        <div class="progress-hero-metrics">
-          <span><small>${t("stats.accuracy")}</small><strong>${accuracy}%</strong></span>
-          <span><small>${t("stats.bestStreak")}</small><strong>${state.stats.bestStreak}</strong></span>
-          <span><small>${t("stats.openErrors")}</small><strong>${openErrors}</strong></span>
-        </div>
+        ${heroMetrics}
       </section>
-      <div class="progress-tabs tabs" role="tablist" style="--tab-count:4">${tabs.map(([key,label])=>`<button class="tab-button ${state.statsTab===key?"active":""}" role="tab" aria-selected="${state.statsTab===key}" data-stats-tab="${key}">${escapeHtml(label)}</button>`).join("")}</div>
+      <div class="progress-tabs tabs" role="tablist" style="--tab-count:5">${tabs.map(([key,label])=>`<button class="tab-button ${state.statsTab===key?"active":""}" role="tab" aria-selected="${state.statsTab===key}" data-stats-tab="${key}">${escapeHtml(label)}</button>`).join("")}</div>
       <div id="statsContent" class="progress-content"></div>
     </section>`;
     document.querySelectorAll("[data-stats-tab]").forEach(button=>button.addEventListener("click",()=>{state.statsTab=button.dataset.statsTab;saveState();renderStats();}));
-    if(state.statsTab==="types")renderTypeStats();else if(state.statsTab==="errors")renderMistakes();else if(state.statsTab==="achievements")renderAchievements();else renderStatsOverview();
+    if(state.statsTab==="learning")renderLearningProfile();else if(state.statsTab==="types")renderTypeStats();else if(state.statsTab==="errors")renderMistakes();else if(state.statsTab==="achievements")renderAchievements();else renderStatsOverview();
   }
 
   function renderStatsOverview() {
@@ -2406,6 +6806,7 @@
         ${progressKpi(iconSvg("time"),t("stats.time"),`${Math.round(state.stats.totalSeconds/60)} min`,t("stats.learningTime"))}
         ${progressKpi(iconSvg("sessions"),t("stats.sessions"),state.stats.sessions,t("stats.completedSessions"))}
       </section>
+      ${learningProfileEntryMarkup()}
       <section class="progress-overview-grid">
         <div class="progress-overview-main">
           <div class="section-title"><h2>${t("stats.modePerformance")}</h2><p>${t("stats.modePerformanceHint")}</p></div>
@@ -2423,6 +6824,7 @@
       <div class="section-title"><h2>${t("stats.lastSessions")}</h2><p>${t("stats.saved",{count:state.stats.history.length})}</p></div>
       <div class="modern-history-list">${recent.length?recent.map((item,index)=>historyCard(item,index)).join(""):`<div class="empty-state-card"><span>◷</span><strong>${t("stats.noSessions")}</strong><p>${t("stats.noSessionsHint")}</p></div>`}</div>`;
     bindRecommendation();
+    document.getElementById("openLearningProfile")?.addEventListener("click",()=>{state.statsTab="learning";saveState();renderStats();});
   }
 
   function progressKpi(icon,label,value,hint){return `<article class="progress-kpi-card"><span class="progress-kpi-icon">${icon}</span><div><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong><p>${escapeHtml(hint)}</p></div></article>`;}
@@ -2441,23 +6843,11 @@
   }
 
   function statsRecommendationHtml() {
-    const weak = getWeakTypes(1)[0];
-    const modeEntries = ["effectiveness","multiplier","impact","pokemon"].map(mode => {
-      const values = state.stats.modes[mode];
-      return { mode, total: values.total, rate: percent(values.correct, values.total) };
-    }).filter(item => item.total >= 3).sort((a,b)=>a.rate-b.rate);
-    const weakestMode = modeEntries[0];
-    if (!weak && !weakestMode) return `<div class="recommendation-card progress-recommendation"><span class="recommendation-icon">◎</span><div><strong>${t("stats.recommendation")}</strong><p>${t("stats.recommendationEmpty")}</p></div></div>`;
-    const mode = weakestMode?.mode || "effectiveness";
-    const typeText = weak ? typeLabel(weak.type) : t("common.none");
-    return `<button class="recommendation-card interactive progress-recommendation" id="startRecommendation"><span class="recommendation-icon">↗</span><div><small>${t("stats.recommended")}</small><strong>${escapeHtml(modeName(mode))}</strong><p>${t("stats.recommendationText",{mode:modeName(mode),type:typeText})}</p></div><span class="arrow">›</span></button>`;
+    return smartRecommendationCardMarkup("startRecommendation");
   }
 
   function bindRecommendation() {
-    const button=document.getElementById("startRecommendation");
-    if(!button)return;
-    const entries=["effectiveness","multiplier","impact","pokemon"].map(mode=>({mode,total:state.stats.modes[mode].total,rate:percent(state.stats.modes[mode].correct,state.stats.modes[mode].total)})).filter(item=>item.total>=3).sort((a,b)=>a.rate-b.rate);
-    button.addEventListener("click",()=>setRoute(`setup-${entries[0]?.mode||"effectiveness"}`));
+    document.getElementById("startRecommendation")?.addEventListener("click",startWeakSession);
   }
 
   function renderTypeStats() {
@@ -2474,14 +6864,314 @@
       </section>
       <div class="section-title"><h2>${t("stats.allTypes")}</h2><p>${t("stats.typeHelp")}</p></div>
       <div class="modern-type-stat-grid">${items.map(item=>typeProgressCard(item)).join("")}</div>`;
-    document.querySelectorAll("[data-progress-type]").forEach(button=>button.addEventListener("click",()=>{learnType=button.dataset.progressType;setRoute("learn-detail");}));
+    document.querySelectorAll("[data-progress-type]").forEach(button=>button.addEventListener("click",()=>{knowledgeView="types";learnType=button.dataset.progressType;setRoute("learn-detail");}));
   }
 
   function typeProgressCard(item){
     const meta=TYPE_META[item.type];
     const label=!item.total?t("stats.notExplored"):item.rate>=80&&item.total>=5?t("stats.mastered"):item.rate>=60?t("stats.solid"):t("stats.practice");
     const trendIcon=item.trend==="up"?"↑":item.trend==="down"?"↓":"→";
-    return `<button class="modern-type-stat-card" data-progress-type="${item.type}" style="--type-color:${meta.color}"><span class="modern-type-stat-top">${typeChip(item.type)}<span class="trend ${item.trend}">${trendIcon}</span></span><span class="modern-type-stat-body"><small>${escapeHtml(label)}</small><strong>${item.total?`${item.rate}%`:"–"}</strong><p>${t("stats.questionsCount",{count:item.total})}</p></span><span class="type-library-progress"><i style="width:${item.total?item.rate:0}%"></i></span></button>`;
+    return `<button class="modern-type-stat-card" data-progress-type="${item.type}" style="--type-color:${meta.color}"><span class="modern-type-stat-top">${typeChip(item.type)}<span class="trend ${item.trend}">${trendIcon}</span></span><span class="modern-type-stat-body"><small>${escapeHtml(label)}</small><strong>${item.total?`${item.rate}%`:"–"}</strong><p>${tp("stats.questionsCountOne","stats.questionsCount",item.total)}</p></span><span class="type-library-progress"><i style="width:${item.total?item.rate:0}%"></i></span></button>`;
+  }
+
+  function errorPatternIcon(pattern) {
+    if (pattern.key.startsWith("matchup:")) return "⇄";
+    if (pattern.key.startsWith("pokemon:")) return "◇";
+    const icons = {
+      "direction-reversal":"↔", "immunity-overlooked":"0", "immunity-assumed":"?",
+      "quarter-half-confusion":"¼", "double-quad-confusion":"4", "dual-neutralization":"1",
+      "dual-multiplication":"×", "pokemon-missing-secondary":"+", "pokemon-extra-type":"−", "pokemon-wrong-type":"◇"
+    };
+    return icons[pattern.code] || "!";
+  }
+
+  function errorRuleTitle(code) {
+    return t(`errorAnalysis.rule.${code}.title`);
+  }
+
+  function errorRuleText(code) {
+    return t(`errorAnalysis.rule.${code}.text`);
+  }
+
+  function errorPatternTitle(pattern) {
+    const sample = pattern.sample || {};
+    if (pattern.key.startsWith("matchup:") && sample.attackingType && sample.defendingTypes?.length) {
+      return `${typeLabel(sample.attackingType)} → ${sample.defendingTypes.map(typeLabel).join(" + ")}`;
+    }
+    if (pattern.key.startsWith("pokemon:")) return sample.pokemonName || t("errorAnalysis.pokemonFallback");
+    return errorRuleTitle(pattern.code);
+  }
+
+  function errorPatternText(pattern) {
+    if (pattern.key.startsWith("matchup:")) return t("errorAnalysis.matchupText");
+    if (pattern.key.startsWith("pokemon:")) return t("errorAnalysis.pokemonText");
+    return errorRuleText(pattern.code);
+  }
+
+  function errorPatternConfidence(pattern) {
+    if (pattern.sessions >= 3 && pattern.opportunities >= 8 && pattern.errors >= 3) return { id:"reliable", label:t("errorAnalysis.confidence.reliable") };
+    if (pattern.sessions >= 2 && pattern.opportunities >= 4 && pattern.errors >= 2) return { id:"recurring", label:t("errorAnalysis.confidence.recurring") };
+    return { id:"first", label:t("errorAnalysis.confidence.first") };
+  }
+
+  function errorPatternTimeline(key, events = sanitizeErrorEvents(state.stats.errorAnalysis?.events || [])) {
+    return events.filter(event => event.opportunities.includes(key)).map(event => ({
+      at:event.at,
+      sessionId:event.sessionId,
+      error:event.issues.some(issue => issue.patternKey === key),
+      sample:event.issues.find(issue => issue.patternKey === key) || null
+    })).sort((a,b)=>new Date(a.at)-new Date(b.at));
+  }
+
+  function errorPatternDevelopment(pattern, events) {
+    const timeline=errorPatternTimeline(pattern.key,events);
+    const recent=timeline.slice(-5);
+    const previous=timeline.slice(Math.max(0,timeline.length-10),Math.max(0,timeline.length-5));
+    const rate=list=>list.length?list.filter(item=>item.error).length/list.length:0;
+    const recentRate=rate(recent);
+    const previousRate=rate(previous);
+    let correctStreak=0;
+    for(let index=timeline.length-1;index>=0&&!timeline[index].error;index-=1)correctStreak+=1;
+    const streakSessions=new Set(timeline.slice(-correctStreak).map(item=>item.sessionId)).size;
+    let status="active";
+    if(pattern.errors>=2&&pattern.opportunities>=6&&correctStreak>=4&&streakSessions>=2)status="resolved";
+    else if(previous.length>=3&&recent.length>=3&&recentRate<=previousRate-.20)status="improving";
+    else if(previous.length>=3&&recent.length>=3&&recentRate>=previousRate+.20)status="worsening";
+    else if(pattern.confidence?.id==="first")status="building";
+    return { timeline,recent,previous,recentRate,previousRate,correctStreak,streakSessions,status };
+  }
+
+  function errorPatternStatusLabel(status) { return t(`errorAnalysis.status.${status}`); }
+
+  function summarizeErrorAnalysis() {
+    const events = sanitizeErrorEvents(state.stats.errorAnalysis?.events || []);
+    const patterns = new Map();
+    const ensure = key => {
+      if (!patterns.has(key)) patterns.set(key, { key, code:key.startsWith("rule:")?key.slice(5):key.startsWith("matchup:")?"matchup":"pokemon-specific", opportunities:0, errors:0, sessions:new Set(), lastSeen:null, sample:null });
+      return patterns.get(key);
+    };
+    events.forEach(event => {
+      unique(event.opportunities).forEach(key => {
+        const pattern=ensure(key);pattern.opportunities+=1;pattern.sessions.add(event.sessionId);pattern.lastSeen=event.at;
+      });
+      const seen=new Set();
+      event.issues.forEach(issue => {
+        if(seen.has(issue.patternKey))return;seen.add(issue.patternKey);
+        const pattern=ensure(issue.patternKey);pattern.errors+=1;pattern.sessions.add(event.sessionId);pattern.lastSeen=event.at;pattern.sample=issue;
+      });
+    });
+    const all=[...patterns.values()].map(pattern=>({
+      ...pattern,
+      sessions:pattern.sessions.size,
+      rate:pattern.opportunities?pattern.errors/pattern.opportunities:0
+    })).filter(pattern=>pattern.errors>=2&&pattern.opportunities>=2).map(pattern=>{
+      const confidence=errorPatternConfidence(pattern);
+      const withConfidence={...pattern,confidence};
+      return {...withConfidence,development:errorPatternDevelopment(withConfidence,events)};
+    }).sort((a,b)=>{
+      const statusRank={worsening:5,active:4,building:3,improving:2,resolved:1};
+      return (statusRank[b.development.status]||0)-(statusRank[a.development.status]||0)||b.errors-a.errors||b.rate-a.rate||new Date(b.lastSeen)-new Date(a.lastSeen);
+    });
+    const recurring=all.filter(pattern=>pattern.confidence.id!=="first"&&pattern.development.status!=="resolved").length;
+    const concrete=all.filter(pattern=>pattern.key.startsWith("matchup:")||pattern.key.startsWith("pokemon:")).length;
+    return {
+      events,
+      analyzed:events.length,
+      errorAnswers:events.filter(event=>event.issues.length).length,
+      recurring,
+      concrete,
+      patterns:all,
+      candidates:all.slice(0,6)
+    };
+  }
+
+  function errorPatternCard(pattern) {
+    const title=errorPatternTitle(pattern);
+    const text=errorPatternText(pattern);
+    const context=pattern.key.startsWith("matchup:")&&pattern.sample?.attackingType
+      ? `<div class="error-pattern-types">${typeChip(pattern.sample.attackingType,"small")}<span>→</span>${pattern.sample.defendingTypes.map(type=>typeChip(type,"small")).join("")}</div>`
+      : "";
+    return `<button type="button" class="error-pattern-card ${pattern.confidence.id} ${pattern.development.status}" data-error-pattern="${escapeHtml(pattern.key)}">
+      <div class="error-pattern-head"><span>${errorPatternIcon(pattern)}</span><div><small>${escapeHtml(pattern.confidence.label)}</small><strong>${escapeHtml(title)}</strong></div><em class="error-pattern-status ${pattern.development.status}">${escapeHtml(errorPatternStatusLabel(pattern.development.status))}</em></div>
+      ${context}<p>${escapeHtml(text)}</p>
+      <div class="error-pattern-evidence"><b>${t("errorAnalysis.openDetails")}</b><i aria-hidden="true">›</i></div>
+    </button>`;
+  }
+
+  function errorAnalysisMarkup() {
+    const analysis=summarizeErrorAnalysis();
+    const stage=analysis.analyzed<5?"start":analysis.analyzed<15?"building":"active";
+    const lead=analysis.candidates[0]||null;
+    const remaining=analysis.candidates.slice(lead?1:0);
+    return `<section class="error-analysis-panel cleanup-error-analysis">
+      <div class="error-analysis-heading"><div><p class="quiz-kicker">${t("cleanup2.patternSectionKicker")}</p><h2>${t("cleanup2.patternSectionTitle")}</h2><p>${t("cleanup2.patternSectionText")}</p></div><span class="error-analysis-stage ${stage}">${t(`errorAnalysis.stage.${stage}`)}</span></div>
+      ${lead?`<div class="error-analysis-lead"><small>${t("cleanup2.mostImportantPattern")}</small>${errorPatternCard(lead)}</div>`:`<div class="error-analysis-empty"><span>◎</span><strong>${t("errorAnalysis.emptyTitle")}</strong><p>${analysis.analyzed?t("errorAnalysis.emptyBuilding"):t("errorAnalysis.emptyText")}</p></div>`}
+      ${remaining.length?`<div class="section-title error-analysis-section-title"><h3>${t("cleanup2.otherPatterns")}</h3><p>${t("errorAnalysis.patternsHintDetailed")}</p></div><div class="error-pattern-grid">${remaining.map(errorPatternCard).join("")}</div>`:""}
+      <details class="error-analysis-details"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div class="error-analysis-metrics"><article><small>${t("errorAnalysis.analyzed")}</small><strong>${analysis.analyzed}</strong></article><article><small>${t("errorAnalysis.errorAnswers")}</small><strong>${analysis.errorAnswers}</strong></article><article><small>${t("errorAnalysis.recurring")}</small><strong>${analysis.recurring}</strong></article><article><small>${t("errorAnalysis.concrete")}</small><strong>${analysis.concrete}</strong></article></div><div class="error-analysis-note"><span>i</span><p>${t("errorAnalysis.note")}</p></div></details>
+    </section>`;
+  }
+
+  function errorPatternByKey(key) {
+    return summarizeErrorAnalysis().patterns.find(pattern=>pattern.key===sanitizeErrorPatternKey(key))||null;
+  }
+
+  function errorPatternDevelopmentMarkup(pattern) {
+    const development=pattern.development;
+    if(development.previous.length<3||development.recent.length<3)return `<div class="error-detail-development empty"><strong>${t("errorAnalysis.developmentTitle")}</strong><p>${t("errorAnalysis.developmentBuilding")}</p></div>`;
+    return `<div class="error-detail-development"><strong>${t("errorAnalysis.developmentTitle")}</strong><div><span><small>${t("errorAnalysis.previousWindow")}</small><b>${Math.round(development.previousRate*100)}%</b><i><em style="width:${Math.round(development.previousRate*100)}%"></em></i></span><span><small>${t("errorAnalysis.recentWindow")}</small><b>${Math.round(development.recentRate*100)}%</b><i><em style="width:${Math.round(development.recentRate*100)}%"></em></i></span></div></div>`;
+  }
+
+  function errorPatternCriterionText(pattern) {
+    const development=pattern.development;
+    if(development.status==="resolved")return t("errorAnalysis.criterionResolved",{count:development.correctStreak});
+    if(development.status==="improving")return t("errorAnalysis.criterionImproving");
+    return t("errorAnalysis.criterionOpen",{count:Math.max(0,4-development.correctStreak)});
+  }
+
+  function showErrorPatternDetail(key) {
+    const pattern=errorPatternByKey(key);
+    if(!pattern)return;
+    const title=errorPatternTitle(pattern);
+    const context=pattern.key.startsWith("matchup:")&&pattern.sample?.attackingType
+      ? `<div class="error-detail-matchup">${typeChip(pattern.sample.attackingType,"large")}<span>→</span>${pattern.sample.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div>`:"";
+    const canTrain=pattern.confidence.id!=="first";
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="errorPatternTitle"><section class="modal-card error-pattern-modal" tabindex="-1">
+      <header class="error-detail-head"><span>${errorPatternIcon(pattern)}</span><div><p class="quiz-kicker">${t("errorAnalysis.detailKicker")}</p><h2 id="errorPatternTitle">${escapeHtml(title)}</h2><p>${escapeHtml(errorPatternText(pattern))}</p></div><em class="error-pattern-status ${pattern.development.status}">${escapeHtml(errorPatternStatusLabel(pattern.development.status))}</em></header>
+      ${context}
+      <section class="error-detail-cause"><span>?</span><div><strong>${t("errorAnalysis.causeTitle")}</strong><p>${escapeHtml(errorPatternText(pattern))}</p></div></section>
+      ${errorPatternDevelopmentMarkup(pattern)}
+      <section class="error-detail-criterion"><strong>${t("errorAnalysis.statusTitle")}</strong><p>${escapeHtml(errorPatternCriterionText(pattern))}</p></section>
+      <details class="error-detail-data"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><section class="error-detail-metrics"><article><small>${t("errorAnalysis.wrongOfRelevant")}</small><strong>${pattern.errors}/${pattern.opportunities}</strong><span>${Math.round(pattern.rate*100)}%</span></article><article><small>${t("errorAnalysis.sessionsSeen")}</small><strong>${pattern.sessions}</strong><span>${t("errorAnalysis.trainingUnits")}</span></article><article><small>${t("errorAnalysis.correctStreak")}</small><strong>${pattern.development.correctStreak}</strong><span>${t("errorAnalysis.confirmations")}</span></article></section></details>
+      <section class="error-detail-training ${canTrain?"":"locked"}"><div><small>${t("errorAnalysis.problemTrainingKicker")}</small><strong>${t("errorAnalysis.problemTrainingTitle")}</strong><p>${canTrain?t("errorAnalysis.problemTrainingText"):t("errorAnalysis.problemTrainingLocked")}</p></div><span>${tp("train.questionCountOne","train.questionCount",8)}</span></section>
+      <div class="modal-actions"><button id="closeErrorPattern" class="secondary-button">${t("common.close")}</button><button id="startProblemTraining" class="primary-button" ${canTrain?"":"disabled"}>${t("errorAnalysis.startProblemTraining")}</button></div>
+    </section></div>`,{initialFocus:canTrain?"#startProblemTraining":"#closeErrorPattern"});
+    document.getElementById("closeErrorPattern")?.addEventListener("click",()=>closeModal());
+    document.getElementById("startProblemTraining")?.addEventListener("click",()=>closeModal(()=>launchProblemTraining(buildProblemTrainingPlan(pattern))));
+  }
+
+  function fixedImpactSpec(attackingType,defendingTypes,difficulty="medium") {
+    const correctMultiplier=effectiveness(attackingType,defendingTypes);
+    const all=[0,.25,.5,1,2,4];
+    const optionCount=difficulty==="easy"?4:6;
+    const alternatives=shuffle(all.filter(value=>value!==correctMultiplier)).slice(0,optionCount-1);
+    return {kind:"impact",attackingType,defendingTypes:[...defendingTypes],options:shuffle([correctMultiplier,...alternatives]),correctMultiplier,focusTypes:unique([attackingType,...defendingTypes])};
+  }
+
+  function problemImpactMatching(predicate,difficulty="medium",random=Math.random) {
+    for(let attempt=0;attempt<240;attempt+=1){
+      const attackingType=randomItem(TYPES,random);
+      const dual=random()<.72;
+      const defendingTypes=dual?shuffle(TYPES,random).slice(0,2):[randomItem(TYPES,random)];
+      const expected=effectiveness(attackingType,defendingTypes);
+      const factors=defendingTypes.map(type=>effectiveness(attackingType,[type]));
+      if(predicate({attackingType,defendingTypes,expected,factors}))return fixedImpactSpec(attackingType,defendingTypes,difficulty);
+    }
+    return generateImpactSpec({difficulty,defense:"mixed",random});
+  }
+
+  function problemPokemonSpec(pattern,difficulty="medium",index=0,random=Math.random) {
+    const sample=pattern.sample||{};
+    let pool=FALLBACK_POKEMON;
+    if(pattern.key.startsWith("pokemon:")&&sample.pokemonId){
+      const exact=FALLBACK_POKEMON.find(item=>item.id===Number(sample.pokemonId));
+      if(index===0&&exact)return {kind:"pokemon",pokemon:formatFallbackPokemon(exact),display:difficulty==="hard"?"image":"both",focusTypes:[...exact.types]};
+      if(exact)pool=FALLBACK_POKEMON.filter(item=>item.types.some(type=>exact.types.includes(type)));
+    }else if(pattern.code==="pokemon-missing-secondary")pool=FALLBACK_POKEMON.filter(item=>item.types.length===2);
+    else if(pattern.code==="pokemon-extra-type")pool=FALLBACK_POKEMON.filter(item=>item.types.length===1);
+    const pokemon=randomItem(pool.length?pool:FALLBACK_POKEMON,random);
+    return {kind:"pokemon",pokemon:formatFallbackPokemon(pokemon),display:difficulty==="hard"?"image":"both",focusTypes:[...pokemon.types]};
+  }
+
+  function problemSpecForPattern(pattern,difficulty="medium",index=0,random=Math.random) {
+    let spec;
+    if(pattern.key.startsWith("matchup:")&&pattern.sample?.attackingType&&pattern.sample?.defendingTypes?.length){
+      const attacker=pattern.sample.attackingType;
+      const original=[...pattern.sample.defendingTypes];
+      if(index===0)spec=fixedImpactSpec(attacker,original,difficulty);
+      else if(original.length===2){
+        const keep=original[index%2];
+        const replacement=randomItem(TYPES.filter(type=>!original.includes(type)),random);
+        spec=fixedImpactSpec(attacker,[keep,replacement],difficulty);
+      }else{
+        const replacement=randomItem(TYPES.filter(type=>type!==original[0]),random);
+        spec=fixedImpactSpec(attacker,[replacement],difficulty);
+      }
+    }
+    else if(pattern.key.startsWith("pokemon:")||String(pattern.code).startsWith("pokemon"))spec=problemPokemonSpec(pattern,difficulty,index,random);
+    else {
+      const predicates={
+        "direction-reversal":item=>item.defendingTypes.length===1&&item.expected!==effectiveness(item.defendingTypes[0],[item.attackingType]),
+        "immunity-overlooked":item=>item.expected===0,
+        "immunity-assumed":item=>item.expected!==0,
+        "quarter-half-confusion":item=>item.defendingTypes.length===2&&(item.expected===.25||item.expected===.5),
+        "double-quad-confusion":item=>item.defendingTypes.length===2&&(item.expected===2||item.expected===4),
+        "dual-neutralization":item=>item.defendingTypes.length===2&&item.expected===1&&item.factors.includes(2)&&item.factors.includes(.5),
+        "dual-multiplication":item=>item.defendingTypes.length===2&&item.factors.some(value=>value!==1)
+      };
+      spec=problemImpactMatching(predicates[pattern.code]||(()=>true),difficulty,random);
+    }
+    const focusKey=smartFocusKeyForSpec(spec);
+    return {...spec,_smartFocusKey:focusKey,_smartLabel:errorPatternTitle(pattern),_smartSource:"problem",_smartBaseDifficulty:difficulty,_smartDifficulty:difficulty,_smartDifficultyReason:"problem",_smartDifficultyCalibrating:false,_problemPatternKey:pattern.key,_problemSource:index===0?"exact":"similar"};
+  }
+
+  function buildProblemTrainingPlan(pattern) {
+    const base=pattern.rate>=.65?"easy":pattern.rate<=.30?"hard":"medium";
+    const levels=base==="easy"?["easy","easy","medium","medium","medium","medium","medium","medium"]:base==="hard"?["medium","medium","hard","hard","hard","hard","hard","hard"]:["easy","medium","medium","medium","medium","medium","hard","hard"];
+    const sequence=[];const signatures=new Set();
+    for(let index=0;index<8;index+=1){
+      let spec=null;
+      for(let attempt=0;attempt<100;attempt+=1){
+        const candidate=problemSpecForPattern(pattern,levels[index],index,Math.random);
+        const signature=questionSignature(candidate);
+        if(!signatures.has(signature)){spec=candidate;signatures.add(signature);break;}
+      }
+      if(spec)sequence.push(spec);
+    }
+    while(sequence.length<8){const fallback=problemSpecForPattern(pattern,"medium",sequence.length,Math.random);if(!signatures.has(questionSignature(fallback))){signatures.add(questionSignature(fallback));sequence.push(fallback);}}
+    return {patternKey:pattern.key,title:errorPatternTitle(pattern),sequence,initial:errorPatternSnapshot(pattern),difficultyCounts:ADAPTIVE_DIFFICULTIES.reduce((map,level)=>({...map,[level]:sequence.filter(spec=>spec._smartDifficulty===level).length}),{})};
+  }
+
+  function errorPatternSnapshot(pattern) {
+    return {key:pattern.key,errors:pattern.errors,opportunities:pattern.opportunities,rate:pattern.rate,status:pattern.development.status,recentRate:pattern.development.recentRate,correctStreak:pattern.development.correctStreak};
+  }
+
+  function launchProblemTraining(plan) {
+    if(!plan?.sequence?.length)return;
+    session=newSession("problem",{length:plan.sequence.length,difficulty:"adaptive"},plan.sequence);
+    session.problemPlan={patternKey:plan.patternKey,title:plan.title,difficultyCounts:{...plan.difficultyCounts}};
+    session.problemBefore={...plan.initial};
+    session.adaptiveFlow={offset:0,lastChecked:0,adjustments:[],initialDifficultyCounts:{...plan.difficultyCounts}};
+    prepareRouteMotion(state.route,"session","forward");state.route="session";saveState();updateNavigation();renderQuestion();
+  }
+
+  function problemSessionProgress() {
+    if(session?.mode!=="problem"||!session.problemPlan)return null;
+    const after=errorPatternByKey(session.problemPlan.patternKey);
+    const answerRate=percent(session.correct,session.answers.length);
+    const before=session.problemBefore||{};
+    const resolved=after?.development.status==="resolved";
+    const improved=resolved||answerRate>=75||Number(after?.development.recentRate||1)<Number(before.recentRate||1);
+    return {answerRate,resolved,improved,before,after:after?errorPatternSnapshot(after):null};
+  }
+
+  function problemTrainingSummaryMarkup() {
+    if(session?.mode!=="problem")return"";
+    const progress=session.problemProgress||problemSessionProgress();
+    if(!progress)return"";
+    const stateKey=progress.resolved?"resolved":progress.improved?"improved":"practice";
+    return `<section class="summary-problem-card ${stateKey}"><span>${progress.resolved?"✓":progress.improved?"↗":"◎"}</span><div><p class="quiz-kicker">${t("errorAnalysis.problemSummaryKicker")}</p><h2>${t(`errorAnalysis.problemSummary.${stateKey}.title`)}</h2><p>${t(`errorAnalysis.problemSummary.${stateKey}.text`)}</p>${progress.after?`<b>${escapeHtml(errorPatternStatusLabel(progress.after.status))}</b>`:""}</div></section>`;
+  }
+
+  function mistakeIssueLabel(issue) {
+    if (!issue) return "";
+    if (issue.patternKey?.startsWith("matchup:")) return t("errorAnalysis.issue.matchup");
+    if (issue.patternKey?.startsWith("pokemon:")) return t("errorAnalysis.issue.pokemon");
+    return errorRuleTitle(issue.code);
+  }
+
+  function mistakeIssueChips(item) {
+    const labels=unique((item.lastIssues||[]).map(mistakeIssueLabel).filter(Boolean)).slice(0,2);
+    return labels.length?`<div class="mistake-issue-chips">${labels.map(label=>`<span>${escapeHtml(label)}</span>`).join("")}</div>`:"";
   }
 
   function mistakeTitle(item) {
@@ -2501,20 +7191,20 @@
   function renderMistakes() {
     const content=document.getElementById("statsContent");
     const open=state.stats.mistakes.filter(item=>item.status!=="resolved").sort((a,b)=>new Date(b.lastSeen)-new Date(a.lastSeen));
-    const resolved=state.stats.mistakes.filter(item=>item.status==="resolved").length;
     content.innerHTML=`
-      <section class="mistake-book-hero">
-        <div><p class="quiz-kicker">${t("stats.errorBook")}</p><h2>${open.length?t("stats.openMistakes",{count:open.length}):t("stats.noOpenMistakes")}</h2><p>${open.length?t("stats.errorHelp"):t("stats.noErrors")}</p></div>
-        <div class="mistake-book-summary"><span><small>${t("stats.open")}</small><strong>${open.length}</strong></span><span><small>${t("stats.resolved")}</small><strong>${resolved}</strong></span></div>
+      ${errorAnalysisMarkup()}
+      <section class="mistake-book-hero cleanup-mistake-book">
+        <div><p class="quiz-kicker">${t("cleanup2.questionSectionKicker")}</p><h2>${t("cleanup2.questionSectionTitle")}</h2><p>${t("cleanup2.questionSectionText")}</p>${open.length?`<strong class="mistake-open-count">${t("stats.openMistakes",{count:open.length})}</strong>`:""}</div>
         <button id="reviewAllMistakes" class="primary-button" ${open.length?"":"disabled"}>${t("stats.reviewAll")}</button>
       </section>
       <div class="modern-error-list">${open.length?open.map(item=>mistakeCard(item)).join(""):`<div class="empty-state-card success"><span>✓</span><strong>${t("stats.noErrors")}</strong><p>${t("stats.noErrorsHint")}</p></div>`}</div>`;
     document.getElementById("reviewAllMistakes")?.addEventListener("click",()=>{if(open.length)startReviewSession(open.map(item=>clone(item.spec)));});
+    document.querySelectorAll("[data-error-pattern]").forEach(button=>button.addEventListener("click",()=>showErrorPatternDetail(button.dataset.errorPattern)));
   }
 
   function mistakeCard(item){
     const progress=Math.min(2,item.correctReviews||0);
-    return `<article class="modern-error-card"><div class="modern-error-head"><span class="error-mode-icon">${modeVisual(item.spec.kind).icon}</span><div><strong>${escapeHtml(mistakeTitle(item))}</strong><small>${escapeHtml(modeName(item.spec.kind))} · ${formatDate(item.lastSeen)}</small></div><span class="error-count">${item.wrongCount}×</span></div><div class="modern-error-answer"><small>${t("stats.correctSolution")}</small><div>${mistakeAnswer(item)}</div></div><div class="review-progress"><span>${t("stats.reviewProgress")}</span><div>${[0,1].map(step=>`<i class="${step<progress?"done":""}"></i>`).join("")}</div><strong>${progress}/2</strong></div></article>`;
+    return `<article class="modern-error-card"><div class="modern-error-head"><span class="error-mode-icon">${modeVisual(item.spec.kind).icon}</span><div><strong>${escapeHtml(mistakeTitle(item))}</strong><small>${escapeHtml(modeName(item.spec.kind))} · ${formatDate(item.lastSeen)}</small></div><span class="error-count">${item.wrongCount}×</span></div>${mistakeIssueChips(item)}<div class="modern-error-answer"><small>${t("stats.correctSolution")}</small><div>${mistakeAnswer(item)}</div></div><div class="review-progress"><span>${t("stats.reviewProgress")}</span><div>${[0,1].map(step=>`<i class="${step<progress?"done":""}"></i>`).join("")}</div><strong>${progress}/2</strong></div></article>`;
   }
 
   function achievementProgress(id){
@@ -2546,7 +7236,7 @@
     const languageLabel=state.language==="de"?"Deutsch":"English";
     const themeLabel=dark?t("settings.dark"):t("settings.light");
     view.innerHTML=`<section class="settings-page">
-      <section class="settings-hero"><div><p class="quiz-kicker">${t("settings.centerKicker")}</p><h1>${t("settings.centerTitle")}</h1><p>${t("settings.centerSubtitle")}</p></div><div class="settings-status-grid"><span><small>${t("settings.language")}</small><strong>${languageLabel}</strong></span><span><small>${t("settings.theme")}</small><strong>${themeLabel}</strong></span><span><small>${t("settings.animations")}</small><strong>${state.animations?t("settings.on"):t("settings.off")}</strong></span></div></section>
+      <section class="settings-hero"><div><p class="quiz-kicker">${t("settings.centerKicker")}</p><h1>${t("settings.centerTitle")}</h1><p>${t("settings.centerSubtitle")}</p></div><div class="settings-current-overview"><div class="settings-current-heading"><small>${t("settings.currentTitle")}</small><p>${t("settings.currentHint")}</p></div><div class="settings-status-grid"><span><small>${t("settings.language")}</small><strong>${languageLabel}</strong></span><span><small>${t("settings.theme")}</small><strong>${themeLabel}</strong></span><span><small>${t("settings.animations")}</small><strong>${state.animations?t("settings.on"):t("settings.off")}</strong></span></div></div></section>
       <section class="settings-group"><div class="settings-group-heading"><span>◐</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
         ${settingSelectRow("languageSelect","文",t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
         ${settingToggleRow("themeToggle","◐",t("settings.theme"),t("settings.themeDesc"),dark)}
@@ -2557,11 +7247,11 @@
         ${settingActionRow("restartTutorial","◎",t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
       </div></section>
       <section class="settings-group"><div class="settings-group-heading"><span>⇄</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("exportProgress","↓",t("settings.export"),t("settings.exportDesc"),"Export")}
-        ${settingActionRow("importProgress","↑",t("settings.import"),t("settings.importDesc"),"Import")}
+        ${settingActionRow("exportProgress","↓",t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
+        ${settingActionRow("importProgress","↑",t("settings.import"),t("settings.importDesc"),t("settings.importAction"))}
         <input id="importFile" type="file" accept="application/json" hidden>
         ${settingActionRow("exportFeedback","✎",t("settings.feedback"),t("settings.feedbackDesc"),t("settings.createReport"))}
-        ${settingActionRow("exportDiagnostics","⌁",t("settings.diagnostics"),t("settings.diagnosticsDesc"),"Export")}
+        ${settingActionRow("exportDiagnostics","⌁",t("settings.diagnostics"),t("settings.diagnosticsDesc"),t("settings.exportAction"))}
       </div></section>
       <section class="settings-group danger-zone"><div class="settings-group-heading"><span>!</span><div><h2>${t("settings.dangerZone")}</h2><p>${t("settings.dangerZoneHint")}</p></div></div><div class="settings-list modern-settings-list">
         ${settingActionRow("resetProgress","×",t("settings.reset"),t("settings.resetDesc"),t("settings.delete"),true)}
@@ -2577,33 +7267,43 @@
     document.getElementById("importFile").addEventListener("change",importProgress);
     document.getElementById("exportFeedback").addEventListener("click",exportFeedback);
     document.getElementById("exportDiagnostics").addEventListener("click",exportDiagnostics);
-    document.getElementById("resetProgress").addEventListener("click",()=>showConfirmDialog({ title:t("settings.resetTitle"), message:t("settings.resetConfirm"), confirmLabel:t("settings.resetAction"), cancelLabel:t("common.cancel"), kind:"danger", icon:"×", onConfirm:()=>{ OLD_KEYS.concat(STORAGE_KEY).forEach(key=>localStorage.removeItem(key)); state=clone(defaults); state.language=defaultLanguage; saveState(); renderSettings(); enqueueToast("✓",t("settings.resetDone"),t("settings.resetDoneHint"),"success"); } }));
+    document.getElementById("resetProgress").addEventListener("click",()=>showConfirmDialog({ title:t("settings.resetTitle"), message:t("settings.resetConfirm"), confirmLabel:t("settings.resetAction"), cancelLabel:t("common.cancel"), kind:"danger", icon:"×", onConfirm:()=>{ QuizmonStorage.clearQuizmonData(localStorage, STORAGE_KEY, OLD_KEYS); state=clone(defaults); state.language=defaultLanguage; saveState(); renderSettings(); enqueueToast("✓",t("settings.resetDone"),t("settings.resetDoneHint"),"success"); } }));
   }
 
-  function settingSelectRow(id,icon,title,description,options){return `<div class="modern-setting-row"><span class="modern-setting-icon">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><select id="${id}" class="select-control">${options}</select></div>`;}
-  function settingToggleRow(id,icon,title,description,on){return `<div class="modern-setting-row"><span class="modern-setting-icon">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><button id="${id}" class="switch ${on?"on":""}" aria-label="${title}" aria-pressed="${on}"></button></div>`;}
-  function settingActionRow(id,icon,title,description,label,danger=false){return `<div class="modern-setting-row"><span class="modern-setting-icon ${danger?"danger":""}">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><button id="${id}" class="${danger?"danger-button":"secondary-button"}">${label}</button></div>`;}
+  function settingSelectRow(id,icon,title,description,options){const labelId=`${id}Label`;const descriptionId=`${id}Description`;return `<div class="modern-setting-row"><span class="modern-setting-icon" aria-hidden="true">${icon}</span><div class="modern-setting-copy"><h3 id="${labelId}">${title}</h3><p id="${descriptionId}">${description}</p></div><select id="${id}" class="select-control" aria-labelledby="${labelId}" aria-describedby="${descriptionId}">${options}</select></div>`;}
+  function settingToggleRow(id,icon,title,description,on){return `<div class="modern-setting-row"><span class="modern-setting-icon" aria-hidden="true">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><button id="${id}" class="switch ${on?"on":""}" aria-label="${title}" aria-pressed="${on}"></button></div>`;}
+  function settingActionRow(id,icon,title,description,label,danger=false){return `<div class="modern-setting-row"><span class="modern-setting-icon ${danger?"danger":""}" aria-hidden="true">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><button id="${id}" class="${danger?"danger-button":"secondary-button"}">${label}</button></div>`;}
 
   function downloadJson(data, filename) { const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url); }
-  function exportProgress(){ const payload={app:"Quizmon",exportVersion:BUILD_VERSION,schema:6,exportedAt:new Date().toISOString(),state}; downloadJson(payload,`Quizmon-Beta-1.0-Fortschritt-${todayKey()}.json`); state.diagnostics.lastBackup=new Date().toISOString(); saveState(); enqueueToast("↓",t("settings.exportDone"),t("settings.exportDoneHint"),"success"); }
-  function exportDiagnostics(){ downloadJson({app:"Quizmon",version:"Beta 1.0",build:BUILD_VERSION,createdAt:new Date().toISOString(),route:state.route,language:state.language,userAgent:navigator.userAgent,online:navigator.onLine,diagnostics:state.diagnostics},`Quizmon-Diagnose-${todayKey()}.json`); enqueueToast("↓",t("settings.diagnosticsDone"),t("settings.fileCreated"),"success"); }
-  function exportFeedback(){ const report={category:"",description:"",expected:"",steps:"",appVersion:"Beta 1.0",build:BUILD_VERSION,createdAt:new Date().toISOString(),route:state.route,language:state.language,userAgent:navigator.userAgent,recentErrors:state.diagnostics.errors.slice(-5)}; downloadJson(report,`Quizmon-Feedback-${todayKey()}.json`); enqueueToast("↓",t("settings.feedbackDone"),t("settings.fileCreated"),"success"); }
+  function exportProgress(){ const payload={app:"Quizmon",exportVersion:BUILD_VERSION,schema:DATA_SCHEMA,exportedAt:new Date().toISOString(),state}; downloadJson(payload,`Quizmon-Beta-1.2-Fortschritt-${todayKey()}.json`); state.diagnostics.lastBackup=new Date().toISOString(); saveState(); enqueueToast("↓",t("settings.exportDone"),t("settings.exportDoneHint"),"success"); }
+  function exportDiagnostics(){ downloadJson({app:"Quizmon",version:PUBLIC_VERSION,build:BUILD_VERSION,schema:DATA_SCHEMA,createdAt:new Date().toISOString(),route:state.route,language:state.language,userAgent:navigator.userAgent,online:navigator.onLine,storage:{bytes:byteLength(state),learningEvents:state.stats.learning.events.length,errorEvents:state.stats.errorAnalysis.events.length,history:state.stats.history.length,pokemonCache:Object.keys(state.pokemonCache).length,importBackups:importBackupKeys().length},diagnostics:state.diagnostics},`Quizmon-Diagnose-${todayKey()}.json`); enqueueToast("↓",t("settings.diagnosticsDone"),t("settings.fileCreated"),"success"); }
+  function exportFeedback(){ const report={category:"",description:"",expected:"",steps:"",appVersion:PUBLIC_VERSION,build:BUILD_VERSION,createdAt:new Date().toISOString(),route:state.route,language:state.language,userAgent:navigator.userAgent,recentErrors:state.diagnostics.errors.slice(-5)}; downloadJson(report,`Quizmon-Feedback-${todayKey()}.json`); enqueueToast("↓",t("settings.feedbackDone"),t("settings.fileCreated"),"success"); }
+  function importBackupKeys() { return QuizmonStorage.listBackupKeys(localStorage, STORAGE_KEY); }
+
+  function pruneImportBackups(limit = IMPORT_BACKUP_LIMIT) { return QuizmonStorage.pruneBackups(localStorage, STORAGE_KEY, limit); }
+
+  function createImportBackup() {
+    pruneImportBackups(Math.max(0, IMPORT_BACKUP_LIMIT - 1));
+    const backup = clone(state);
+    compactStateCollections(backup, { aggressive: true, record: false });
+    QuizmonStorage.createBackup(localStorage, STORAGE_KEY, backup);
+    pruneImportBackups();
+  }
+
   async function importProgress(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     const importButton = document.getElementById("importProgress");
     setButtonBusy(importButton, true, t("import.loading"));
     try {
-      const parsed = JSON.parse(await file.text());
-      const incoming = parsed.state || parsed;
-      const ver = String(incoming.version || parsed.exportVersion || "");
-      const currentVersions = [BUILD_VERSION,"1.6-sprint2-v2","1.6-sprint2-v1","1.6-sprint1-v1","1.5-sprint2-v1","1.5-sprint1-v1-fix1","1.5-sprint1-v1","1.4-sprint3-v2","1.4-sprint3-v1","1.4-sprint2-v6","1.4-sprint2-v5","1.4-sprint2-v3","1.4-sprint2-v2","1.4-sprint2-v1","1.4-sprint1-v2","1.4-sprint1-v1","1.3-sprint3-v3","1.3-sprint2-v2","1.3-sprint1-v1","1.2-sprint2-v2","1.2-sprint2-v1","1.2-sprint1-v2","1.2-sprint1-v1","1.0-sprint3-v1","1.0-sprint2-v2","1.0-sprint2","1.0-sprint1","1.0"];
-      const alphaVersions = ["0.6.1","0.6"];
-      const legacyVersions = ["0.5","0.4","0.3"];
-      if (![...currentVersions,...alphaVersions,...legacyVersions].includes(ver)) throw new Error("version");
-      const backup = clone(state);
-      localStorage.setItem(`${STORAGE_KEY}.backup.${Date.now()}`,JSON.stringify(backup));
-      state = [...currentVersions,...alphaVersions].includes(ver) ? repairState(incoming) : repairState(migrateLegacy(incoming));
+      if (Number(file.size || 0) > MAX_IMPORT_BYTES) throw new Error("size");
+      const currentVersions = [BUILD_VERSION, ...SUPPORTED_CURRENT_VERSIONS];
+      const allowedVersions = new Set([...currentVersions,...SUPPORTED_ALPHA_VERSIONS,...SUPPORTED_LEGACY_VERSIONS]);
+      const inspected = QuizmonImportGuard.parse(await file.text(), allowedVersions);
+      const incoming = inspected.incoming;
+      const ver = inspected.version;
+      createImportBackup();
+      state = [...currentVersions,...SUPPORTED_ALPHA_VERSIONS].includes(ver) ? repairState(incoming) : repairState(migrateLegacy(incoming));
       state.version = BUILD_VERSION;
       state.route = "settings";
       saveState();
@@ -2618,47 +7318,82 @@
     }
   }
 
-  function openOnboarding(page=0){onboardingOpen=true;onboardingPage=page;renderOnboarding(true);}
+  function openOnboarding(page=0){
+    onboardingOpen=true;
+    onboardingPage=Math.max(0,Math.min(5,Number(page)||0));
+    onboardingDemoAnswer=null;
+    renderOnboarding(true);
+  }
   function renderOnboarding(forceShell=false){
     const pages=6;
     let backdrop = modalRoot.querySelector(".onboarding-backdrop");
     if(forceShell || !backdrop){
-      setModalMarkup(`<div class="modal-backdrop onboarding-backdrop" role="dialog" aria-modal="true"><section class="modal-card onboarding-modal"><div id="onboardingProgress" class="onboarding-progress"></div><div id="onboardingContent"></div><div class="modal-actions"><button id="skipOnboarding" class="ghost-button">${t("common.skip")}</button><button id="nextOnboarding" class="primary-button"></button></div></section></div>`, { closeOnBackdrop: false, closeOnEscape: false, initialFocus: "#nextOnboarding" });
+      setModalMarkup(`<div class="modal-backdrop onboarding-backdrop" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle"><section class="modal-card onboarding-modal"><div class="onboarding-progress-row"><div id="onboardingProgress" class="onboarding-progress" aria-hidden="true"></div><span id="onboardingStepCount" class="onboarding-step-count"></span></div><div id="onboardingContent"></div><div class="modal-actions onboarding-actions"><button id="backOnboarding" class="secondary-button">${t("common.back")}</button><button id="skipOnboarding" class="ghost-button">${t("common.skip")}</button><button id="nextOnboarding" class="primary-button"></button></div></section></div>`, { closeOnBackdrop: false, closeOnEscape: false, initialFocus: "#nextOnboarding" });
       backdrop = modalRoot.querySelector(".onboarding-backdrop");
     }
 
-    const progress = modalRoot.querySelector("#onboardingProgress");
-    const contentRoot = modalRoot.querySelector("#onboardingContent");
-    const nextButton = modalRoot.querySelector("#nextOnboarding");
-    const skipButton = modalRoot.querySelector("#skipOnboarding");
+    const progress = backdrop.querySelector("#onboardingProgress");
+    const stepCount = backdrop.querySelector("#onboardingStepCount");
+    const contentRoot = backdrop.querySelector("#onboardingContent");
+    const backOnboardingButton = backdrop.querySelector("#backOnboarding");
+    const nextButton = backdrop.querySelector("#nextOnboarding");
+    const skipButton = backdrop.querySelector("#skipOnboarding");
 
     let content="";
-    if(onboardingPage===0)content=`<div class="onboarding-visual">PT</div><h2>${t("onboarding.welcomeTitle")}</h2><p>${t("onboarding.welcomeText")}</p><div class="language-picks"><button class="language-pick ${state.language==="de"?"active":""}" data-language="de">🇩🇪 Deutsch</button><button class="language-pick ${state.language==="en"?"active":""}" data-language="en">🇬🇧 English</button></div>`;
-    else if(onboardingPage===1)content=`<div class="onboarding-visual">×</div><h2>${t("onboarding.basicsTitle")}</h2><p>${t("onboarding.basicsText")}</p><div class="multiplier-guide"><div><strong>0×</strong><small>${t("onboarding.none")}</small></div><div><strong>½×</strong><small>${t("onboarding.half")}</small></div><div><strong>1×</strong><small>${t("onboarding.normal")}</small></div><div><strong>2×</strong><small>${t("onboarding.double")}</small></div><div><strong>4×</strong><small>${t("onboarding.quad")}</small></div></div><div class="formula">${typeChip("fire","small")} 2× × ${typeChip("steel","small")} 2× = 4×</div>`;
-    else if(onboardingPage===2)content=`<div class="onboarding-visual">⚔</div><h2>${t("onboarding.effectTitle")}</h2><p>${t("onboarding.effectText")}</p><div class="demo-question"><div class="type-prompt">${typeChip("fire","large")}</div><div class="demo-options">${["water","grass","dragon","fire"].map(type=>`<button class="demo-option" data-demo-effect="${type}">${typeChip(type)}</button>`).join("")}</div><div id="demoMessage" class="demo-message"></div></div>`;
-    else if(onboardingPage===3)content=`<div class="onboarding-visual">×4</div><h2>${t("onboarding.sortTitle")}</h2><p>${t("onboarding.sortText")}</p><div class="demo-sort"><button class="demo-option" id="demoWater">${typeChip("water")}</button><div class="demo-buckets">${[.5,1,2].map(value=>`<button class="demo-bucket" data-demo-bucket="${value}">${formatMultiplier(value)}</button>`).join("")}</div><div id="demoMessage" class="demo-message"></div></div>`;
-    else if(onboardingPage===4)content=`<div class="onboarding-visual">◉</div><h2>${t("onboarding.pokemonTitle")}</h2><p>${t("onboarding.pokemonText")}</p><div class="demo-question"><div class="pokemon-frame" style="width:150px;height:150px"><img class="pokemon-art" src="${artworkUrl(25)}" alt="Pikachu"></div><div class="demo-options">${["electric","normal","fairy","fire"].map(type=>`<button class="demo-option" data-demo-pokemon="${type}">${typeChip(type)}</button>`).join("")}</div><div id="demoMessage" class="demo-message"></div></div>`;
-    else content=`<div class="onboarding-visual">🎯</div><h2>${t("onboarding.personalTitle")}</h2><p>${t("onboarding.personalText")}</p><div class="feature-list"><div class="feature-item"><span class="feature-icon">!</span><span><strong>${t("stats.errors")}</strong><small>${t("stats.errorHelp")}</small></span></div><div class="feature-item"><span class="feature-icon">◇</span><span><strong>${t("learn.title")}</strong><small>${t("learn.subtitle")}</small></span></div><div class="feature-item"><span class="feature-icon">XP</span><span><strong>${t("stats.level")}</strong><small>${t("home.progress")}</small></span></div></div>`;
+    if(onboardingPage===0)content=`<p class="onboarding-kicker">${t("onboarding.welcomeKicker")}</p><div class="onboarding-visual">Q</div><h2 id="onboardingTitle">${t("onboarding.welcomeTitle")}</h2><p>${t("onboarding.welcomeText")}</p><div class="language-picks" role="group" aria-label="${t("onboarding.language")}"><button class="language-pick ${state.language==="de"?"active":""}" data-language="de" aria-pressed="${state.language==="de"}">🇩🇪 Deutsch</button><button class="language-pick ${state.language==="en"?"active":""}" data-language="en" aria-pressed="${state.language==="en"}">🇬🇧 English</button></div><p class="onboarding-note">${t("onboarding.languageText")}</p>`;
+    else if(onboardingPage===1)content=`<div class="onboarding-visual">◎</div><h2 id="onboardingTitle">${t("onboarding.goalTitle")}</h2><p>${t("onboarding.goalText")}</p><div class="onboarding-concept-card"><div class="onboarding-matchup compact">${typeChip("water")}<span class="matchup-arrow" aria-hidden="true">→</span>${typeChip("fire")}<strong class="matchup-value">2×</strong></div><p>${t("onboarding.goalHint")}</p></div>`;
+    else if(onboardingPage===2)content=`<div class="onboarding-visual">→</div><h2 id="onboardingTitle">${t("onboarding.directionTitle")}</h2><p>${t("onboarding.directionText")}</p><div class="matchup-flow"><div class="matchup-side"><small>${t("onboarding.attacker")}</small>${typeChip("water","large")}</div><span class="matchup-arrow large" aria-hidden="true">→</span><div class="matchup-side"><small>${t("onboarding.defender")}</small>${typeChip("fire","large")}</div></div><div class="matchup-result"><strong>2×</strong><span>${t("onboarding.directionResult")}</span></div><p class="onboarding-note">${t("onboarding.directionHint")}</p>`;
+    else if(onboardingPage===3)content=`<div class="onboarding-visual">×</div><h2 id="onboardingTitle">${t("onboarding.basicsTitle")}</h2><p>${t("onboarding.basicsText")}</p><div class="multiplier-guide beginner-guide"><div data-multiplier="2"><strong>2×</strong><span><b>${t("onboarding.double")}</b><small>${t("onboarding.doubleHint")}</small></span></div><div data-multiplier="1"><strong>1×</strong><span><b>${t("onboarding.normal")}</b><small>${t("onboarding.normalHint")}</small></span></div><div data-multiplier="0.5"><strong>½×</strong><span><b>${t("onboarding.half")}</b><small>${t("onboarding.halfHint")}</small></span></div><div data-multiplier="0"><strong>0×</strong><span><b>${t("onboarding.none")}</b><small>${t("onboarding.noneHint")}</small></span></div></div><p class="onboarding-note">${t("onboarding.advancedLater")}</p>`;
+    else if(onboardingPage===4)content=`<div class="onboarding-visual">?</div><h2 id="onboardingTitle">${t("onboarding.effectTitle")}</h2><p>${t("onboarding.effectText")}</p><div class="demo-question beginner-demo"><div class="onboarding-matchup">${typeChip("water")}<span class="matchup-arrow" aria-hidden="true">→</span>${typeChip("fire")}</div><div class="demo-options onboarding-demo-options" role="group" aria-label="${t("onboarding.chooseMultiplier")}">${[.5,1,2].map(value=>`<button class="demo-option demo-multiplier" data-demo-multiplier="${value}" aria-label="${formatMultiplier(value)}">${formatMultiplier(value)}</button>`).join("")}</div><div id="demoMessage" class="demo-message" aria-live="polite">${t("onboarding.answerToContinue")}</div></div>`;
+    else content=`<div class="onboarding-visual">✓</div><h2 id="onboardingTitle">${t("onboarding.readyTitle")}</h2><p>${t("onboarding.readyText")}</p><div class="feature-list"><div class="feature-item"><span class="feature-icon">10</span><span><strong>${t("onboarding.readyShortTitle")}</strong><small>${t("onboarding.readyShortText")}</small></span></div><div class="feature-item"><span class="feature-icon">1</span><span><strong>${t("onboarding.readySimpleTitle")}</strong><small>${t("onboarding.readySimpleText")}</small></span></div><div class="feature-item"><span class="feature-icon">↻</span><span><strong>${t("onboarding.readyLearnTitle")}</strong><small>${t("onboarding.readyLearnText")}</small></span></div></div><p class="onboarding-note">${t("onboarding.readyLater")}</p><div class="onboarding-ruleset"><strong>${t("rules.badge")}</strong><span>${t("rules.mainSeries")}</span></div>`;
 
     progress.innerHTML = Array.from({length:pages},(_,i)=>`<span class="${i===onboardingPage?"active":""}"></span>`).join("");
+    stepCount.textContent = t("onboarding.stepCount",{current:onboardingPage+1,total:pages});
     contentRoot.innerHTML = content;
+    const onboardingTitle = contentRoot.querySelector("#onboardingTitle");
+    onboardingTitle?.setAttribute("tabindex","-1");
     contentRoot.classList.remove("onboarding-step-enter");
     if(motionEnabled()){void contentRoot.offsetWidth;contentRoot.classList.add("onboarding-step-enter");}
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const modalCard=backdrop.querySelector(".onboarding-modal");
+      if(modalCard)modalCard.scrollTop=0;
+      onboardingTitle?.focus?.({preventScroll:true});
+      if(modalCard)modalCard.scrollTop=0;
+    }));
+    backOnboardingButton.hidden = onboardingPage===0;
+    backOnboardingButton.textContent = t("common.back");
     nextButton.textContent = onboardingPage===pages-1 ? t("onboarding.startTraining") : t("common.next");
-    skipButton.textContent = t("common.skip");
+    nextButton.disabled = onboardingPage===4 && onboardingDemoAnswer===null;
+    skipButton.textContent = onboardingPage===pages-1 ? t("onboarding.showHome") : t("common.skip");
 
-    document.querySelectorAll("[data-language]").forEach(button=>button.addEventListener("click",()=>{state.language=button.dataset.language;saveState();applyPreferences();renderOnboarding(false);}));
-    document.querySelectorAll("[data-demo-effect]").forEach(button=>button.addEventListener("click",()=>{const correct=button.dataset.demoEffect==="grass";document.querySelectorAll("[data-demo-effect]").forEach(item=>{item.classList.toggle("correct",item.dataset.demoEffect==="grass");item.classList.toggle("incorrect",item===button&&!correct);});document.getElementById("demoMessage").textContent=correct?t("onboarding.effectCorrect"):t("onboarding.effectWrong");}));
-    const waterButton=document.getElementById("demoWater");let waterSelected=false;
-    waterButton?.addEventListener("click",()=>{waterSelected=true;waterButton.classList.add("correct");document.getElementById("demoMessage").textContent=t("onboarding.sortText");});
-    document.querySelectorAll("[data-demo-bucket]").forEach(button=>button.addEventListener("click",()=>{if(!waterSelected)return;const correct=Number(button.dataset.demoBucket)===2;document.querySelectorAll("[data-demo-bucket]").forEach(item=>item.classList.toggle("correct",Number(item.dataset.demoBucket)===2));document.getElementById("demoMessage").textContent=correct?t("onboarding.sortDone"):t("onboarding.sortText");}));
-    document.querySelectorAll("[data-demo-pokemon]").forEach(button=>button.addEventListener("click",()=>{const correct=button.dataset.demoPokemon==="electric";document.querySelectorAll("[data-demo-pokemon]").forEach(item=>{item.classList.toggle("correct",item.dataset.demoPokemon==="electric");item.classList.toggle("incorrect",item===button&&!correct);});document.getElementById("demoMessage").textContent=correct?t("onboarding.pokemonCorrect"):t("onboarding.pokemonWrong");}));
+    backdrop.querySelectorAll("[data-language]").forEach(button=>button.addEventListener("click",()=>{state.language=button.dataset.language;saveState();applyPreferences();renderOnboarding(false);}));
+    backdrop.querySelectorAll("[data-demo-multiplier]").forEach(button=>button.addEventListener("click",()=>{
+      if(onboardingDemoAnswer!==null)return;
+      onboardingDemoAnswer=Number(button.dataset.demoMultiplier);
+      const correct=onboardingDemoAnswer===2;
+      backdrop.querySelectorAll("[data-demo-multiplier]").forEach(item=>{
+        const value=Number(item.dataset.demoMultiplier);
+        item.classList.toggle("correct",value===2);
+        item.classList.toggle("incorrect",item===button&&!correct);
+        item.disabled=true;
+      });
+      const message=backdrop.querySelector("#demoMessage");
+      message.textContent=correct?t("onboarding.effectCorrect"):t("onboarding.effectWrong");
+      message.classList.toggle("success",correct);
+      message.classList.toggle("error",!correct);
+      nextButton.disabled=false;
+      haptic(correct?"success":"error");
+    }));
+    backOnboardingButton.onclick = ()=>lockInteraction(backOnboardingButton,()=>{if(onboardingPage>0){onboardingPage-=1;onboardingDemoAnswer=null;renderOnboarding(false);}},220);
     skipButton.onclick = ()=>completeOnboarding(false);
-    nextButton.onclick = ()=>lockInteraction(nextButton,()=>{if(onboardingPage<pages-1){onboardingPage+=1;renderOnboarding(false);}else completeOnboarding(true);},300);
+    nextButton.onclick = ()=>lockInteraction(nextButton,()=>{if(onboardingPage<pages-1){onboardingPage+=1;onboardingDemoAnswer=null;renderOnboarding(false);}else completeOnboarding(true);},300);
   }
-  function completeOnboarding(startTraining){onboardingOpen=false;state.onboardingComplete=true;saveState();closeModal(()=>{if(startTraining)setRoute("setup-effectiveness");else render();});}
+  function startBeginnerTraining(){
+    state.config.effectiveness={...state.config.effectiveness,length:10,kind:"effective",difficulty:"easy"};
+    startSession("effectiveness");
+  }
+  function completeOnboarding(startTraining){onboardingOpen=false;onboardingDemoAnswer=null;state.onboardingComplete=true;saveState();closeModal(()=>{if(startTraining)startBeginnerTraining();else render();});}
 
-  function showLevelModal(){const level=getLevelInfo();setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true"><section class="modal-card"><div class="onboarding-visual">${level.current.level}</div><h2>${escapeHtml(t(level.current.key))}</h2><p>${level.next?`${state.stats.xp} / ${level.next.xp} XP`:`${state.stats.xp} XP`}</p><div class="progress-track" style="margin-top:18px"><div class="progress-fill" style="width:${level.progress}%"></div></div><div class="actions stack"><button id="closeLevel" class="primary-button">${t("common.close")}</button></div></section></div>`, { initialFocus: "#closeLevel" });document.getElementById("closeLevel").addEventListener("click",()=>closeModal());}
   function enqueueToast(icon,title,description,kind="info"){toastQueue.push({icon,title,description,kind});if(!toastBusy)showNextToast();}
   function showNextToast(){const item=toastQueue.shift();if(!item){toastBusy=false;return;}toastBusy=true;const toast=document.createElement("div");toast.className=`toast toast-${item.kind||"info"}`;toast.setAttribute("role",item.kind==="error"||item.kind==="warning"?"alert":"status");toast.setAttribute("aria-live",item.kind==="error"?"assertive":"polite");toast.innerHTML=`<span class="toast-icon">${item.icon}</span><span><strong>${escapeHtml(item.title)}</strong>${item.description?`<small>${escapeHtml(item.description)}</small>`:""}</span>`;toastRoot.appendChild(toast);const finish=()=>{toast.remove();toastBusy=false;showNextToast();};const visibleFor=item.kind==="error"?4100:item.kind==="level"?3400:2700;setTimeout(()=>{if(!motionEnabled()){finish();return;}toast.classList.add("is-leaving");setTimeout(finish,230);},visibleFor);}
 
@@ -2677,10 +7412,10 @@
       const cacheKey=`${randomId}-${state.language}`;
       if(state.pokemonCache[cacheKey])return state.pokemonCache[cacheKey];
       try{
-        const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),6500);
-        const [pokemonResponse,speciesResponse]=await Promise.all([fetch(`https://pokeapi.co/api/v2/pokemon/${randomId}`,{signal:controller.signal}),fetch(`https://pokeapi.co/api/v2/pokemon-species/${randomId}`,{signal:controller.signal})]);clearTimeout(timeout);
-        if(!pokemonResponse.ok||!speciesResponse.ok)throw new Error("api");
-        const pokemonData=await pokemonResponse.json();const speciesData=await speciesResponse.json();const lang=state.language==="de"?"de":"en";const name=speciesData.names.find(entry=>entry.language.name===lang)?.name||speciesData.names.find(entry=>entry.language.name==="en")?.name||pokemonData.name;
+        const [pokemonData,speciesData]=await Promise.all([
+          QuizmonNetwork.fetchJson(`https://pokeapi.co/api/v2/pokemon/${randomId}`),
+          QuizmonNetwork.fetchJson(`https://pokeapi.co/api/v2/pokemon-species/${randomId}`)
+        ]);const lang=state.language==="de"?"de":"en";const name=speciesData.names.find(entry=>entry.language.name===lang)?.name||speciesData.names.find(entry=>entry.language.name==="en")?.name||pokemonData.name;
         const types=pokemonData.types.sort((a,b)=>a.slot-b.slot).map(entry=>API_TYPE_MAP[entry.type.name]).filter(Boolean);const image=pokemonData.sprites.other?.["official-artwork"]?.front_default||pokemonData.sprites.front_default||artworkUrl(randomId);
         if(!types.length||!image)throw new Error("incomplete");
         const result={id:randomId,name,types,image};state.pokemonCache[cacheKey]=result;const keys=Object.keys(state.pokemonCache);if(keys.length>160)delete state.pokemonCache[keys[0]];saveState();return result;
@@ -2691,7 +7426,7 @@
     return formatFallbackPokemon(randomItem(pool.length?pool:FALLBACK_POKEMON));
   }
   function formatFallbackPokemon(p){return{id:p.id,name:p.names[state.language]||p.names.en,types:[...p.types],image:artworkUrl(p.id)};}
-  function artworkUrl(id){return`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;}
+  function artworkUrl(id) { return QuizmonNetwork.artworkUrl(id); }
 
 
   function isIosDevice(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
@@ -2722,17 +7457,19 @@
   async function installApp(){if(isStandalone()){enqueueToast("✓",t("home.install"),t("install.alreadyInstalled"));return;}if(!deferredInstallPrompt){showInstallGuide();return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;renderHome();}
 
   backButton.addEventListener("click",()=>{
-    if(state.route==="profile"){setRoute("home");return;}
-    if(state.route==="learn-detail"){setRoute("learn");return;}
-    if(state.route.startsWith("setup-")){setRoute("train");return;}
+    if(state.route==="learn"&&state.learnTab==="cards"&&flashcardSession){finishFlashcardSession();return;}
     if(state.route==="session"){requestExitSession("train");return;}
+    if(canUseBrowserBack()){history.back();return;}
+    if(state.route==="profile"){setRoute("home");return;}
+    if(state.route==="learn-detail"){if(knowledgeSearchOpenedResult){returnToKnowledgeSearchResults();return;}setRoute("knowledge");return;}
+    if(state.route.startsWith("setup-")){setRoute("train");return;}
     if(state.route==="summary"){session=null;setRoute("train");return;}
     setRoute("home");
   });
-  homeButton.addEventListener("click",()=>{if(state.route==="session"){requestExitSession("home");return;}session=null;setRoute("home");});
-  brandButton.addEventListener("click",()=>{if(state.route==="session"){requestExitSession("home");return;}session=null;setRoute("home");});
-  levelButton.addEventListener("click",()=>setRoute("profile"));
-  navButtons.forEach(button=>button.addEventListener("click",()=>{if(state.route==="session"){requestExitSession(button.dataset.route);return;}session=null;setRoute(button.dataset.route);}));
+  homeButton.addEventListener("click",()=>{knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;if(state.route==="session"){requestExitSession("home");return;}session=null;setRoute("home");});
+  brandButton.addEventListener("click",()=>{knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;if(state.route==="session"){requestExitSession("home");return;}session=null;setRoute("home");});
+  levelButton.addEventListener("click",()=>{knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;setRoute("profile");});
+  navButtons.forEach(button=>button.addEventListener("click",()=>{knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;if(state.route==="session"){requestExitSession(button.dataset.route);return;}session=null;setRoute(button.dataset.route);}));
 
   document.querySelector(".bottom-nav").addEventListener("keydown", event => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -2760,9 +7497,51 @@
       }
       return;
     }
+    const activeTag=document.activeElement?.tagName?.toLowerCase();
+    const editing=["input","textarea","select"].includes(activeTag)||document.activeElement?.isContentEditable;
+    const interactive=["button","a","input","textarea","select"].includes(activeTag)||document.activeElement?.isContentEditable;
+    if(!editing&&state.route==="learn"&&state.learnTab==="cards"&&flashcardSession){
+      if(event.key==="Escape"){event.preventDefault();finishFlashcardSession();return;}
+      if(flashcardSession.phase!=="summary"){
+        if(!interactive&&(event.key===" "||event.code==="Space")){event.preventDefault();flashcardToggleReveal();return;}
+        if(flashcardSession.revealed&&["1","2","3"].includes(event.key)){event.preventDefault();flashcardRate({"1":"known","2":"unsure","3":"unknown"}[event.key]);return;}
+        if(event.key==="ArrowRight"){event.preventDefault();const progress=QuizmonFlashcards.progress(flashcardSession);const rating=QuizmonFlashcards.ratingFor(flashcardSession);if(rating&&!progress.last)flashcardMove(1);return;}
+        if(event.key==="ArrowLeft"){event.preventDefault();const progress=QuizmonFlashcards.progress(flashcardSession);if(!progress.first)flashcardMove(-1);return;}
+        if(event.key.toLowerCase()==="s"&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();flashcardShuffle();return;}
+      }
+    }
+    const searchShortcut=(event.key==="/"&&!event.ctrlKey&&!event.metaKey&&!event.altKey)||(event.key.toLowerCase()==="k"&&(event.ctrlKey||event.metaKey));
+    if(searchShortcut&&!editing&&["knowledge","learn-detail"].includes(state.route)){
+      event.preventDefault();
+      if(state.route==="knowledge"&&knowledgeView==="search")document.getElementById("knowledgeSearchPageInput")?.focus();
+      else openKnowledgeSearchPage();
+      return;
+    }
     if (event.key !== "Escape" || !isInnerRoute(state.route)) return;
     event.preventDefault();
     backButton.click();
+  });
+
+
+  window.addEventListener("popstate", event => {
+    const target = event.state?.quizmon;
+    if (!target?.snapshot) return;
+    browserHistoryIndex = Math.max(0, Number(target.index) || 0);
+    if (modalStack.length) {
+      closeModal();
+      pushBrowserHistorySnapshot();
+      return;
+    }
+    if (state.route === "session" && session?.answers?.length && target.snapshot.route !== "session") {
+      pendingHistorySnapshot = target.snapshot;
+      pushBrowserHistorySnapshot();
+      showConfirmDialog({
+        title:t("session.exitTitle"), message:t("session.exitConfirm"), confirmLabel:t("session.exitAction"), cancelLabel:t("session.keepTraining"), kind:"danger", icon:"!",
+        onConfirm:()=>{ const snapshot=pendingHistorySnapshot; pendingHistorySnapshot=null; session=null; restoreRouteSnapshot(snapshot,{replace:true}); }
+      });
+      return;
+    }
+    restoreRouteSnapshot(target.snapshot);
   });
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{if(state.theme==="system")applyPreferences();});
@@ -2771,10 +7550,8 @@
 
   document.addEventListener("error", event => {
     const image = event.target;
-    if (!(image instanceof HTMLImageElement) || image.dataset.fallbackApplied === "true") return;
-    image.dataset.fallbackApplied = "true";
-    image.classList.add("image-load-failed");
-    image.src = "assets/pokemon-placeholder.svg";
+    if (!(image instanceof HTMLImageElement)) return;
+    QuizmonImageFallback.apply(image);
   }, true);
 
   window.addEventListener("error", e => logError(e.error || e.message, "window.error"));
@@ -2799,7 +7576,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=1-6-sprint2-v2-hotfix2",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=phase3-cleanup-v1",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{
@@ -2817,6 +7594,7 @@
 
   initializeMotionSystem();
   applyNetworkStatus(false);
+  initializeBrowserHistory();
   saveState();
   render();
   if (!navigator.onLine) setTimeout(() => applyNetworkStatus(true), 250);

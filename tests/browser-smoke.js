@@ -1,0 +1,197 @@
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const http = require("node:http");
+const os = require("node:os");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+
+const ROOT = path.resolve(__dirname, "..");
+const MIME = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8", ".webmanifest":"application/manifest+json", ".svg":"image/svg+xml", ".png":"image/png" };
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function startServer() {
+  const server = http.createServer((request, response) => {
+    const url = new URL(request.url, "http://localhost");
+    const relative = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
+    const file = path.resolve(ROOT, `.${relative}`);
+    if (!file.startsWith(ROOT) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+      response.writeHead(404); response.end("Not found"); return;
+    }
+    response.setHeader("Content-Type", MIME[path.extname(file)] || "application/octet-stream");
+    response.setHeader("Cache-Control", "no-store");
+    fs.createReadStream(file).pipe(response);
+  });
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve({ server, port:server.address().port }));
+  });
+}
+
+function chromeExecutable() {
+  const candidates = [process.env.CHROME_PATH, process.env.CHROMIUM_PATH, "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser"].filter(Boolean);
+  return candidates.find(candidate => fs.existsSync(candidate)) || null;
+}
+
+async function launchChrome() {
+  const executable = chromeExecutable();
+  if (!executable) throw new Error("Chrome/Chromium executable not found");
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), "quizmon-browser-"));
+  const child = spawn(executable, [
+    "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--allow-file-access-from-files",
+    "--disable-background-networking", "--disable-default-apps", "--no-first-run",
+    "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"
+  ], { stdio:["ignore","ignore","pipe"] });
+  let stderr = "";
+  const wsUrl = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Chrome DevTools timeout\n${stderr.slice(-2000)}`)), 15000);
+    child.stderr.on("data", chunk => {
+      stderr += chunk.toString();
+      const match = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/);
+      if (match) { clearTimeout(timer); resolve(match[1]); }
+    });
+    child.once("exit", code => { clearTimeout(timer); reject(new Error(`Chrome exited early (${code})\n${stderr.slice(-2000)}`)); });
+  });
+  return { child, profile, wsUrl };
+}
+
+class CDP {
+  constructor(url) {
+    this.ws = new WebSocket(url);
+    this.id = 0;
+    this.pending = new Map();
+    this.listeners = new Map();
+  }
+  async open() {
+    await new Promise((resolve, reject) => {
+      this.ws.addEventListener("open", resolve, { once:true });
+      this.ws.addEventListener("error", reject, { once:true });
+    });
+    this.ws.addEventListener("message", event => {
+      const message = JSON.parse(event.data);
+      if (message.id && this.pending.has(message.id)) {
+        const { resolve, reject } = this.pending.get(message.id); this.pending.delete(message.id);
+        if (message.error) reject(new Error(message.error.message)); else resolve(message.result || {});
+        return;
+      }
+      const list = this.listeners.get(message.method) || [];
+      list.forEach(listener => listener(message.params || {}, message.sessionId));
+    });
+  }
+  send(method, params = {}, sessionId) {
+    const id = ++this.id;
+    const payload = { id, method, params };
+    if (sessionId) payload.sessionId = sessionId;
+    this.ws.send(JSON.stringify(payload));
+    return new Promise((resolve, reject) => this.pending.set(id, { resolve, reject }));
+  }
+  on(method, listener) { this.listeners.set(method, [...(this.listeners.get(method) || []), listener]); }
+  close() { this.ws.close(); }
+}
+
+async function run() {
+  const { server, port } = await startServer();
+  const chrome = await launchChrome();
+  const cdp = new CDP(chrome.wsUrl);
+  const exceptions = [];
+  try {
+    await cdp.open();
+    const { targetId } = await cdp.send("Target.createTarget", { url:"about:blank" });
+    const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten:true });
+    cdp.on("Runtime.exceptionThrown", params => exceptions.push(params.exceptionDetails?.text || "Runtime exception"));
+    await cdp.send("Runtime.enable", {}, sessionId);
+    await cdp.send("Page.enable", {}, sessionId);
+    await cdp.send("Log.enable", {}, sessionId);
+    await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source:`localStorage.setItem("quizmon.beta1", JSON.stringify({version:"phase3-cleanup-v1",dataSchema:17,onboardingComplete:true,route:"home"}));` }, sessionId);
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width:1440,height:1000,deviceScaleFactor:1,mobile:false }, sessionId);
+    await cdp.send("Page.navigate", { url:`http://127.0.0.1:${port}/index.html` }, sessionId);
+    await sleep(1500);
+
+    async function evaluate(expression) {
+      const result = await cdp.send("Runtime.evaluate", { expression, returnByValue:true, awaitPromise:true }, sessionId);
+      if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || "Evaluation failed");
+      return result.result?.value;
+    }
+    let managedBlock = await evaluate(`location.protocol === "chrome-error:" && /blocked|organization/i.test(document.body?.innerText || "")`);
+    if (managedBlock) {
+      const localFile = `file://${ROOT.replace(/\\/g, "/")}/index.html`;
+      await cdp.send("Page.navigate", { url:localFile }, sessionId);
+      await sleep(1500);
+      managedBlock = await evaluate(`location.protocol === "chrome-error:" && /blocked|organization/i.test(document.body?.innerText || "")`);
+    }
+    if (managedBlock) {
+      console.log("Browser smoke skipped locally: managed browser policy blocks loopback and file pages. GitHub browser gate remains enabled.");
+      return;
+    }
+
+    async function waitFor(expression, timeout = 7000) {
+      const started = Date.now();
+      while (Date.now() - started < timeout) {
+        if (await evaluate(`Boolean(${expression})`)) return;
+        await sleep(100);
+      }
+      const debug = await evaluate(`({title:document.title,body:document.body?.innerText?.slice(0,500),html:document.body?.innerHTML?.slice(0,500),url:location.href})`).catch(error => ({ evaluateError:error.message }));
+      throw new Error(`Timed out waiting for ${expression}
+${JSON.stringify(debug)}
+Exceptions: ${exceptions.join(" | ")}`);
+    }
+    async function click(selector) {
+      const clicked = await evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)return false;el.click();return true;})()`);
+      assert.equal(clicked, true, `Missing clickable ${selector}`);
+      await sleep(350);
+    }
+    async function noOverflow(label) {
+      const value = await evaluate(`Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)-window.innerWidth`);
+      assert.ok(value <= 1, `${label} horizontal overflow: ${value}px`);
+    }
+    async function noInternalKeys(label) {
+      const keys = await evaluate(`document.body.innerText.split(/\\s+/).filter(value=>/^(knowledge|flashcards|trainingLists|favorites)\\.[A-Za-z]/.test(value)).slice(0,5)`);
+      assert.deepEqual(keys, [], `${label} exposes translation keys`);
+    }
+
+    await waitFor('document.querySelector(".game-home")');
+    await noOverflow("home desktop");
+    await noInternalKeys("home desktop");
+    await click('[data-destination="knowledge"]');
+    await waitFor('document.querySelector(".knowledge-home")');
+    assert.match(await evaluate('document.querySelector(".brand small").textContent'), /Wissenswelt|Knowledge Hub/);
+    await noOverflow("knowledge desktop");
+    await click('[data-knowledge-section="pokemon"]');
+    await waitFor('document.querySelector(".knowledge-pokemon-page")');
+    await click('.knowledge-pokemon-card');
+    await waitFor('document.querySelector(".knowledge-detail-page")');
+    await evaluate('history.back()');
+    await waitFor('document.querySelector(".knowledge-pokemon-page")');
+    await click('[data-open-knowledge-search]');
+    await waitFor('document.querySelector("#knowledgeSearchPageInput")');
+    await evaluate(`(()=>{const input=document.querySelector("#knowledgeSearchPageInput");input.value="Pikachu";input.dispatchEvent(new Event("input",{bubbles:true}));})()`);
+    await waitFor('document.querySelector(".knowledge-search-result")');
+    await noInternalKeys("search desktop");
+
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width:390,height:844,deviceScaleFactor:2,mobile:true }, sessionId);
+    await evaluate('document.getElementById("homeButton").click()');
+    await waitFor('document.querySelector(".game-home")');
+    await noOverflow("home mobile");
+    await click('[data-destination="knowledge"]');
+    await waitFor('document.querySelector(".knowledge-home")');
+    await noOverflow("knowledge mobile");
+    const touchFailures = await evaluate(`[...document.querySelectorAll('.knowledge-favorite-button,.knowledge-training-list-button,.knowledge-search-field button')].map(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height})).filter(size=>size.w<43.5||size.h<43.5)`);
+    assert.deepEqual(touchFailures, [], "Phase-3 touch controls must be at least 44px");
+    assert.deepEqual(exceptions, [], `Browser exceptions: ${exceptions.join(" | ")}`);
+    console.log("Browser smoke passed: desktop/mobile, navigation, search, history, overflow, touch targets");
+  } finally {
+    cdp.close();
+    chrome.child.kill("SIGKILL");
+    await Promise.race([
+      new Promise(resolve => chrome.child.once("exit", resolve)),
+      sleep(2000)
+    ]);
+    await new Promise(resolve => server.close(resolve));
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try { fs.rmSync(chrome.profile, { recursive:true, force:true, maxRetries:3, retryDelay:100 }); break; }
+      catch (error) { if (attempt === 4) console.warn(`Could not remove temporary Chrome profile: ${error.message}`); else await sleep(250); }
+    }
+  }
+}
+
+run().catch(error => { console.error(error.stack || error); process.exitCode = 1; });

@@ -1,0 +1,377 @@
+/* ==========================================================
+   Quizmon Beta 1.0 — 1.5 Sprint 1: Animationen & Rückmeldungen
+   ========================================================== */
+:root {
+  --motion-instant: 90ms;
+  --motion-fast: 150ms;
+  --motion-normal: 240ms;
+  --motion-slow: 380ms;
+  --motion-emphasis: 560ms;
+  --motion-enter: cubic-bezier(.16,1,.3,1);
+  --motion-exit: cubic-bezier(.4,0,1,1);
+  --motion-spring: cubic-bezier(.2,1.35,.45,1);
+}
+
+/* New views use one consistent directional language. */
+.view { animation: none; }
+.route-enter > :first-child { transform-origin: 50% 0; }
+.route-enter-forward > :first-child { animation: route-forward-in var(--motion-slow) var(--motion-enter) both; }
+.route-enter-back > :first-child { animation: route-back-in var(--motion-slow) var(--motion-enter) both; }
+.route-enter-replace > :first-child { animation: route-replace-in var(--motion-normal) var(--motion-enter) both; }
+@keyframes route-forward-in {
+  from { opacity: 0; transform: translate3d(18px,8px,0) scale(.995); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes route-back-in {
+  from { opacity: 0; transform: translate3d(-15px,5px,0) scale(.997); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes route-replace-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Every interactive surface reacts with the same timing and pressure. */
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+  transition-property: transform, scale, filter, background-color, border-color, box-shadow, color, opacity;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
+}
+button:not(:disabled):active, [role="button"]:not([aria-disabled="true"]):active { scale: .975; }
+.action-card:active, .mode-card:active, .learn-card:active, .main-menu-card:active,
+.profile-choice-card:active, .favorite-pokemon-option:active, .favorite-type-option:active { scale: .985; }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+.answer-button.is-locked, .type-option.is-locked, .multiplier-option.is-locked,
+.bucket.is-locked, .type-chip.is-locked { pointer-events: none; cursor: default; }
+.answer-button.selected, .type-option.selected, .multiplier-option.selected,
+.choice-tile.selected { animation: selection-settle 220ms var(--motion-spring) both; }
+@keyframes selection-settle {
+  0% { scale: .965; }
+  65% { scale: 1.025; }
+  100% { scale: 1; }
+}
+
+/* Navigation indicates the newly active destination without constant motion. */
+.nav-item.nav-just-activated .nav-icon { animation: nav-destination 360ms var(--motion-spring) both; }
+.nav-item.nav-just-activated small { animation: nav-label-arrive 280ms var(--motion-enter) both; }
+@keyframes nav-destination {
+  0% { opacity: .45; transform: translateY(3px) scale(.82); }
+  68% { opacity: 1; transform: translateY(-1px) scale(1.08); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes nav-label-arrive { from { opacity: .4; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+/* Answer → feedback → next-action hierarchy. */
+.feedback.visible { position: relative; overflow: hidden; }
+.feedback.visible .explanation { animation: explanation-arrive 340ms var(--motion-enter) 90ms both; }
+@keyframes explanation-arrive { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.session-actions .primary-button.is-ready { position: relative; overflow: hidden; }
+.session-actions .primary-button.is-ready::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.22) 49%, transparent 68%);
+  transform: translateX(-130%);
+  animation: ready-sheen 620ms var(--motion-enter) 100ms both;
+}
+@keyframes ready-sheen { to { transform: translateX(130%); } }
+
+/* Progress is smooth and anchored; it never changes layout. */
+.session-progress span, .progress-fill, .hero-progress span, .profile-progress-track i,
+.game-level-track i, .summary-xp-track i {
+  transition: width 440ms var(--motion-enter);
+  will-change: width;
+}
+
+/* Training summary makes earned XP and level-ups explicit. */
+.summary-xp-card {
+  display: grid;
+  grid-template-columns: 58px minmax(0,1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 17px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb,var(--primary) 24%,var(--line));
+  background: linear-gradient(135deg,color-mix(in srgb,var(--primary) 9%,var(--surface-solid)),var(--surface-solid));
+  box-shadow: var(--shadow-sm);
+}
+.summary-xp-card.level-up {
+  border-color: color-mix(in srgb,#d69a25 55%,var(--line));
+  background: linear-gradient(135deg,color-mix(in srgb,#e7ad38 16%,var(--surface-solid)),var(--surface-solid));
+  animation: level-card-arrive 720ms var(--motion-spring) both;
+}
+.summary-xp-badge {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: white;
+  background: linear-gradient(145deg,var(--primary),var(--primary-2));
+  box-shadow: 0 12px 25px color-mix(in srgb,var(--primary) 26%,transparent);
+  font-weight: 1000;
+  font-size: 17px;
+}
+.level-up .summary-xp-badge {
+  color: #342206;
+  background: linear-gradient(145deg,#ffd66d,#e7a92d);
+  box-shadow: 0 12px 25px rgba(194,132,19,.24);
+  animation: level-badge-pop 700ms var(--motion-spring) both;
+}
+.summary-xp-content { min-width: 0; }
+.summary-xp-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.summary-xp-heading small, .summary-xp-heading strong { display: block; }
+.summary-xp-heading small { margin-bottom: 3px; color: var(--muted); font-size: 11px; font-weight: 850; text-transform: uppercase; letter-spacing: .06em; }
+.summary-xp-heading strong { font-size: 17px; }
+.summary-xp-heading b { flex: 0 0 auto; color: var(--primary); }
+.summary-xp-track { height: 9px; margin-top: 11px; overflow: hidden; border-radius: 999px; background: var(--surface-strong); }
+.summary-xp-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,var(--primary),var(--primary-2)); }
+.level-up .summary-xp-track i { background: linear-gradient(90deg,#d38d17,#ffd369); }
+.summary-xp-card p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+@keyframes level-card-arrive {
+  0% { opacity: 0; transform: translateY(10px) scale(.97); }
+  68% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes level-badge-pop {
+  0% { transform: scale(.72) rotate(-8deg); }
+  72% { transform: scale(1.08) rotate(2deg); }
+  100% { transform: none; }
+}
+
+/* Toast types share one component, but urgency remains visible. */
+.toast { overflow: hidden; position: relative; }
+.toast::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--primary); }
+.toast-success::before { background: var(--success); }
+.toast-error::before { background: var(--danger); }
+.toast-warning::before { background: var(--warning); }
+.toast-level::before, .toast-unlock::before { background: #d99b27; }
+.toast-level .toast-icon, .toast-unlock .toast-icon { color: #533500; background: #fff1c7; }
+.toast-success .toast-icon { color: var(--success); background: var(--success-bg); }
+.toast-error .toast-icon { color: var(--danger); background: var(--danger-bg); }
+.toast-warning .toast-icon { color: var(--warning); background: var(--warning-bg); }
+
+/* Onboarding steps move independently inside the dialog. */
+.onboarding-step-enter { animation: onboarding-step-in 340ms var(--motion-enter) both; }
+@keyframes onboarding-step-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 560px) {
+  .summary-xp-card { grid-template-columns: 48px minmax(0,1fr); padding: 14px; }
+  .summary-xp-badge { width: 47px; height: 47px; border-radius: 15px; font-size: 14px; }
+  .summary-xp-heading { gap: 7px; }
+  .summary-xp-heading strong { font-size: 15px; }
+}
+
+html[data-animations="off"] .route-enter > :first-child,
+html[data-animations="off"] .nav-just-activated .nav-icon,
+html[data-animations="off"] .nav-just-activated small,
+html[data-animations="off"] .answer-button.selected,
+html[data-animations="off"] .type-option.selected,
+html[data-animations="off"] .multiplier-option.selected,
+html[data-animations="off"] .feedback.visible .explanation,
+html[data-animations="off"] .session-actions .primary-button.is-ready::after,
+html[data-animations="off"] .summary-xp-card.level-up,
+html[data-animations="off"] .level-up .summary-xp-badge,
+html[data-animations="off"] .onboarding-step-enter { animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .route-enter > :first-child, .nav-just-activated .nav-icon, .nav-just-activated small,
+  .answer-button.selected, .type-option.selected, .multiplier-option.selected,
+  .feedback.visible .explanation, .session-actions .primary-button.is-ready::after,
+  .summary-xp-card.level-up, .level-up .summary-xp-badge, .onboarding-step-enter {
+    animation: none !important;
+  }
+}
+
+
+/* ==========================================================
+   Quizmon Beta 1.0 — 1.5 Sprint 1 v1 Fix 1
+   Flackerfreie Ansichtswechsel
+   ========================================================== */
+/*
+   Die bisherigen Ansichtsanimationen blendeten den neuen Inhalt kurz von
+   transparent auf sichtbar. Das konnte bei schnellen Ansichtswechseln wie
+   ein weißes Flackern wirken. Neue Menüs sind nun sofort vollständig
+   sichtbar und bewegen sich nur noch minimal zur Orientierung.
+*/
+.route-enter > :first-child {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+}
+.route-enter-forward > :first-child {
+  animation: route-forward-in-stable 180ms var(--motion-enter) both;
+}
+.route-enter-back > :first-child {
+  animation: route-back-in-stable 180ms var(--motion-enter) both;
+}
+.route-enter-replace > :first-child {
+  animation: route-replace-in-stable 150ms var(--motion-enter) both;
+}
+@keyframes route-forward-in-stable {
+  from { opacity: 1; transform: translate3d(6px,2px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+@keyframes route-back-in-stable {
+  from { opacity: 1; transform: translate3d(-6px,2px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+@keyframes route-replace-in-stable {
+  from { opacity: 1; transform: translate3d(0,2px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+
+/* Kein verzögertes Einblenden einzelner Karten nach einem Menüwechsel. */
+.motion-page-item,
+.motion-stagger-item {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* ==========================================================
+   Quizmon Beta 1.0 — 1.5 Sprint 2 v1
+   Moderne Bedienabläufe und UX-Abschluss
+   ========================================================== */
+body.modal-open { overflow:hidden; touch-action:none; }
+.nested-modal-backdrop { z-index:120; background:color-mix(in srgb,#071117 76%,transparent); }
+.confirmation-dialog { width:min(100%,480px); text-align:center; padding:26px; }
+.confirmation-dialog h2 { margin-top:14px; }
+.dialog-status-icon {
+  width:66px; height:66px; margin:0 auto; display:grid; place-items:center;
+  border-radius:22px; color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,var(--surface-soft));
+  border:1px solid color-mix(in srgb,var(--primary) 25%,var(--line)); font-size:28px; font-weight:1000;
+}
+.confirmation-danger .dialog-status-icon,
+.confirmation-error .dialog-status-icon { color:var(--danger); background:var(--danger-bg); border-color:color-mix(in srgb,var(--danger) 30%,var(--line)); }
+.confirmation-warning .dialog-status-icon { color:#8a5c00; background:#fff2c9; border-color:#f1cd71; }
+html[data-theme="dark"] .confirmation-warning .dialog-status-icon { color:#ffd97b; background:#3a2e13; border-color:#6e5420; }
+.confirmation-actions { grid-template-columns:1fr 1fr; }
+.modal-actions.single-action { grid-template-columns:1fr; }
+
+button:disabled, [aria-disabled="true"] { cursor:not-allowed; opacity:.55; filter:saturate(.72); }
+button.is-busy { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:9px; pointer-events:none; }
+.button-spinner { width:16px; height:16px; flex:0 0 auto; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:button-spin 700ms linear infinite; }
+@keyframes button-spin { to { transform:rotate(360deg); } }
+
+.field-meta { display:flex; justify-content:space-between; gap:12px; margin-top:7px; color:var(--muted); font-size:11px; }
+.field-meta strong { color:var(--text-strong); }
+.field-error { min-height:20px; margin-top:5px; color:var(--danger); font-size:12px; font-weight:750; }
+.profile-name-field input[aria-invalid="true"] { border-color:var(--danger); box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 12%,transparent); }
+
+.loading-state-card {
+  min-height:430px; display:grid; align-content:center; justify-items:center; gap:10px; padding:34px 18px; text-align:center;
+}
+.loading-state-card h1 { margin:6px 0 0; color:var(--text-strong); font-size:clamp(23px,5vw,34px); }
+.loading-state-card p { margin:0; color:var(--muted); }
+.loading-orbit { position:relative; width:72px; height:72px; display:grid; place-items:center; border:2px solid var(--line); border-radius:50%; }
+.loading-orbit::before { content:""; width:27px; height:27px; border:7px solid var(--surface-solid); border-radius:50%; background:linear-gradient(145deg,var(--primary),var(--primary-2)); box-shadow:0 8px 20px color-mix(in srgb,var(--primary) 30%,transparent); }
+.loading-orbit i { position:absolute; width:14px; height:14px; border-radius:50%; background:var(--primary); box-shadow:0 0 0 5px color-mix(in srgb,var(--primary) 14%,transparent); animation:loading-orbit 1.1s linear infinite; transform-origin:36px 36px; left:29px; top:-7px; }
+@keyframes loading-orbit { to { transform:rotate(360deg); } }
+
+.favorite-picker-empty, .profile-cosmetic-empty {
+  min-height:170px; display:grid; place-content:center; justify-items:center; gap:6px; padding:24px; text-align:center;
+  border:1px dashed var(--line); border-radius:20px; color:var(--muted); background:var(--surface-soft);
+}
+.favorite-picker-empty::before, .profile-cosmetic-empty::before { content:"⌕"; width:48px; height:48px; display:grid; place-items:center; border-radius:15px; color:var(--primary); background:var(--surface-solid); font-size:22px; font-weight:900; }
+
+.modal-card:focus { outline:none; }
+.modal-card :focus-visible { outline:3px solid color-mix(in srgb,var(--primary) 44%,transparent); outline-offset:3px; }
+
+@media (max-width:560px) {
+  .confirmation-dialog { padding:22px 18px; }
+  .confirmation-actions { grid-template-columns:1fr; }
+  .confirmation-actions .secondary-button { order:2; }
+  .dialog-status-icon { width:58px; height:58px; border-radius:19px; }
+}
+
+html[data-animations="off"] .button-spinner,
+html[data-animations="off"] .loading-orbit i { animation:none !important; }
+@media (prefers-reduced-motion:reduce) {
+  .button-spinner,.loading-orbit i { animation:none !important; }
+}
+
+
+/* ==========================================================
+   Quizmon Beta 1.0 — 1.6 Sprint 1: Stabilität & Geräte-Polishing
+   ========================================================== */
+html, body { max-width: 100%; overflow-x: clip; }
+.view, .view > *, .app-shell, .panel, section, article, aside, nav, header, footer,
+[class*="grid"], [class*="row"], [class*="copy"], [class*="heading"] { min-width: 0; }
+img, svg, video, canvas { max-width: 100%; }
+h1, h2, h3, h4, p, strong, small, button, label, .type-chip { overflow-wrap: anywhere; }
+input, select, textarea, button { max-width: 100%; }
+
+/* Large catalogue and statistics areas skip off-screen paint work without changing layout. */
+.profile-choice-card, .modern-type-stat-card, .mistake-card, .achievement-card,
+.favorite-pokemon-picker-card, .lexicon-card, .training-mode-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 120px;
+}
+
+.image-load-failed {
+  object-fit: contain !important;
+  padding: 10% !important;
+  opacity: .72;
+  filter: saturate(.75);
+  background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+}
+
+.app-recovery-state {
+  min-height: min(560px, calc(100dvh - 190px));
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 30px 20px;
+  text-align: center;
+}
+.app-recovery-state > span {
+  width: 64px; height: 64px; display: grid; place-items: center;
+  border-radius: 20px; background: color-mix(in srgb, var(--danger) 12%, var(--surface-solid));
+  color: var(--danger); font-size: 30px; font-weight: 950;
+}
+.app-recovery-state h1 { margin: 2px 0 0; max-width: 620px; color: var(--text-strong); }
+.app-recovery-state p { margin: 0; max-width: 620px; color: var(--muted); }
+.app-recovery-state > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+
+@media (max-width: 340px) {
+  .view { padding-left: 10px; padding-right: 10px; }
+  .topbar { padding-left: 10px; padding-right: 10px; }
+  .bottom-nav { padding-left: 4px; padding-right: 4px; }
+  .nav-item { min-width: 0; padding-left: 3px; padding-right: 3px; }
+  .nav-item small { font-size: 9px; }
+  .nav-icon { width: 20px; height: 20px; }
+  .brand-copy small { display: none; }
+  .header-metric { padding-inline: 8px; }
+  .app-recovery-state > div { width: 100%; }
+  .app-recovery-state button { width: 100%; }
+}
+
+
+/* ==========================================================
+   Quizmon Beta 1.0 — 1.6 Sprint 2 v1
+   Offline-Sicherheit und finaler Feinschliff
+   ========================================================== */
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+img { max-width: 100%; }
+button, input, select, textarea { font: inherit; }
+.panel, .modal-card, .profile-choice-card, .setting-row, .stat-card, .toast { overflow-wrap: anywhere; }
+.image-load-failed { object-fit: contain !important; padding: 10% !important; background: var(--surface-soft) !important; }
+.pokemon-frame .image-load-failed { padding: 7% !important; border-radius: 26px; }
+.pokemon-name-fallback { margin-top: 4px; }
+html[data-network="offline"] .pokemon-frame { border-style: dashed; }
+@media (max-width: 430px) {
+  button, .nav-item, .icon-button { min-height: 44px; }
+  .modal-card { max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px); }
+  .toast-root { left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .topbar { position: sticky; top: 0; }
+  .modal-card { max-height: calc(100dvh - 20px); }
+  .loading-state-card { min-height: 260px; }
+}
+
+

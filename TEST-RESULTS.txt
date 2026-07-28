@@ -1,0 +1,81 @@
+Quizmon Beta 1.2 – Phase-3-Abschluss-Clean-up v1
+Build: phase3-cleanup-v1
+Datenschema: 17
+Lernpfadversion: 3
+
+Verbindliche Grundlage:
+- Quizmon-Beta-1.2-3.5-Sprint-2-v2-Windows.zip
+
+Automatische Modul- und Strukturprüfung:
+- npm run check: bestanden
+- 150 von 150 Tests bestanden
+- sämtliche JavaScript-Syntaxprüfungen bestanden
+- CSS-Kaskadenprüfung bestanden
+- Deutsch-/Englisch-Schlüsselparität bestanden
+- Übersetzungs-Platzhalterparität bestanden
+- keine fehlenden lokalen HTML-, CSS-, Script-, Manifest- oder Service-Worker-Dateien
+- Datenschema 17 unverändert
+- Lernpfadversion 3 unverändert
+
+Phase-3-Daten und Fachlogik:
+- 1.025 Pokémon geprüft
+- 919 Attacken geprüft
+- 313 Fähigkeiten geprüft
+- 2.176 Items geprüft
+- 340 Entwicklungslinien geprüft
+- 9 Regionen geprüft
+- 145 Trainer und Figuren geprüft
+- 117 Arenaleiter-, Top-Vier- und Champion-Einträge geprüft
+- 450 vollständige Trainer-Teamplätze geprüft
+- 21 Learnset-Spielgruppen weiterhin strikt getrennt
+- Spielauswahl, Lernmethoden, Maschinen und Rückverknüpfungen geprüft
+- Suche, Generationenfilter, Favoriten, Trainingslisten und Lernkarten geprüft
+- Typenberechnung, Lernintelligenz, Schwierigkeit, Fehleranalyse, Motivation und Fortschritt geprüft
+
+Neue Clean-up-Prüfungen:
+- Browser-History-Integration und Zustands-Snapshots statisch geprüft
+- nur eine Service-Worker-Registrierung vorhanden
+- Service-Worker-Build und Paketversion konsistent
+- Learnset-Metadaten für alle 1.025 Pokémon und 919 Attacken gegen den vollständigen Datensatz verglichen
+- vollständige Learnsets werden nicht mehr im allgemeinen HTML-Startpfad ausgeführt
+- vollständige Learnsets bleiben im Offline-App-Shell-Cache
+- Import-Guard für aktuelle und ältere unterstützte Zustände geprüft
+- ungültige, leere, nicht unterstützte und beschädigte Imports werden abgewiesen
+- Phase-3-Zustandsreparatur für Favoriten, Trainingslisten und Lernkarten geprüft
+- kritische persönliche, Lern- und Motivationsdaten für Rundreisen abgebildet
+- getrennte Pokémon-, Item- und allgemeine Bildfallbacks geprüft
+- relevante Phase-3-Touchflächen auf mindestens 44 Pixel abgesichert
+- progressive Gruppen der Wissenswelt geprüft
+- keine veralteten sichtbaren Hinweise auf spätere Lexikon-Sprints
+- Fortschrittsbezeichnung konsistent
+- GitHub-Veröffentlichung hängt vom vollständigen Verify-Job ab
+
+Performanceprüfung in der Entwicklungsumgebung:
+- vollständiger Learnset-Datensatz: 8.425.835 Bytes
+- kompakte Learnset-Metadaten: 70.730 Bytes
+- isolierte Node-Auswertung der Metadaten: etwa 5,5 ms
+- isolierte Node-Auswertung des vollständigen Datensatzes: etwa 406 ms
+- vollständiger Datensatz wird erst bei tatsächlichem Learnset-Bedarf ausgewertet
+- alle lokalen Kernwissensdaten bleiben offline verfügbar
+
+Browserprüfung:
+- ein dependency-freier Chrome-Smoke-Test wurde erstellt
+- geprüft werden Desktop 1.440 × 1.000 und Smartphone 390 × 844
+- geprüft werden Startseite, Wissenswelt, Pokémon-Katalog, Detailnavigation, Browser-Zurück, Suche, Überbreite, Übersetzungsschlüssel und Touchziele
+- der lokale Browserdurchlauf konnte in der verwalteten Entwicklungsumgebung nicht ausgeführt werden, da die Browserrichtlinie sowohl Loopback- als auch Datei-Seiten blockiert
+- der Test meldet diesen lokalen Ausschluss transparent
+- im GitHub-Workflow wird Chrome eingerichtet und der Smoke-Test ist eine verpflichtende Veröffentlichungssperre
+
+PWA und Offline:
+- nur eine zentrale Service-Worker-Registrierung
+- neuer Cache-Build phase3-cleanup-v1
+- alte Quizmon-Caches werden weiterhin entfernt
+- große Kernassets erhalten einen erweiterten Installationszeitraum
+- optionale Bilder bleiben im kontrollierten Laufzeitcache
+- lokale Platzhalter für Pokémon, Items und allgemeine Bilder vorhanden
+
+In dieser Entwicklungsumgebung nicht vollständig ersetzbar:
+- physischer iPhone- und Safari-Test
+- installierte PWA auf einem echten Gerät
+- reales GitHub-Pages-Service-Worker-Update
+- echter Import des persönlichen Nutzerexports
