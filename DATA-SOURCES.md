@@ -30,6 +30,18 @@ Quizmon liefert Namen, Beziehungen und Kerndaten lokal aus. Pokémon-Artworks un
 Item-Sprites werden bei Bedarf geladen, begrenzt gecacht und bei fehlender
 Verbindung durch lokale Platzhalter ersetzt.
 
+## PokéIdle
+
+Die datenbasierten Hinweise aus Phase 4.1 Sprint 1 werden ausschließlich aus den
+bereits lokal geprüften Pokémon-, Typen-, Fähigkeiten- und Entwicklungsdaten
+abgeleitet. Das System erzeugt keine unbelegten Verhaltens-, Farb- oder
+Pokédextexte. Jede Hinweiskombination wird rechnerisch gegen alle 1.025
+Katalogeinträge geprüft.
+
+Visuelle Hinweise und Pokémon-Rufe sind nicht Teil dieses Sprints. Das Artwork
+wird erst nach Abschluss einer Runde zur Auflösung geladen und erhält bei
+fehlender Verbindung weiterhin den lokalen Pokémon-Platzhalter.
+
 Pokémon und zugehörige Marken sind Eigentum ihrer jeweiligen Rechteinhaber.
 Quizmon ist ein unabhängiges Lernprojekt und nicht mit Nintendo, Game Freak oder
 The Pokémon Company verbunden.

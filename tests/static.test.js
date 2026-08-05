@@ -16,9 +16,10 @@ test("all local script, stylesheet and manifest references exist", () => {
 test("CSS imports preserve the intended app-wide cascade", () => {
   const imports = [...read("styles.css").matchAll(/@import url\("(.+?)"\)/g)].map(match => match[1]);
   assert.deepEqual(imports, [
-    "./styles-base.css", "./styles-home.css", "./styles-training.css", "./styles-learning.css",
+    "./styles-base.css", "./styles-home.css", "./styles-play.css", "./styles-training.css", "./styles-learning.css",
     "./styles-knowledge.css", "./styles-progress.css", "./styles-profile.css", "./styles-motion.css", "./styles-feedback.css",
-    "./styles-motivation.css", "./styles-intelligence.css"
+    "./styles-motivation.css", "./styles-intelligence.css", "./styles-visual-refresh.css", "./styles-visual-refresh-sprint2.css",
+    "./styles-visual-refresh-sprint3.css"
   ]);
   for (const ref of imports) assert.ok(fs.existsSync(path.resolve(ROOT, ref)), `missing ${ref}`);
 });
@@ -37,7 +38,8 @@ test("manifest is valid and exposes PWA shortcuts", () => {
   const manifest = JSON.parse(read("manifest.webmanifest"));
   assert.equal(manifest.name, "Quizmon");
   assert.equal(manifest.display, "standalone");
-  assert.equal(manifest.shortcuts.length, 3);
+  assert.equal(manifest.shortcuts.length, 4);
+  assert.equal(manifest.shortcuts[0].url, "./?route=play");
 });
 
 test("old product-name remnants are absent from user-facing source", () => {
@@ -52,17 +54,17 @@ test("the accepted Phase 2 finalization export remains import-compatible", () =>
 });
 
 
-test("Phase 3 starts publicly as Beta 1.2 and loads knowledge data without eagerly parsing full learnsets", () => {
+test("Beta 1.3 preserves the complete Phase 3 knowledge data without eagerly parsing full learnsets", () => {
   const html = read("index.html");
   const sw = read("service-worker.js");
-  assert.match(html, /<small>Beta 1\.2<\/small>/);
+  assert.match(html, /<small>Beta 1\.3<\/small>/);
   assert.match(html, /knowledge-data\.js/);
   assert.match(html, /knowledge-content-data\.js/);
   assert.match(html, /knowledge-learnset-meta\.js/);
   assert.match(html, /knowledge-learnset-loader\.js/);
   assert.doesNotMatch(html, /<script[^>]+src="knowledge-learnset-data\.js"/);
   assert.match(html, /knowledge-engine\.js/);
-  assert.match(read("app.js"), /const PUBLIC_VERSION = "Beta 1\.2"/);
+  assert.match(read("app.js"), /const PUBLIC_VERSION = "Beta 1\.3"/);
   assert.match(read("app.js"), /"3\.1-sprint1-v2"/);
   assert.match(sw, /knowledge-content-data\.js/);
   assert.match(sw, /knowledge-learnset-data\.js/);
@@ -197,26 +199,25 @@ test("current build and the single service-worker registration are consistent", 
   const pkg = JSON.parse(read("package.json"));
   const combined = `${html}
 ${app}`;
-  assert.match(app, /const BUILD_VERSION = "phase3-cleanup-v1"/);
-  assert.match(app, /service-worker\.js\?build=phase3-cleanup-v1/);
+  assert.match(app, /const BUILD_VERSION = "visual-refresh-sprint3-v1"/);
+  assert.match(app, /service-worker\.js\?build=visual-refresh-sprint3-v1/);
   assert.doesNotMatch(html, /navigator\.serviceWorker\.register/);
   assert.equal((combined.match(/navigator\.serviceWorker\.register/g) || []).length, 1);
-  assert.match(sw, /const BUILD = "phase3-cleanup-v1"/);
-  assert.equal(pkg.version, "1.2.0-phase3-cleanup.1");
+  assert.match(sw, /const BUILD = "visual-refresh-sprint3-v1"/);
+  assert.equal(pkg.version, "1.3.0-visual-refresh-sprint3.1");
   assert.match(app, /"3\.5-sprint2-v2"/);
 });
 
 
-test("Phase 3.3 Sprint 1 v2 separates learning and knowledge in the seven-area main menu", () => {
+test("visual refresh replaces the seven-area home menu without removing its routes", () => {
   const app = read("app.js");
   const router = read("router.js");
   const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function renderProfile"));
   const learn = app.slice(app.indexOf("function renderLearn()"), app.indexOf("function pathImpactSpec"));
-  const routes = ["play","train","learn","knowledge","stats","settings","support"];
-  const positions = routes.map(route => home.indexOf(`gameMenuButton("${route}"`));
-  positions.forEach((position,index) => assert.ok(position >= 0, routes[index]));
-  assert.deepEqual(positions, [...positions].sort((a,b)=>a-b));
-  assert.match(home, /expanded-main-menu/);
+  assert.match(home, /refreshedHomePlayMarkup/);
+  assert.match(home, /refreshedHomeMotivationMarkup/);
+  assert.doesNotMatch(home, /gameMenuButton\(/);
+  assert.doesNotMatch(home, /expanded-main-menu/);
   assert.match(app, /function renderKnowledgePage/);
   assert.match(app, /function renderFutureArea/);
   assert.match(learn, /--tab-count:3/);
@@ -224,23 +225,19 @@ test("Phase 3.3 Sprint 1 v2 separates learning and knowledge in the seven-area m
   assert.match(router, /\"play\"/);
   assert.match(router, /\"knowledge\"/);
   assert.match(router, /\"support\"/);
-  assert.match(read("styles-home.css"), /expanded-main-menu.*repeat\(7/s);
-  assert.match(read("styles-intelligence.css"), /daily-goal-card\{margin-top:auto\}/);
 });
 
 
-test("Phase 3.3 Sprint 1 v3 enlarges the desktop main-menu typography and unifies Trainieren colors", () => {
+test("visual refresh keeps training, learning, progress and settings only in bottom navigation", () => {
   const app = read("app.js");
-  const css = read("styles-home.css");
+  const html = read("index.html");
   const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function renderProfile"));
-  const trainingCall = 'gameMenuButton("train", iconSvg("train"), "02", t("home.gameTrain"), t("home.gameTrainDesc"))';
-  assert.ok(home.includes(trainingCall));
-  assert.ok(!home.includes(`${trainingCall.slice(0,-1)}, true)`));
-  assert.match(css, /expanded-main-menu-panel \.game-panel-heading span\{font-size:16px\}/);
-  assert.match(css, /expanded-main-menu-panel \.game-panel-heading small\{font-size:12px\}/);
-  assert.match(css, /expanded-main-menu \.game-menu-number\{font-size:10px\}/);
-  assert.match(css, /expanded-main-menu \.game-menu-copy strong\{font-size:17px/);
-  assert.match(css, /expanded-main-menu \.game-menu-copy small\{[^}]*font-size:11px/);
+  const nav = html.match(/<nav class="bottom-nav"[\s\S]*?<\/nav>/)?.[0] || "";
+  for (const route of ["train", "learn", "stats", "settings"]) assert.match(nav, new RegExp(`data-route="${route}"`));
+  assert.doesNotMatch(home, /home\.gameTrain/);
+  assert.doesNotMatch(home, /home\.gameLearn/);
+  assert.doesNotMatch(home, /home\.gameProgress/);
+  assert.doesNotMatch(home, /home\.gameSettings/);
 });
 
 

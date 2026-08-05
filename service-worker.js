@@ -1,5 +1,5 @@
-const CACHE_PREFIX = "quizmon-beta-1-2";
-const BUILD = "phase3-cleanup-v1";
+const CACHE_PREFIX = "quizmon-beta-1-3";
+const BUILD = "visual-refresh-sprint3-v1";
 const SHELL_CACHE = `${CACHE_PREFIX}-${BUILD}-shell`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}-${BUILD}-runtime`;
 const CURRENT_CACHES = new Set([SHELL_CACHE, RUNTIME_CACHE]);
@@ -13,6 +13,7 @@ const SHELL = Object.freeze([
   "./styles.css",
   "./styles-base.css",
   "./styles-home.css",
+  "./styles-play.css",
   "./styles-training.css",
   "./styles-learning.css",
   "./styles-knowledge.css",
@@ -22,6 +23,9 @@ const SHELL = Object.freeze([
   "./styles-feedback.css",
   "./styles-motivation.css",
   "./styles-intelligence.css",
+  "./styles-visual-refresh.css",
+  "./styles-visual-refresh-sprint2.css",
+  "./styles-visual-refresh-sprint3.css",
   "./data.js",
   "./cosmetics.js",
   "./i18n.js",
@@ -51,6 +55,8 @@ const SHELL = Object.freeze([
   "./favorites.js",
   "./training-lists.js",
   "./flashcards.js",
+  "./whos-that-pokemon.js",
+  "./daily-service.js",
   "./image-fallback.js",
   "./app.js",
   "./manifest.webmanifest",
@@ -236,7 +242,9 @@ self.addEventListener("fetch", event => {
     event.respondWith((async () => {
       const result = await staleWhileRevalidate(request);
       if (result.update) event.waitUntil(result.update);
-      return result.response || (request.destination === "image" ? offlineImageFallback() : new Response("", { status: 503, statusText: "Offline" }));
+      if (result.response) return result.response;
+      if (request.destination === "image" && !url.searchParams.has("quizmon-media")) return offlineImageFallback();
+      return new Response("", { status: 503, statusText: "Offline" });
     })());
   }
 });

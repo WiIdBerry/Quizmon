@@ -1,12 +1,12 @@
 {
   "name": "Quizmon",
   "short_name": "Quizmon",
-  "description": "Adaptives Pokémon-Lernen und eine wachsende Wissensplattform.",
+  "description": "Adaptives Pokémon-Lernen, Wissensplattform und abwechslungsreiche Spielmodi.",
   "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#315f72",
+  "background_color": "#05091a",
+  "theme_color": "#5d55d9",
   "orientation": "any",
   "lang": "de",
   "icons": [
@@ -49,6 +49,18 @@
     "client_mode": "navigate-existing"
   },
   "shortcuts": [
+    {
+      "name": "Spielen",
+      "short_name": "Spielen",
+      "url": "./?route=play",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
     {
       "name": "Training",
       "short_name": "Training",

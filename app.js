@@ -2,9 +2,9 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "phase3-cleanup-v1";
-  const PUBLIC_VERSION = "Beta 1.2";
-  const DATA_SCHEMA = 17;
+  const BUILD_VERSION = "visual-refresh-sprint3-v1";
+  const PUBLIC_VERSION = "Beta 1.3";
+  const DATA_SCHEMA = 19;
   const LEARNING_EVENT_LIMIT = 800;
   const ERROR_EVENT_LIMIT = 600;
   const HISTORY_LIMIT = 30;
@@ -16,7 +16,9 @@
   const LEARNING_EVENT_MODES = Object.freeze([...PLAYABLE_MODES, "weak", "daily", "review", "problem", "path"]);
   const ADAPTIVE_SESSION_MODES = Object.freeze(["weak", "problem"]);
   const SUPPORTED_CURRENT_VERSIONS = Object.freeze([
-    "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
+    "visual-refresh-sprint2-v1", "visual-refresh-sprint1-v1",
+    "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
+    "4.1-sprint1-v1", "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
     "2.5-sprint3-v1", "2.5-sprint2-v1", "2.5-sprint1-v1", "2.4-sprint2-v1", "2.4-sprint1-v1",
     "2.3-sprint2-v3", "2.3-sprint2-v2", "2.3-sprint2-v1", "2.3-sprint1-v1",
     "2.2-sprint2-v1", "2.2-sprint1-v1", "2.1-sprint3-v1", "2.1-sprint2-v5",
@@ -61,6 +63,13 @@
   const levelNumber = document.getElementById("levelNumber");
   const headerStreak = document.getElementById("headerStreak");
   const navButtons = [...document.querySelectorAll(".nav-item")];
+  const WHOS_CONTEXT = QuizmonWhosThatPokemon.createContext({
+    pokemon: QuizmonKnowledgeData.POKEMON,
+    types: TYPES,
+    typeChart: TYPE_CHART,
+    evolutionMethods: QuizmonKnowledgeContent.EVOLUTION_METHODS,
+    starterIds: QuizmonKnowledgeWorld.REGIONS.flatMap(region => region.starters || [])
+  });
 
   const blankTypeStats = () => Object.fromEntries(
     TYPES.map(type => [type, { total: 0, correct: 0, recent: [], lastSeen: null }])
@@ -91,6 +100,12 @@
     favorites: { pokemon: [], types: [], sortPokemon: "recent", sortTypes: "recent" },
     trainingLists: { lists: [] },
     flashcards: { review: [], history: [] },
+    whosThat: {
+      difficulty: "medium", round: null,
+      statistics: QuizmonWhosThatPokemon.blankStatistics(),
+      completedRoundIds: [],
+      daily: { installationId: globalThis.crypto?.randomUUID?.() || `quizmon-${Date.now()}-${Math.random().toString(16).slice(2)}`, lastTrustedDate: null, history: {}, pendingUploads: [], distribution: null }
+    },
     seenHints: { effectiveness: false, multiplier: false, impact: false, pokemon: false },
     statsTab: "overview",
     learnTab: "path",
@@ -193,6 +208,8 @@
   let flashcardSession = null;
   let flashcardSwipeStartX = null;
   let flashcardSwipeHandled = false;
+  let whosSuggestionQuery = "";
+  let whosSelectedPokemonId = null;
   let profileCustomizerTab = "avatar";
   let profileCustomizerQuery = "";
   let profileCustomizerCategory = "all";
@@ -332,6 +349,12 @@
       output.config[mode] = { ...clone(base.config[mode]), ...(output.config[mode] || {}) };
     });
     output.seenHints = { ...base.seenHints, ...((saved || {}).seenHints || {}) };
+    output.whosThat = { ...clone(base.whosThat), ...((saved || {}).whosThat || {}) };
+    output.whosThat.statistics = QuizmonWhosThatPokemon.sanitizeStatistics(output.whosThat.statistics);
+    output.whosThat.completedRoundIds = unique(Array.isArray(output.whosThat.completedRoundIds) ? output.whosThat.completedRoundIds.filter(id => typeof id === "string").slice(-300) : []);
+    output.whosThat.daily = { ...clone(base.whosThat.daily), ...(output.whosThat.daily || {}) };
+    output.whosThat.daily.history = output.whosThat.daily.history && typeof output.whosThat.daily.history === "object" ? output.whosThat.daily.history : {};
+    output.whosThat.daily.pendingUploads = Array.isArray(output.whosThat.daily.pendingUploads) ? output.whosThat.daily.pendingUploads.slice(-30) : [];
     output.profile = { ...clone(base.profile), ...((saved || {}).profile || {}) };
     output.profile.unlocked = {
       avatars: unique([...(base.profile.unlocked?.avatars || []), ...(((saved || {}).profile?.unlocked?.avatars) || [])]),
@@ -525,6 +548,10 @@
     repaired.favorites = phase3State.favorites;
     repaired.trainingLists = phase3State.trainingLists;
     repaired.flashcards = phase3State.flashcards;
+    repaired.whosThat = repaired.whosThat && typeof repaired.whosThat === "object" ? repaired.whosThat : clone(defaults.whosThat);
+    repaired.whosThat.difficulty = QuizmonWhosThatPokemon.DIFFICULTIES.includes(repaired.whosThat.difficulty) ? repaired.whosThat.difficulty : "medium";
+    repaired.whosThat.round = QuizmonWhosThatPokemon.sanitizeRound(repaired.whosThat.round, WHOS_CONTEXT);
+    repaired.whosThat.statistics = QuizmonWhosThatPokemon.sanitizeStatistics(repaired.whosThat.statistics);
 
     const oldLevel = getLevelInfo(repaired.stats.xp).current.level;
     const oldMastered = TYPES.filter(type => repaired.stats.types[type].total >= 5 && percent(repaired.stats.types[type].correct, repaired.stats.types[type].total) >= 80).length;
@@ -746,6 +773,10 @@
   function tp(singularKey, pluralKey, count, vars = {}) {
     return t(QuizmonI18n.pluralKey(state.language, count, singularKey, pluralKey), { ...vars, count });
   }
+  function dailyGoalRewardToast(streak, bonusXp) {
+    const key = QuizmonI18n.pluralKey(state.language, streak, "daily.goalRewardToastOne", "daily.goalRewardToast");
+    return t(key, { count:bonusXp, streak });
+  }
 
   function escapeHtml(value) { return QuizmonCore.escapeHtml(value); }
 
@@ -902,7 +933,7 @@
   }
   function feedbackProgressiveDetails(html, open = false) {
     if (!html) return "";
-    return `<details class="feedback-progressive-details" ${open ? "open" : ""}><summary><span><strong>${t("cleanup2.feedbackDetails")}</strong><small>${t("cleanup2.feedbackDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div>${html}</div></details>`;
+    return `<details class="feedback-progressive-details" ${open ? "open" : ""}><summary><span><strong>${t("cleanup2.feedbackDetails")}</strong><small>${t("cleanup2.feedbackDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><div>${html}</div></details>`;
   }
 
   function feedbackHeading(correct, subtitle = "") {
@@ -1156,6 +1187,23 @@
     state.daily.history[todayKey()] = { progress: finiteNonNegative(state.daily.goalProgress), completed: Boolean(state.daily.goalCompleted) };
     return { ...dailyGoalInfo(), completedNow, bonusXp, show: !beforeCompleted || completedNow };
   }
+  function completeDailyGoalFromPokeidle(round) {
+    if (round?.mode !== "daily" || round.status !== "won") return { completedNow:false, bonusXp:0, streak:dailyGoalInfo().streak };
+    normalizeDailyState(false);
+    const completion = QuizmonMotivation.completeDailyGoal(state.daily, {
+      today:todayKey(),
+      yesterday:offsetDateKey(-1),
+      result:{ source:"pokeidle", solvedAtHint:Math.min(5, Math.max(1, Number(round.revealed) || 1)), lives:Math.max(0, Number(round.lives) || 0) }
+    });
+    state.daily = completion.state;
+    if (completion.bonusXp) addXp(completion.bonusXp);
+    unlockAchievement("daily_first", true);
+    updateHeader();
+    if (completion.completedNow) {
+      enqueueToast("🔥", t("daily.completedTitle"), dailyGoalRewardToast(completion.streak, completion.bonusXp), "level");
+    }
+    return completion;
+  }
   function dailyGoalWeekMarkup() {
     return `<div class="daily-goal-week" aria-label="${escapeHtml(t("daily.weekLabel"))}">${weeklyGoalEntries().map(day => `<span class="${day.completed ? "is-complete" : ""} ${day.isToday ? "is-today" : ""}" title="${escapeHtml(day.key)}"><small>${escapeHtml(day.label)}</small><i>${day.completed ? "✓" : ""}</i></span>`).join("")}</div>`;
   }
@@ -1200,7 +1248,7 @@
     document.documentElement.dataset.animations = state.animations ? "on" : "off";
     document.documentElement.lang = state.language;
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-      meta.setAttribute("content", actualTheme() === "dark" ? "#10171b" : "#f4f6f8");
+      meta.setAttribute("content", actualTheme() === "dark" ? "#05091a" : "#f3f6ff");
       meta.removeAttribute("media");
     });
     document.querySelectorAll("[data-nav-label]").forEach(item => item.textContent = t(`nav.${item.dataset.navLabel}`));
@@ -1739,6 +1787,7 @@
     const goal = dailyGoalInfo();
     levelNumber.textContent = `Lv. ${level.current.level}`;
     headerStreak.textContent = `🔥 ${goal.streak}`;
+    levelButton?.style.setProperty("--header-level-progress", `${level.progress}%`);
     if(brandVersion)brandVersion.textContent=["knowledge","learn-detail"].includes(state.route)?`${PUBLIC_VERSION} · ${t("nav.knowledge")}`:PUBLIC_VERSION;
     headerStreak.setAttribute("title", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
     headerStreak.setAttribute("aria-label", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
@@ -1821,7 +1870,7 @@
       updateDocumentTitle();
 
       if (state.route === "home") renderHome();
-      else if (state.route === "play") renderFutureArea("play");
+      else if (state.route === "play") renderPlay();
       else if (state.route === "train") renderTrain();
       else if (state.route === "learn") renderLearn();
       else if (state.route === "knowledge") renderKnowledgePage();
@@ -1938,6 +1987,439 @@
     </section>`;
   }
 
+  function whosPokemonName(item) { return item?.[state.language] || item?.en || item?.de || ""; }
+  function whosDifficultyName(difficulty) { return t(`whos.difficulty.${difficulty}`); }
+  function whosNumber(value) {
+    return new Intl.NumberFormat(state.language === "de" ? "de-DE" : "en-US", { maximumFractionDigits: 1 }).format(Number(value) || 0);
+  }
+  function whosStatNames(edge) {
+    return (edge?.keys || []).map(key => t(`knowledge.stat.${key}`)).join(" / ");
+  }
+  function whosAbilityName(id) {
+    const ability = QuizmonKnowledgeContent.ABILITY_BY_ID.get(Number(id));
+    return ability ? (ability[state.language] || ability.en || ability.de) : `#${id}`;
+  }
+  function whosEvolutionMethodLabel(value) {
+    if (!value?.method) return t("whos.method.special");
+    return t(`whos.method.${value.method}`, value);
+  }
+  function formatWhosHint(descriptor, target) {
+    const value = descriptor?.value;
+    if (!descriptor || !value && value !== 0) return "";
+    if (descriptor.kind === "statSignature") return t("whos.hint.statSignature", {
+      highStat: whosStatNames(value.high), highValue: value.high.value,
+      lowStat: whosStatNames(value.low), lowValue: value.low.value
+    });
+    if (descriptor.kind === "abilityProfile") return t("whos.hint.abilityProfile", { abilities: value.map(row => whosAbilityName(row.id)).join(" · ") });
+    if (descriptor.kind === "measurements") return t("whos.hint.measurements", { height: whosNumber(value.height / 10), weight: whosNumber(value.weight / 10) });
+    if (descriptor.kind === "originProfile") return t("whos.hint.originProfile", value);
+    if (descriptor.kind === "defenseProfile") return t("whos.hint.defenseProfile", {
+      ...value,
+      weaknessLabel: t(value.weaknesses === 1 ? "whos.count.weaknessOne" : "whos.count.weaknessMany"),
+      resistanceLabel: t(value.resistances === 1 ? "whos.count.resistanceOne" : "whos.count.resistanceMany"),
+      immunityLabel: t(value.immunities === 1 ? "whos.count.immunityOne" : "whos.count.immunityMany")
+    });
+    if (descriptor.kind === "baseTotal") return t("whos.hint.baseTotal", { value });
+    if (descriptor.kind === "generation") return t("whos.hint.generation", { generation: value, region: knowledgeRegionLabel(value) });
+    if (descriptor.kind === "dexRange") return t("whos.hint.dexRange", value);
+    if (descriptor.kind === "strongestStat") return t("whos.hint.strongestStat", { stat: whosStatNames(value), value: value.value });
+    if (descriptor.kind === "weakestStat") return t("whos.hint.weakestStat", { stat: whosStatNames(value), value: value.value });
+    if (descriptor.kind === "battleStyle") return t("whos.hint.battleStyle", { style: t(`whos.style.${value}`) });
+    if (descriptor.kind === "typeCount") return t(value === 1 ? "whos.hint.typeCountOne" : "whos.hint.typeCount", { count: value });
+    if (descriptor.kind === "typeOne") return t("whos.hint.typeOne", { type: typeLabel(value) });
+    if (descriptor.kind === "typeCombo") return t("whos.hint.typeCombo", { types: String(value).split("|").map(typeLabel).join(" / ") });
+    if (descriptor.kind === "matchup") {
+      const key = value.relation === "weak" ? "whos.hint.matchupWeak" : value.relation === "immune" ? "whos.hint.matchupImmune" : "whos.hint.matchupResist";
+      return t(key, { type: typeLabel(value.type), multiplier: formatMultiplier(value.multiplier) });
+    }
+    if (descriptor.kind === "singleAbility") return t(value.hidden ? "whos.hint.hiddenAbility" : "whos.hint.singleAbility", { ability: whosAbilityName(value.id) });
+    if (descriptor.kind === "evolutionStage") return t("whos.hint.evolutionStage", { stage: value });
+    if (descriptor.kind === "familySize") return t("whos.hint.familySize", { count: value });
+    if (descriptor.kind === "evolutionNeighbor") {
+      const neighbor = WHOS_CONTEXT.byId.get(Number(value.id));
+      return t(value.direction === "from" ? "whos.hint.evolutionFrom" : "whos.hint.evolutionTo", { name: whosPokemonName(neighbor) });
+    }
+    if (descriptor.kind === "evolutionMethod") return t("whos.hint.evolutionMethod", { method: whosEvolutionMethodLabel(value) });
+    if (descriptor.kind === "specialGroup") return t("whos.hint.specialGroup", { group: t(`whos.group.${value}`) });
+    if (descriptor.kind === "heightBand") return t("whos.hint.heightBand", { band: t(`whos.height.${value}`) });
+    if (descriptor.kind === "weightBand") return t("whos.hint.weightBand", { band: t(`whos.weight.${value}`) });
+    if (descriptor.kind === "namePattern") {
+      const pattern = value[state.language === "de" ? "de" : "en"];
+      return t("whos.hint.namePattern", pattern);
+    }
+    if (descriptor.kind === "evolutionGap") {
+      const line = value.map(id => Number(id) === Number(target?.id) ? "????" : whosPokemonName(WHOS_CONTEXT.byId.get(Number(id)))).join(" · ");
+      return t("whos.hint.evolutionGap", { line });
+    }
+    if (["shadow", "pixel", "crop", "cry"].includes(descriptor.kind)) return t(`whos.media.${descriptor.kind}`);
+    return "";
+  }
+
+  function whosCryUrl(target) {
+    return `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${Number(target.id)}.ogg`;
+  }
+  function whosMediaFallbackMarkup(descriptor, target) {
+    const fallback = descriptor?.value?.fallback;
+    return `<p class="whos-media-fallback" hidden>${escapeHtml(fallback ? formatWhosHint(fallback, target) : t("whos.media.unavailable"))}</p>`;
+  }
+  function whosHintContentMarkup(descriptor, target) {
+    if (!["shadow", "pixel", "crop", "cry"].includes(descriptor?.kind)) return `<p>${escapeHtml(formatWhosHint(descriptor, target))}</p>`;
+    const strength = escapeHtml(descriptor.value?.strength || "medium");
+    const artwork = escapeHtml(`${knowledgeArtwork(target)}?quizmon-media=1`);
+    const fallback = whosMediaFallbackMarkup(descriptor, target);
+    if (descriptor.kind === "cry") return `<div class="whos-media-hint whos-cry-hint" data-whos-media>
+      <audio preload="metadata" src="${escapeHtml(whosCryUrl(target))}"></audio>
+      <button type="button" class="whos-cry-play" data-whos-cry-play><span aria-hidden="true">▶</span>${t("whos.media.playCry")}</button>
+      <label><span>${t("whos.media.volume")}</span><input type="range" min="0" max="100" value="70" data-whos-volume aria-label="${escapeHtml(t("whos.media.volume"))}"></label>
+      <button type="button" class="whos-cry-mute" data-whos-mute aria-pressed="false">${t("whos.media.mute")}</button>${fallback}</div>`;
+    return `<div class="whos-media-hint whos-${descriptor.kind}-hint strength-${strength}" data-whos-media>
+      <div class="whos-media-stage" style="--media-anchor:${Number(descriptor.value?.anchor) || 50}%"><img src="${artwork}" alt="${escapeHtml(t(`whos.media.${descriptor.kind}Alt`))}" crossorigin="anonymous"></div>${fallback}</div>`;
+  }
+
+  function bindWhosMediaHints(root = view) {
+    root.querySelectorAll("[data-whos-media] img").forEach(image => image.addEventListener("error", () => {
+      image.closest(".whos-media-stage")?.setAttribute("hidden", "");
+      const fallback = image.closest("[data-whos-media]")?.querySelector(".whos-media-fallback");
+      if (fallback) fallback.hidden = false;
+    }, { once: true }));
+    root.querySelectorAll(".whos-cry-hint").forEach(container => {
+      const audio = container.querySelector("audio");
+      const play = container.querySelector("[data-whos-cry-play]");
+      const volume = container.querySelector("[data-whos-volume]");
+      const mute = container.querySelector("[data-whos-mute]");
+      if (!audio || !play || !volume || !mute) return;
+      const difficulty = container.closest("[data-whos-difficulty]")?.dataset.whosDifficulty;
+      const limit = difficulty === "easy" ? Number.POSITIVE_INFINITY : difficulty === "hard" ? 0.55 : 1.6;
+      const fail = () => { container.querySelector(".whos-media-fallback").hidden = false; play.disabled = true; };
+      audio.addEventListener("error", fail, { once: true });
+      audio.addEventListener("timeupdate", () => { if (audio.currentTime >= limit) { audio.pause(); audio.currentTime = 0; play.querySelector("span").textContent = "▶"; } });
+      audio.addEventListener("ended", () => { play.querySelector("span").textContent = "▶"; });
+      play.addEventListener("click", () => { audio.currentTime = 0; audio.play().then(() => { play.querySelector("span").textContent = "■"; }).catch(fail); });
+      volume.addEventListener("input", () => { audio.volume = Number(volume.value) / 100; audio.muted = false; mute.setAttribute("aria-pressed", "false"); mute.textContent = t("whos.media.mute"); });
+      mute.addEventListener("click", () => { audio.muted = !audio.muted; mute.setAttribute("aria-pressed", String(audio.muted)); mute.textContent = t(audio.muted ? "whos.media.unmute" : "whos.media.mute"); const fallback = container.querySelector(".whos-media-fallback"); if (fallback) fallback.hidden = !audio.muted; });
+      audio.volume = .7;
+    });
+  }
+
+  function whosDifficultyCard(difficulty, numeral) {
+    const selected = state.whosThat.difficulty === difficulty;
+    return `<button type="button" class="whos-difficulty-card ${selected ? "selected" : ""}" data-whos-difficulty="${difficulty}" aria-pressed="${selected}">
+      <span aria-hidden="true">${numeral}</span><div><strong>${t(`whos.difficulty.${difficulty}`)}</strong><p>${t(`whos.difficulty.${difficulty}Desc`)}</p></div><i aria-hidden="true">${selected ? "✓" : ""}</i>
+    </button>`;
+  }
+
+  function whosTodayKey() {
+    const localKey = QuizmonWhosThatPokemon.utcDateKey(new Date());
+    const previous = state.whosThat.daily.lastTrustedDate;
+    const trusted = previous && previous > localKey ? previous : localKey;
+    state.whosThat.daily.lastTrustedDate = trusted;
+    return trusted;
+  }
+
+  function whosDailyEntry(dateKey = whosTodayKey()) {
+    return state.whosThat.daily.history?.[dateKey] || null;
+  }
+
+  function startWhosDailyRound() {
+    const dateKey = whosTodayKey();
+    const finished = whosDailyEntry(dateKey);
+    if (finished) {
+      const saved = QuizmonWhosThatPokemon.sanitizeRound(finished.round, WHOS_CONTEXT);
+      if (saved) { state.whosThat.round = saved; saveState(); renderPlay(); }
+      return;
+    }
+    state.whosThat.round = QuizmonWhosThatPokemon.createDailyRound({ context: WHOS_CONTEXT, date: `${dateKey}T12:00:00.000Z` });
+    whosSuggestionQuery = "";
+    whosSelectedPokemonId = null;
+    saveState();
+    renderPlay();
+  }
+
+  function completeWhosRound(round) {
+    if (!round || round.status === "active" || state.whosThat.completedRoundIds.includes(round.id)) return;
+    const score = QuizmonWhosThatPokemon.scoreRound(round);
+    state.whosThat.completedRoundIds = [...state.whosThat.completedRoundIds, round.id].slice(-300);
+    state.whosThat.statistics = QuizmonWhosThatPokemon.recordStatistics(state.whosThat.statistics, round, score);
+    addXp(score.xp);
+    const dailyGoalCompletion = completeDailyGoalFromPokeidle(round);
+    if (round.mode === "daily" && round.dailyDate) {
+      const result = { date: round.dailyDate, solvedAtHint: score.solvedAtHint, status: round.status, lives: round.lives, points: score.points, xp:score.xp + dailyGoalCompletion.bonusXp, dailyGoalCompleted:round.status === "won" };
+      state.whosThat.daily.history[round.dailyDate] = { result, round: clone(round) };
+      state.whosThat.daily.pendingUploads = [...state.whosThat.daily.pendingUploads.filter(item => item.date !== round.dailyDate), result].slice(-30);
+      queueMicrotask(syncWhosDailyResults);
+    }
+  }
+
+  async function syncWhosDailyResults() {
+    const baseUrl = QuizmonDailyService.endpoint();
+    if (!baseUrl || !navigator.onLine || !state.whosThat.daily.pendingUploads.length) return;
+    const pending = [...state.whosThat.daily.pendingUploads];
+    for (const result of pending) {
+      try {
+        await QuizmonDailyService.submit(baseUrl, state.whosThat.daily.installationId, result, QuizmonNetwork.fetchJson);
+        state.whosThat.daily.pendingUploads = state.whosThat.daily.pendingUploads.filter(item => item.date !== result.date);
+        const distribution = await QuizmonDailyService.distribution(baseUrl, result.date, QuizmonNetwork.fetchJson);
+        if (distribution) state.whosThat.daily.distribution = { date: result.date, ...distribution };
+        saveState();
+      } catch (error) { logError(error, "whos.dailySync"); break; }
+    }
+  }
+
+  function whosStatisticsMarkup() {
+    const stats = state.whosThat.statistics;
+    const rate = stats.played ? Math.round(stats.won / stats.played * 100) : 0;
+    const average = stats.played ? (stats.totalHints / stats.played).toFixed(1) : "–";
+    return `<section class="whos-stats-card" aria-labelledby="whosStatsTitle"><header><div><small>${t("whos.stats.kicker")}</small><h2 id="whosStatsTitle">${t("whos.stats.title")}</h2></div><b>${stats.played}</b></header><div class="whos-stat-grid"><span><small>${t("whos.stats.winRate")}</small><strong>${rate}%</strong></span><span><small>${t("whos.stats.averageHints")}</small><strong>${average}</strong></span><span><small>${t("whos.stats.firstHint")}</small><strong>${stats.firstHintWins}</strong></span><span><small>${t("whos.stats.best")}</small><strong>${stats.bestPoints}</strong></span></div></section>`;
+  }
+
+  function whosDailyCardMarkup() {
+    const dateKey = whosTodayKey();
+    const entry = whosDailyEntry(dateKey);
+    return `<section class="whos-daily-card ${entry ? "completed" : ""}" aria-labelledby="whosDailyTitle"><span class="whos-daily-calendar" aria-hidden="true">${dateKey.slice(-2)}</span><div><small>${t("whos.daily.kicker")}</small><h2 id="whosDailyTitle">${t("whos.daily.title")}</h2><p>${entry ? t("whos.daily.completed", { hint: entry.result.solvedAtHint || "–" }) : t("whos.daily.text")}</p></div><button type="button" id="startWhosDaily" class="secondary-button">${t(entry ? "whos.daily.view" : "whos.daily.start")}</button></section>`;
+  }
+
+  function startWhosRound(difficulty = state.whosThat.difficulty) {
+    try {
+      const safeDifficulty = QuizmonWhosThatPokemon.DIFFICULTIES.includes(difficulty) ? difficulty : "medium";
+      state.whosThat.difficulty = safeDifficulty;
+      state.whosThat.round = QuizmonWhosThatPokemon.createRound({ context: WHOS_CONTEXT, difficulty: safeDifficulty });
+      whosSuggestionQuery = "";
+      whosSelectedPokemonId = null;
+      saveState();
+      renderPlay();
+      requestAnimationFrame(() => {
+        if (window.matchMedia("(min-width: 720px)").matches) document.getElementById("whosGuessInput")?.focus({ preventScroll: true });
+      });
+    } catch (error) {
+      logError(error, "whos.createRound");
+      enqueueToast("!", t("error.recoveryTitle"), t("error.recoveryText"), "error");
+    }
+  }
+
+  function renderWhosSetup() {
+    view.innerHTML = `<section class="whos-page whos-setup-page" aria-labelledby="whosTitle">
+      <section class="whos-hero">
+        <div class="whos-hero-orb" aria-hidden="true"><span>?</span><i></i></div>
+        <div class="whos-hero-copy"><div class="whos-mode-meta"><span>${t("whos.modeNumber")}</span><b>${t("whos.available")}</b></div><p class="quiz-kicker">${t("whos.kicker")}</p><h1 id="whosTitle">${t("whos.title")}</h1><p>${t("whos.subtitle")}</p></div>
+      </section>
+      ${whosDailyCardMarkup()}
+      <div class="whos-setup-grid">
+        <section class="whos-difficulty-panel" aria-labelledby="whosDifficultyTitle"><header><div><small>${t("whos.modeNumber")}</small><h2 id="whosDifficultyTitle">${t("whos.difficultyTitle")}</h2></div><p>${t("whos.difficultyText")}</p></header>
+          <div class="whos-difficulty-grid">${whosDifficultyCard("easy", "I")}${whosDifficultyCard("medium", "II")}${whosDifficultyCard("hard", "III")}</div>
+          <button type="button" id="startWhosRound" class="primary-button whos-start-button">${t("whos.start")}<span aria-hidden="true">›</span></button>
+        </section>
+        <aside class="whos-rules-card"><span aria-hidden="true">5</span><div><h2>${t("whos.rulesTitle")}</h2><ul><li>${t("whos.ruleLives")}</li><li>${t("whos.ruleHints")}</li><li>${t("whos.ruleBalance")}</li><li>${t("whos.ruleInput")}</li></ul></div></aside>
+      </div>
+      ${whosStatisticsMarkup()}
+    </section>`;
+    view.querySelectorAll("[data-whos-difficulty]").forEach(button => button.addEventListener("click", () => {
+      state.whosThat.difficulty = button.dataset.whosDifficulty;
+      saveState();
+      renderWhosSetup();
+    }));
+    document.getElementById("startWhosRound")?.addEventListener("click", () => startWhosRound());
+    document.getElementById("startWhosDaily")?.addEventListener("click", startWhosDailyRound);
+  }
+
+  function whosLivesMarkup(round) {
+    const label = tp("whos.livesOne", "whos.livesMany", round.lives);
+    const heart = `<svg viewBox="0 0 24 24" focusable="false"><path d="M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6.01 6.01 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54Z"/></svg>`;
+    return `<div class="whos-lives" role="img" aria-label="${escapeHtml(label)}">${Array.from({ length: round.maxLives }, (_, index) => `<span class="${index < round.lives ? "available" : "lost"}" aria-hidden="true">${heart}</span>`).join("")}<small>${escapeHtml(label)}</small></div>`;
+  }
+
+  function whosHintsMarkup(round, target) {
+    const revealedHints = round.hints.slice(0, Math.min(round.revealed, round.hints.length));
+    return `<section class="whos-review-hints" aria-labelledby="whosReviewHintsTitle"><header><div><small>${t("whos.reviewKicker")}</small><h2 id="whosReviewHintsTitle">${t("whos.hintsLabel")}</h2></div><b>${revealedHints.length}/5</b></header><ol>${revealedHints.map((descriptor, index) => `<li class="whos-review-hint" data-whos-difficulty="${escapeHtml(round.difficulty)}"><span>${String(index + 1).padStart(2, "0")}</span><div><small>${t("whos.hintLabel", { number:index + 1 })}</small>${whosHintContentMarkup(descriptor, target)}</div></li>`).join("")}</ol></section>`;
+  }
+
+  function whosProgressMarkup(round) {
+    return `<ol class="whos-progress" aria-label="${escapeHtml(t("whos.hintsLabel"))}">${round.hints.map((_, index) => {
+      const number = index + 1;
+      const unlocked = number <= round.revealed;
+      const current = round.status === "active" && number === round.revealed;
+      const complete = number < round.revealed || round.status !== "active" && unlocked;
+      const stateLabel = current ? t("whos.progress.current") : unlocked ? t("whos.progress.revealed") : t("whos.progress.locked");
+      return `<li class="whos-progress-step ${unlocked ? "unlocked" : "locked"} ${current ? "current" : ""} ${complete ? "complete" : ""}" ${current ? 'aria-current="step"' : ""}><span>${complete ? "✓" : number}</span><small>${escapeHtml(stateLabel)}</small></li>`;
+    }).join("")}</ol>`;
+  }
+
+  function whosPotentialScore(round) {
+    return QuizmonWhosThatPokemon.scoreRound({ ...round, status:"won" }).points;
+  }
+
+  function whosCurrentStageMarkup(round, target) {
+    const descriptor = round.hints[Math.max(0, round.revealed - 1)];
+    const media = ["shadow", "pixel", "crop", "cry"].includes(descriptor?.kind);
+    return `<section class="whos-current-stage ${media ? "has-media" : "is-text"}" data-whos-difficulty="${escapeHtml(round.difficulty)}" aria-labelledby="whosCurrentHintTitle">
+      <div class="whos-stage-top"><span>${t("whos.currentHint")} · ${String(round.revealed).padStart(2, "0")}</span><div class="whos-stage-potential"><small>${t("whos.potential")}</small><strong>${whosPotentialScore(round)}</strong><b>PTS</b></div></div>
+      <div class="whos-stage-body">
+        <div class="whos-mystery-orb" aria-hidden="true"><i></i><span>?</span></div>
+        <div class="whos-current-copy"><p class="whos-stage-eyebrow">${t("whos.stageQuestion")}</p><h2 id="whosCurrentHintTitle">${escapeHtml(formatWhosHint(descriptor, target))}</h2>${media ? whosHintContentMarkup(descriptor, target) : ""}</div>
+      </div>
+      <p class="whos-stage-risk"><span aria-hidden="true">◆</span>${t("whos.riskHint")}</p>
+    </section>`;
+  }
+
+  function whosDiscoveredHintsMarkup(round, target) {
+    const previous = round.hints.slice(0, Math.max(0, round.revealed - 1));
+    return `<section class="whos-discovered" aria-labelledby="whosDiscoveredTitle"><header><div><small>${t("whos.discoveredKicker")}</small><h2 id="whosDiscoveredTitle">${t("whos.discoveredTitle")}</h2></div><b>${previous.length}</b></header>${previous.length ? `<ol>${previous.map((descriptor, index) => `<li data-whos-difficulty="${escapeHtml(round.difficulty)}"><span>${String(index + 1).padStart(2, "0")}</span><div>${whosHintContentMarkup(descriptor, target)}</div><i aria-hidden="true">✓</i></li>`).join("")}</ol>` : `<p class="whos-discovered-empty">${t("whos.discoveredEmpty")}</p>`}</section>`;
+  }
+
+  function whosCompareRelation(guessValue, targetValue, higherKey = "whos.compare.higher", lowerKey = "whos.compare.lower") {
+    if (Number(guessValue) === Number(targetValue)) return { tone:"exact", arrow:"✓", label:t("whos.compare.exact") };
+    if (Number(targetValue) > Number(guessValue)) return { tone:"direction", arrow:"↑", label:t(higherKey) };
+    return { tone:"direction", arrow:"↓", label:t(lowerKey) };
+  }
+
+  function whosComparisonMarkup(round, target) {
+    const lastId = [...round.guesses].reverse().find(id => Number(id) !== Number(round.targetId));
+    const guessed = WHOS_CONTEXT.byId.get(Number(lastId));
+    if (!guessed || round.status !== "active") return "";
+    const generation = whosCompareRelation(guessed.generation, target.generation, "whos.compare.newer", "whos.compare.older");
+    const height = whosCompareRelation(guessed.height, target.height, "whos.compare.taller", "whos.compare.shorter");
+    const weight = whosCompareRelation(guessed.weight, target.weight, "whos.compare.heavier", "whos.compare.lighter");
+    const matchingTypes = guessed.types.filter(type => target.types.includes(type));
+    const exactTypes = matchingTypes.length === target.types.length && guessed.types.length === target.types.length;
+    const typeTone = exactTypes ? "exact" : matchingTypes.length ? "partial" : "miss";
+    const typeLabelText = exactTypes ? t("whos.compare.typesExact") : matchingTypes.length ? tp("whos.compare.typeOne", "whos.compare.typesMany", matchingTypes.length) : t("whos.compare.typesNone");
+    const item = (label, value, relation) => `<article class="whos-compare-item ${relation.tone}"><small>${label}</small><div><strong>${value}</strong><span aria-hidden="true">${relation.arrow}</span></div><p>${escapeHtml(relation.label)}</p></article>`;
+    return `<section class="whos-comparison" aria-labelledby="whosComparisonTitle"><header><div><small>${t("whos.compare.kicker")}</small><h2 id="whosComparisonTitle">${escapeHtml(whosPokemonName(guessed))}</h2></div><span>${t("whos.compare.clue")}</span></header><div class="whos-compare-grid">
+      ${item(t("whos.compare.generation"), `Gen ${guessed.generation}`, generation)}
+      <article class="whos-compare-item ${typeTone}"><small>${t("whos.compare.types")}</small><div class="whos-compare-types">${guessed.types.map(type => `<span>${escapeHtml(typeLabel(type))}</span>`).join("")}</div><p>${escapeHtml(typeLabelText)}</p></article>
+      ${item(t("whos.compare.height"), `${whosNumber(guessed.height / 10)} m`, height)}
+      ${item(t("whos.compare.weight"), `${whosNumber(guessed.weight / 10)} kg`, weight)}
+    </div></section>`;
+  }
+
+  function whosGuessesMarkup(round) {
+    const items = round.guesses.map(id => {
+      const item = WHOS_CONTEXT.byId.get(Number(id));
+      const correct = Number(id) === Number(round.targetId);
+      return `<li class="${correct ? "correct" : "wrong"}"><span>${escapeHtml(whosPokemonName(item))}</span><b aria-hidden="true">${correct ? "✓" : "×"}</b></li>`;
+    }).join("");
+    return `<section class="whos-guesses"><h2>${t("whos.guessesTitle")}</h2>${items ? `<ul>${items}</ul>` : `<p>${t("whos.noGuesses")}</p>`}</section>`;
+  }
+
+  function whosResultMarkup(round, target) {
+    const won = round.status === "won";
+    const name = whosPokemonName(target);
+    const score = QuizmonWhosThatPokemon.scoreRound(round);
+    const daily = round.mode === "daily";
+    const dailyEntry = daily ? whosDailyEntry(round.dailyDate) : null;
+    const awardedXp = Math.max(0, Number(dailyEntry?.result?.xp) || score.xp);
+    const distribution = daily && state.whosThat.daily.distribution?.date === round.dailyDate ? state.whosThat.daily.distribution : null;
+    return `<section class="whos-result ${won ? "won" : "lost"}" aria-labelledby="whosResultTitle">
+      <div class="whos-result-art"><img src="${escapeHtml(knowledgeArtwork(target))}" data-image-kind="pokemon" alt="${escapeHtml(name)}"><span>#${String(target.id).padStart(4, "0")}</span></div>
+      <div class="whos-result-copy"><p class="quiz-kicker">${t(won ? "whos.wonKicker" : "whos.lostKicker")}</p><h2 id="whosResultTitle">${t(won ? "whos.wonTitle" : "whos.lostTitle")}</h2><p>${t(won ? "whos.wonText" : "whos.lostText", { name, hint: round.revealed, lives: round.lives })}</p><div class="whos-result-identity"><strong>${escapeHtml(name)}</strong><span>${target.types.map(typeLabel).join(" / ")}</span></div>
+        <div class="whos-result-score"><span><small>${t("whos.result.points")}</small><strong>${score.points}</strong></span><span><small>XP</small><strong>+${awardedXp}</strong></span><span><small>${t("whos.result.hints")}</small><strong>${round.revealed}/5</strong></span></div>
+        ${daily ? `<div class="whos-global-status"><strong>${t("whos.daily.distributionTitle")}</strong>${distribution ? `<div class="whos-distribution">${[1,2,3,4,5].map(hint => `<span><small>${hint}</small><i style="height:${distribution.percentages[`hint${hint}`]}%"></i><b>${distribution.percentages[`hint${hint}`]}%</b></span>`).join("")}<span><small>×</small><i style="height:${distribution.percentages.lost}%"></i><b>${distribution.percentages.lost}%</b></span></div><p>${distribution.total} ${t("whos.daily.participants")}</p>` : `<p>${t("whos.daily.distributionPending")}</p>`}</div>` : ""}
+        <div class="whos-result-actions">${daily ? "" : `<button type="button" id="nextWhosRound" class="primary-button">${t("whos.nextRound")}<span aria-hidden="true">›</span></button>`}<button type="button" id="changeWhosDifficulty" class="secondary-button">${t(daily ? "whos.backToModes" : "whos.changeDifficulty")}</button></div>
+      </div>
+    </section>`;
+  }
+
+  function updateWhosSuggestions(input, root) {
+    if (!input || !root) return;
+    whosSuggestionQuery = input.value;
+    whosSelectedPokemonId = null;
+    const query = QuizmonWhosThatPokemon.normalizedName(input.value);
+    const submit = document.getElementById("whosGuessSubmit");
+    const selection = document.getElementById("whosGuessSelection");
+    const exact = QuizmonWhosThatPokemon.findPokemonByName(input.value, state.language, WHOS_CONTEXT);
+    if (exact) whosSelectedPokemonId = exact.id;
+    if (submit) submit.disabled = !exact;
+    if (selection) {
+      selection.hidden = !exact;
+      selection.innerHTML = exact ? `<span aria-hidden="true">✓</span><strong>${escapeHtml(whosPokemonName(exact))}</strong><small>#${String(exact.id).padStart(4, "0")}</small>` : "";
+    }
+    if (!query || exact) { root.innerHTML = ""; root.hidden = true; input.setAttribute("aria-expanded", "false"); return; }
+    const rows = WHOS_CONTEXT.pokemon.map(item => ({ item, name: whosPokemonName(item), normalized: QuizmonWhosThatPokemon.normalizedName(whosPokemonName(item)) }))
+      .filter(row => row.normalized.includes(query))
+      .sort((left, right) => Number(!left.normalized.startsWith(query)) - Number(!right.normalized.startsWith(query)) || left.name.localeCompare(right.name, state.language))
+      .slice(0, 6);
+    root.innerHTML = rows.map(row => `<button type="button" role="option" data-whos-suggestion="${row.item.id}"><span>${escapeHtml(row.name)}</span><small>#${String(row.item.id).padStart(4, "0")}</small></button>`).join("");
+    root.hidden = !rows.length;
+    input.setAttribute("aria-expanded", String(Boolean(rows.length)));
+    root.querySelectorAll("[data-whos-suggestion]").forEach(button => button.addEventListener("click", () => {
+      const item = WHOS_CONTEXT.byId.get(Number(button.dataset.whosSuggestion));
+      input.value = whosPokemonName(item);
+      whosSuggestionQuery = input.value;
+      whosSelectedPokemonId = item.id;
+      root.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      if (submit) submit.disabled = false;
+      if (selection) {
+        selection.hidden = false;
+        selection.innerHTML = `<span aria-hidden="true">✓</span><strong>${escapeHtml(whosPokemonName(item))}</strong><small>#${String(item.id).padStart(4, "0")}</small>`;
+      }
+      input.focus();
+    }));
+  }
+
+  function bindWhosGuessForm(round) {
+    const form = document.getElementById("whosGuessForm");
+    const input = document.getElementById("whosGuessInput");
+    const status = document.getElementById("whosInputStatus");
+    const suggestions = document.getElementById("whosSuggestions");
+    if (!form || !input || !status || !suggestions) return;
+    input.value = whosSuggestionQuery;
+    updateWhosSuggestions(input, suggestions);
+    input.addEventListener("input", () => { status.textContent = ""; updateWhosSuggestions(input, suggestions); });
+    input.addEventListener("focus", () => updateWhosSuggestions(input, suggestions));
+    input.addEventListener("keydown", event => { if (event.key === "Escape") { suggestions.hidden = true; input.setAttribute("aria-expanded", "false"); status.textContent = ""; } });
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const pokemon = WHOS_CONTEXT.byId.get(Number(whosSelectedPokemonId)) || QuizmonWhosThatPokemon.findPokemonByName(input.value, state.language, WHOS_CONTEXT);
+      if (!pokemon) { status.textContent = t("whos.invalidGuess"); status.className = "whos-input-status error"; haptic("error"); return; }
+      const result = QuizmonWhosThatPokemon.submitGuess(round, pokemon.id, WHOS_CONTEXT);
+      if (!result.accepted) {
+        status.textContent = t(result.reason === "duplicate" ? "whos.duplicateGuess" : "whos.invalidGuess");
+        status.className = "whos-input-status error";
+        haptic("error");
+        return;
+      }
+      state.whosThat.round = result.round;
+      completeWhosRound(result.round);
+      whosSuggestionQuery = "";
+      whosSelectedPokemonId = null;
+      saveState();
+      haptic(result.correct ? "success" : "error");
+      if (result.correct) enqueueToast("✓", t("whos.correctGuess"), "", "success");
+      renderPlay();
+      if (result.round.status === "active") requestAnimationFrame(() => {
+        const nextStatus = document.getElementById("whosInputStatus");
+        if (nextStatus) { nextStatus.textContent = t("whos.wrongGuess"); nextStatus.className = "whos-input-status warning"; }
+        document.getElementById("whosGuessInput")?.focus({ preventScroll: true });
+      });
+    });
+  }
+
+  function renderWhosRound(round) {
+    const target = WHOS_CONTEXT.byId.get(Number(round.targetId));
+    const active = round.status === "active";
+    view.innerHTML = `<section class="whos-page whos-round-page" aria-labelledby="whosRoundTitle">
+      <header class="whos-round-header"><div><p class="quiz-kicker">${t(round.mode === "daily" ? "whos.daily.kicker" : "whos.roundKicker")}</p><h1 id="whosRoundTitle">${round.mode === "daily" ? t("whos.daily.title") : whosDifficultyName(round.difficulty)}</h1><span>${t("whos.roundProgress", { current: round.revealed, total: round.hints.length })}</span></div><div class="whos-round-status">${whosLivesMarkup(round)}${active && round.mode !== "daily" ? `<button type="button" id="leaveWhosRound" class="secondary-button whos-leave-round">${t("whos.leaveRound")}</button>` : ""}</div></header>
+      ${whosProgressMarkup(round)}
+      ${active ? `<div class="whos-game-layout"><main class="whos-game-main">${whosCurrentStageMarkup(round, target)}${whosDiscoveredHintsMarkup(round, target)}</main><aside class="whos-answer-panel">
+        <form id="whosGuessForm" class="whos-guess-form" novalidate><div class="whos-answer-heading"><span aria-hidden="true">?</span><div><small>${t("whos.answerKicker")}</small><label for="whosGuessInput">${t("whos.guessLabel")}</label></div></div><div class="whos-search-wrap"><input id="whosGuessInput" type="search" placeholder="${escapeHtml(t("whos.guessPlaceholder"))}" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="go" role="combobox" aria-autocomplete="list" aria-controls="whosSuggestions" aria-expanded="false"><div id="whosSuggestions" class="whos-suggestions" role="listbox" hidden></div></div><div id="whosGuessSelection" class="whos-guess-selection" hidden></div><button id="whosGuessSubmit" type="submit" class="primary-button whos-guess-submit" disabled><span>${t("whos.guessAction")}</span><kbd>↵</kbd></button><p id="whosInputStatus" class="whos-input-status" role="status" aria-live="polite"></p></form>
+        ${whosComparisonMarkup(round, target)}${whosGuessesMarkup(round)}
+      </aside></div>` : `${whosResultMarkup(round, target)}${whosHintsMarkup(round, target)}`}
+    </section>`;
+    if (active) bindWhosGuessForm(round);
+    bindWhosMediaHints(view);
+    document.getElementById("leaveWhosRound")?.addEventListener("click", () => { state.whosThat.round = null; whosSuggestionQuery = ""; whosSelectedPokemonId = null; saveState(); renderWhosSetup(); });
+    document.getElementById("nextWhosRound")?.addEventListener("click", () => startWhosRound(round.difficulty));
+    document.getElementById("changeWhosDifficulty")?.addEventListener("click", () => { state.whosThat.round = null; whosSuggestionQuery = ""; whosSelectedPokemonId = null; saveState(); renderWhosSetup(); });
+  }
+
+  function renderPlay() {
+    const round = QuizmonWhosThatPokemon.sanitizeRound(state.whosThat.round, WHOS_CONTEXT);
+    if (state.whosThat.round && !round) { state.whosThat.round = null; saveState(); }
+    else if (round) state.whosThat.round = round;
+    if (round) renderWhosRound(round);
+    else renderWhosSetup();
+  }
+
 
   function renderFutureArea(kind) {
     const isPlay=kind==="play";
@@ -1956,75 +2438,86 @@
     document.querySelectorAll("[data-future-destination]").forEach(button=>button.addEventListener("click",()=>setRoute(button.dataset.futureDestination)));
   }
 
+
+  function refreshedHomeHeroVisualMarkup() {
+    return `<div class="refresh-hero-visual" aria-hidden="true"><span class="refresh-hero-orb"><i></i></span><span class="refresh-hero-pedestal"><i></i><i></i><i></i></span><span class="refresh-hero-spark spark-one"></span><span class="refresh-hero-spark spark-two"></span><span class="refresh-hero-spark spark-three"></span></div>`;
+  }
+
+  function refreshedHomePlayMarkup() {
+    return `<section class="refresh-play-panel" aria-labelledby="refreshPlayTitle">
+      <div class="refresh-section-heading"><span class="refresh-section-icon">${iconSvg("play")}</span><div><small>${t("home.refreshEyebrow")}</small><h2 id="refreshPlayTitle">${t("home.refreshPlayTitle")}</h2></div></div>
+      <div class="refresh-play-grid">
+        <button class="refresh-play-card pokeidle" type="button" data-home-play="pokeidle" aria-label="${escapeHtml(t("home.refreshPokeidleAction"))}: ${escapeHtml(t("home.refreshPokeidleTitle"))}">
+          <span class="refresh-play-card-head"><span class="refresh-play-card-icon">${iconSvg("idle")}</span><strong>${t("home.refreshPokeidleTitle")}</strong></span>
+          <span class="refresh-play-art idle-art" aria-hidden="true"><i class="idle-orb"></i><i class="idle-crystal one"></i><i class="idle-crystal two"></i><i class="idle-ground"></i></span>
+          <span class="refresh-play-copy">${t("home.refreshPokeidleDesc")}</span>
+          <span class="refresh-play-action">${t("home.refreshPokeidleAction")}<i aria-hidden="true">›</i></span>
+        </button>
+        <article class="refresh-play-card campaign is-coming" aria-labelledby="campaignCardTitle">
+          <span class="refresh-play-card-head"><span class="refresh-play-card-icon">${iconSvg("campaign")}</span><strong id="campaignCardTitle">${t("home.refreshCampaignTitle")}</strong></span>
+          <span class="refresh-play-art campaign-art" aria-hidden="true"><i class="campaign-path"></i><i class="campaign-node node-one"></i><i class="campaign-node node-two"></i><i class="campaign-node node-three"></i><i class="campaign-gate"></i></span>
+          <span class="refresh-play-copy">${t("home.refreshCampaignDesc")}</span>
+          <span class="refresh-coming-badge">${t("home.refreshCampaignComing")}</span>
+        </article>
+      </div>
+    </section>`;
+  }
+
+  function refreshedHomeMotivationMarkup() {
+    const goal = dailyGoalInfo();
+    const activeFlames = Math.min(6, Math.max(0, goal.streak));
+    const flames = Array.from({ length: 6 }, (_, index) => `<i class="${index < activeFlames ? "is-active" : ""}">${iconSvg("flame")}</i>`).join("");
+    return `<section class="refresh-motivation-grid" aria-label="${escapeHtml(t("home.refreshDailyHint"))}">
+      <button id="homeDailyGoal" class="refresh-motivation-card daily ${goal.completed ? "is-complete" : ""}" type="button" style="--refresh-goal-progress:${goal.percent}%">
+        <span class="refresh-motivation-icon">${goal.completed ? iconSvg("accuracy") : iconSvg("target")}</span>
+        <span class="refresh-motivation-copy"><small>${t("daily.kicker")}</small><strong>${goal.completed ? t("daily.completedTitle") : t("daily.title")}</strong><em>${t("daily.progressText", { progress: goal.progress, target: goal.target })}</em></span>
+        <span class="refresh-goal-track" aria-label="${goal.percent}%"><i></i></span>
+        ${dailyGoalWeekMarkup()}
+        <span class="refresh-motivation-link">${goal.completed ? t("daily.keepTraining") : t("daily.continue")}<b aria-hidden="true">›</b></span>
+      </button>
+      <article class="refresh-motivation-card streak">
+        <span class="refresh-motivation-icon">${iconSvg("flame")}</span>
+        <span class="refresh-motivation-copy"><small>${t("home.refreshStreakTitle")}</small><strong>${tp("home.refreshStreakDaysOne", "home.refreshStreakDays", goal.streak)}</strong><em>${t("home.refreshStreakHint")}</em></span>
+        <span class="refresh-streak-flames" aria-hidden="true">${flames}</span>
+      </article>
+    </section>`;
+  }
+
   function renderHome() {
     session = null;
     const level = getLevelInfo();
     const homeBanner = selectedBanner();
-    const recommendationContext = buildRecommendationContext();
-    const recommendation = primaryLearningRecommendation(recommendationContext);
+    const nextXp = level.next ? level.next.xp : state.stats.xp;
 
     view.innerHTML = `
-      <section class="game-home restored-home" aria-labelledby="gameHomeTitle">
-        <section class="game-home-stage">
+      <section class="refresh-home" aria-labelledby="refreshHomeTitle">
+        <section class="refresh-home-stage">
           <div class="home-banner-layer profile-banner profile-banner-${homeBanner.id}" aria-hidden="true"><i></i><i></i><i></i></div>
-          <div class="game-home-decoration" aria-hidden="true"><span></span><span></span><span></span></div>
-
-          <div class="game-home-header restored-home-header">
-            <div class="game-home-intro">
-              <p class="game-home-eyebrow">${t("home.gameEyebrow")}</p>
-              <h1 id="gameHomeTitle">${t("home.gameTitle")}</h1>
-              <p>${t("home.gameSubtitle")}</p>
+          <section class="refresh-home-hero">
+            <div class="refresh-home-intro">
+              <p class="refresh-home-eyebrow">${t("home.refreshEyebrow")}</p>
+              <h1 id="refreshHomeTitle"><span>${t("home.refreshTitleLead")}</span><strong>${t("home.refreshTitleAccent")}</strong></h1>
+              <p>${t("home.refreshSubtitle")}</p>
             </div>
+            ${refreshedHomeHeroVisualMarkup()}
+          </section>
 
-            <button class="game-trainer-card compact" id="openTrainerProfile" type="button" aria-label="${escapeHtml(t("profile.openLabel"))}">
-              <div class="game-profile-avatar-wrap">${profileAvatarMarkup(selectedAvatar().id, "game-profile-avatar")}<span>Lv. ${level.current.level}</span></div>
-              <div class="game-trainer-copy"><small>${t("profile.homeLabel")}</small><strong>${escapeHtml(trainerName())}</strong><span>${escapeHtml(cosmeticName(selectedTitle()))}</span><div class="game-level-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></div></div>
-              <span class="game-trainer-arrow" aria-hidden="true">›</span>
-            </button>
-          </div>
+          <button class="refresh-trainer-card" id="openTrainerProfile" type="button" aria-label="${escapeHtml(t("profile.openLabel"))}">
+            <span class="refresh-profile-avatar-wrap">${profileAvatarMarkup(selectedAvatar().id, "refresh-profile-avatar")}<b>Lv. ${level.current.level}</b></span>
+            <span class="refresh-trainer-copy"><small>${t("profile.homeLabel")}</small><strong>${escapeHtml(trainerName())}</strong><em>${escapeHtml(cosmeticName(selectedTitle()))}</em><span class="refresh-level-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></span><span class="refresh-level-xp">${state.stats.xp} / ${nextXp} XP</span></span>
+            <span class="refresh-trainer-arrow" aria-hidden="true">›</span>
+          </button>
 
-          <div class="game-home-layout restored-home-layout">
-            <section class="game-menu-panel expanded-main-menu-panel" aria-labelledby="gameMenuTitle">
-              <div class="game-panel-heading">
-                <span id="gameMenuTitle">${t("home.gameMenuTitle")}</span>
-                <small>${t("home.gameMenuHint")}</small>
-              </div>
-              <div class="game-menu-list expanded-main-menu">
-                ${gameMenuButton("play", iconSvg("play"), "01", t("home.gamePlay"), t("home.gamePlayDesc"))}
-                ${gameMenuButton("train", iconSvg("train"), "02", t("home.gameTrain"), t("home.gameTrainDesc"))}
-                ${gameMenuButton("learn", iconSvg("learn"), "03", t("home.gameLearn"), t("home.gameLearnDesc"))}
-                ${gameMenuButton("knowledge", iconSvg("knowledge"), "04", t("home.gameKnowledge"), t("home.gameKnowledgeDesc"))}
-                ${gameMenuButton("stats", iconSvg("stats"), "05", t("home.gameProgress"), t("home.gameProgressDesc"))}
-                ${gameMenuButton("settings", iconSvg("settings"), "06", t("home.gameSettings"), t("home.gameSettingsDesc"))}
-                ${gameMenuButton("support", iconSvg("support"), "07", t("home.gameSupport"), t("home.gameSupportDesc"))}
-              </div>
-            </section>
-
-            <aside class="game-command-panel modern-home-command" aria-labelledby="gameTodayTitle">
-              <div class="game-panel-heading">
-                <span id="gameTodayTitle">${t("home.gameToday")}</span>
-                <small>${t("home.gameTodayHint")}</small>
-              </div>
-              ${homeAdaptiveCardMarkup(recommendation)}
-              ${dailyGoalCardMarkup("homeDailyGoal")}
-            </aside>
-          </div>
+          ${refreshedHomePlayMarkup()}
+          ${refreshedHomeMotivationMarkup()}
         </section>
         ${deferredInstallPrompt ? `<button class="game-install-card" id="installApp"><span>＋</span><strong>${t("home.install")}</strong><small>${t("home.installDesc")}</small><i>›</i></button>` : ""}
       </section>`;
 
-    document.querySelectorAll("[data-destination]").forEach(button=>button.addEventListener("click",()=>{
-      const destination=button.dataset.destination;
-      if(destination==="knowledge"){
-        knowledgeView="home";knowledgePokemonId=null;knowledgeContentKind=null;knowledgeContentId=null;learnType=null;knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;
-      }
-      setRoute(destination);
-    }));
-    document.querySelector("[data-primary-recommendation]")?.addEventListener("click",()=>activatePrimaryRecommendation(recommendation));
-    document.querySelector("[data-primary-reason]")?.addEventListener("click",()=>showPrimaryRecommendationReason(recommendation));
-    document.getElementById("homeDailyGoal")?.addEventListener("click",startDailyGoalTraining);
-    document.getElementById("openTrainerProfile")?.addEventListener("click",()=>setRoute("profile"));
-    document.getElementById("installApp")?.addEventListener("click",installApp);
+    document.querySelector("[data-home-play='pokeidle']")?.addEventListener("click", () => setRoute("play"));
+    document.getElementById("homeDailyGoal")?.addEventListener("click", startDailyGoalTraining);
+    document.getElementById("openTrainerProfile")?.addEventListener("click", () => setRoute("profile"));
+    document.getElementById("installApp")?.addEventListener("click", installApp);
   }
 
   function renderProfile() {
@@ -2044,7 +2537,7 @@
     const nextReward = nextLevelRewardInfo(level.current.level);
 
     view.innerHTML = `
-      <section class="trainer-profile-page" aria-labelledby="trainerProfileTitle">
+      <section class="trainer-profile-page visual-refresh-profile" aria-labelledby="trainerProfileTitle">
         <section class="trainer-profile-hero profile-banner profile-banner-${banner.id}">
           <div class="profile-banner-pattern" aria-hidden="true"><i></i><i></i><i></i></div>
           <div class="profile-hero-main">
@@ -2073,7 +2566,7 @@
         <section class="profile-dashboard-grid profile-priority-grid">
           <article class="profile-panel profile-level-panel">
             <div class="profile-panel-heading">
-              <span>↗</span>
+              <span>${iconSvg("stats")}</span>
               <div><small>${t("profile.journey")}</small><h2>${t("profile.levelProgress")}</h2></div>
             </div>
             <div class="profile-level-summary">
@@ -2087,7 +2580,7 @@
 
           <article class="profile-panel profile-record-panel">
             <div class="profile-panel-heading">
-              <span>✦</span>
+              <span>${iconSvg("trophy")}</span>
               <div><small>${t("profile.personalBest")}</small><h2>${t("profile.records")}</h2></div>
             </div>
             <div class="profile-record-list">
@@ -2127,9 +2620,9 @@
 
         <section class="profile-kpi-grid" aria-label="${escapeHtml(t("profile.overview"))}">
           ${profileKpi("XP", t("profile.xp"), state.stats.xp, level.next ? t("profile.xpRemaining", { count: remainingXp }) : t("profile.maxLevel"))}
-          ${profileKpi("◎", t("profile.accuracy"), `${accuracy}%`, `${state.stats.correct}/${state.stats.total} ${t("common.correct").toLowerCase()}`)}
-          ${profileKpi("▦", t("profile.sessions"), state.stats.sessions, t("profile.completedSessions"))}
-          ${profileKpi("◇", t("profile.types"), `${mastered}/18`, t("profile.typesHint", { explored }))}
+          ${profileKpi(iconSvg("accuracy"), t("profile.accuracy"), `${accuracy}%`, `${state.stats.correct}/${state.stats.total} ${t("common.correct").toLowerCase()}`)}
+          ${profileKpi(iconSvg("sessions"), t("profile.sessions"), state.stats.sessions, t("profile.completedSessions"))}
+          ${profileKpi(iconSvg("knowledge"), t("profile.types"), `${mastered}/18`, t("profile.typesHint", { explored }))}
         </section>
 
         <section class="profile-activity-card">
@@ -2479,7 +2972,26 @@
       answered: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M9.2 9.5a3 3 0 1 1 4.3 2.7c-.9.4-1.5 1.1-1.5 1.8"></path><path d="M12 17h.01"></path></svg>`,
       accuracy: `<svg ${attrs}><path d="M20 6 9 17l-5-5"></path></svg>`,
       time: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>`,
-      sessions: `<svg ${attrs}><rect x="5" y="4" width="14" height="16" rx="2"></rect><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>`
+      sessions: `<svg ${attrs}><rect x="5" y="4" width="14" height="16" rx="2"></rect><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>`,
+      idle: `<svg ${attrs}><path d="M12 3.5 14 8l4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2z"></path><path d="M5 17.5h14"></path><path d="M7 20h10"></path></svg>`,
+      campaign: `<svg ${attrs}><path d="M4 19c3.5-5.5 4.5-2 7-6s4-1 9-8"></path><circle cx="4" cy="19" r="2"></circle><circle cx="11" cy="13" r="2"></circle><circle cx="20" cy="5" r="2"></circle></svg>`,
+      target: `<svg ${attrs}><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m14.5 9.5 5-5"></path><path d="M16.5 4.5h3v3"></path></svg>`,
+      flame: `<svg ${attrs}><path d="M13.5 3.5c.7 3.1-1.5 4.4-2.8 6.1-1.2-1-1.6-2.1-1.4-3.5C6.7 8 5 10.4 5 13.2A7 7 0 0 0 19 13c0-4-2.5-6.8-5.5-9.5z"></path><path d="M10 17.5c0-1.7 1.1-2.8 2.3-4.2.6 1.3 1.7 2.2 1.7 3.8a2 2 0 0 1-4 .4z"></path></svg>`,
+      trophy: `<svg ${attrs}><path d="M8 4h8v4a4 4 0 0 1-8 0z"></path><path d="M8 6H5v1a4 4 0 0 0 4 4"></path><path d="M16 6h3v1a4 4 0 0 1-4 4"></path><path d="M12 12v5"></path><path d="M8 20h8"></path><path d="M9 17h6"></path></svg>`,
+      back: `<svg ${attrs}><path d="m15 18-6-6 6-6"></path></svg>`,
+      chevronDown: `<svg ${attrs}><path d="m7 10 5 5 5-5"></path></svg>`,
+      language: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path></svg>`,
+      theme: `<svg ${attrs}><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z"></path></svg>`,
+      motion: `<svg ${attrs}><path d="M4 12h9"></path><path d="m10 8 4 4-4 4"></path><path d="M17 7h3"></path><path d="M17 12h3"></path><path d="M17 17h3"></path></svg>`,
+      haptic: `<svg ${attrs}><path d="M8 5v14"></path><path d="M16 5v14"></path><path d="M4 9v6"></path><path d="M20 9v6"></path><path d="M11 7v10"></path><path d="M13 7v10"></path></svg>`,
+      help: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M9.7 9a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.3 1-1.3 1.7"></path><path d="M12 17h.01"></path></svg>`,
+      data: `<svg ${attrs}><ellipse cx="12" cy="5" rx="7" ry="3"></ellipse><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5"></path><path d="M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7"></path></svg>`,
+      download: `<svg ${attrs}><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
+      upload: `<svg ${attrs}><path d="M12 21V9"></path><path d="m7 14 5-5 5 5"></path><path d="M5 3h14"></path></svg>`,
+      feedback: `<svg ${attrs}><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>`,
+      diagnostics: `<svg ${attrs}><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 15 3-4 3 2 4-6"></path><circle cx="17" cy="7" r="1"></circle></svg>`,
+      warning: `<svg ${attrs}><path d="m12 3 10 18H2z"></path><path d="M12 9v5"></path><path d="M12 17h.01"></path></svg>`,
+      trash: `<svg ${attrs}><path d="M4 7h16"></path><path d="M9 3h6l1 4H8z"></path><path d="m6 7 1 14h10l1-14"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`
     };
     return icons[name] || icons.home;
   }
@@ -2530,12 +3042,12 @@
     if(openMistakes.length) targeted.push(`<button class="training-focus-card" id="reviewOpenMistakes"><span class="training-focus-icon">${iconSvg("review")}</span><span class="training-focus-copy"><small>${t("cleanup.target.mistakes")}</small><strong>${t("train.review")}</strong><p>${t("train.reviewDesc")}</p></span><span class="training-focus-count">${openMistakes.length}</span></button>`);
     if(state.lastMode&&state.lastConfig&&targeted.length<3) targeted.push(`<button class="training-focus-card" id="repeatLastTraining"><span class="training-focus-icon">${iconSvg("repeat")}</span><span class="training-focus-copy"><small>${t("train.continueLabel")}</small><strong>${t("home.continue")}</strong><p>${t("home.continueDesc",{mode:modeName(state.lastMode)})}</p></span><span class="training-focus-arrow">›</span></button>`);
 
-    view.innerHTML=`<section class="training-hub adaptive-training-hub">
-      <section class="training-command-hero simplified"><div class="training-command-copy"><p class="quiz-kicker">${t("cleanup.trainEyebrow")}</p><h1>${t("cleanup.trainTitle")}</h1><p>${t("cleanup.trainSubtitle")}</p></div><span class="training-adaptive-seal">◎ ${t("cleanup.adaptiveBadge")}</span></section>
+    view.innerHTML=`<section class="training-hub adaptive-training-hub visual-refresh-training">
+      <section class="training-command-hero simplified"><div class="training-command-copy"><p class="quiz-kicker">${t("cleanup.trainEyebrow")}</p><h1>${t("cleanup.trainTitle")}</h1><p>${t("cleanup.trainSubtitle")}</p></div><div class="training-hero-visual" aria-hidden="true"><span>${iconSvg("train")}</span><i></i><i></i><i></i></div><span class="training-adaptive-seal">${iconSvg("weak")} ${t("cleanup.adaptiveBadge")}</span></section>
       ${adaptiveHeroMarkup(recommendation,"training")}
       ${compactDailyProgressMarkup("trainingDailyMix")}
       ${targeted.length?`<section class="training-section" aria-labelledby="targetedTrainingTitle"><div class="training-section-heading"><div><small>${t("cleanup.targetedKicker")}</small><h2 id="targetedTrainingTitle">${t("cleanup.targetedTitle")}</h2></div><p>${t("cleanup.targetedHint")}</p></div><div class="training-focus-grid targeted">${targeted.slice(0,3).join("")}</div></section>`:""}
-      ${customLists.length?`<section class="training-section" aria-labelledby="customTrainingListsTitle"><div class="training-section-heading"><div><small>${t("trainingLists.kicker")}</small><h2 id="customTrainingListsTitle">${t("trainingLists.title")}</h2></div><button type="button" class="ghost-button training-list-manage-link" data-manage-training-lists>${t("trainingLists.manage")}</button></div><div class="training-list-quick-grid">${customLists.slice(0,3).map(list=>`<button type="button" class="training-list-quick-card" data-start-training-list="${escapeHtml(list.id)}"><span aria-hidden="true">${list.kind==="pokemon"?"◉":"◆"}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t(`trainingLists.kind.${list.kind}`)} · ${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><i aria-hidden="true">›</i></button>`).join("")}</div></section>`:""}
+      ${customLists.length?`<section class="training-section" aria-labelledby="customTrainingListsTitle"><div class="training-section-heading"><div><small>${t("trainingLists.kicker")}</small><h2 id="customTrainingListsTitle">${t("trainingLists.title")}</h2></div><button type="button" class="ghost-button training-list-manage-link" data-manage-training-lists>${t("trainingLists.manage")}</button></div><div class="training-list-quick-grid">${customLists.slice(0,3).map(list=>`<button type="button" class="training-list-quick-card" data-start-training-list="${escapeHtml(list.id)}"><span aria-hidden="true">${list.kind==="pokemon"?iconSvg("pokemon"):iconSvg("list")}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t(`trainingLists.kind.${list.kind}`)} · ${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><i aria-hidden="true">›</i></button>`).join("")}</div></section>`:""}
       <section class="training-section" aria-labelledby="trainingModesTitle"><div class="training-section-heading"><div><small>${t("cleanup.freeKicker")}</small><h2 id="trainingModesTitle">${t("train.free")}</h2></div><p>${t("cleanup.freeHint")}</p></div><div class="training-mode-grid simplified">${trainingModeCard("effectiveness",t("mode.effectivenessDesc"))}${trainingModeCard("multiplier",t("mode.multiplierDesc"))}${trainingModeCard("impact",t("mode.impactDesc"))}${trainingModeCard("pokemon",t("mode.pokemonDesc"))}</div></section>
     </section>`;
 
@@ -2554,7 +3066,7 @@
   function trainingModeCard(mode, description) {
     const visual=modeVisual(mode);
     const modeStats=state.stats.modes[mode]||blankModeStats();
-    return `<button class="training-mode-card simplified" data-mode="${mode}"><span class="training-mode-icon">${visual.icon}</span><span class="training-mode-copy"><strong>${escapeHtml(modeName(mode))}</strong><p>${escapeHtml(description)}</p><small>${modeStats.total?t("cleanup.freePlayed"):t("cleanup.freeConfigure")}</small></span><span class="training-mode-arrow">›</span></button>`;
+    return `<button class="training-mode-card simplified mode-${mode}" data-mode="${mode}"><span class="training-mode-icon">${visual.icon}</span><span class="training-mode-copy"><strong>${escapeHtml(modeName(mode))}</strong><p>${escapeHtml(description)}</p><small>${modeStats.total?t("cleanup.freePlayed"):t("cleanup.freeConfigure")}</small></span><span class="training-mode-arrow">›</span></button>`;
   }
 
   function renderSetup(mode) {
@@ -2562,9 +3074,9 @@
     const modeDescription = t(`mode.${mode}Desc`);
     const visual = modeVisual(mode);
     view.innerHTML = `
-      <section class="setup-shell">
+      <section class="setup-shell visual-refresh-setup mode-${mode}">
         <aside class="setup-mode-preview">
-          <div class="setup-preview-top"><span class="setup-preview-number">${visual.number}</span><span class="setup-preview-icon">${visual.icon}</span></div>
+          <div class="setup-preview-top"><span class="setup-preview-number">${visual.number}</span><span class="setup-preview-icon">${visual.icon}</span><span class="setup-preview-orbit" aria-hidden="true"><i></i><i></i><i></i></span></div>
           <p class="quiz-kicker">${t("setup.kicker")}</p>
           <h1>${escapeHtml(modeName(mode))}</h1>
           <p>${escapeHtml(modeDescription)}</p>
@@ -2824,7 +3336,7 @@
 
   function renderSessionLoading() {
     if (!session) return;
-    view.innerHTML = `<section class="panel quiz-session-panel session-loading-panel" aria-busy="true">${sessionHeader()}<div class="loading-state-card"><span class="loading-orbit" aria-hidden="true"><i></i></span><h1>${t("session.loadingPokemon")}</h1><p>${t("session.loadingHint")}</p></div></section>`;
+    view.innerHTML = `<section class="panel quiz-session-panel visual-refresh-session session-loading-panel" aria-busy="true">${sessionHeader()}<div class="loading-state-card"><span class="loading-orbit" aria-hidden="true"><i></i></span><h1>${t("session.loadingPokemon")}</h1><p>${t("session.loadingHint")}</p></div></section>`;
   }
 
   async function renderQuestion() {
@@ -2891,7 +3403,7 @@
   function renderEffectivenessQuestion(spec) {
     const effective = spec.questionKind === "effective";
     spec.selected = new Set();
-    view.innerHTML = `<section class="panel quiz-session-panel">${sessionHeader()}${hintHtml("effectiveness",t("session.multiHint"),t("session.multiHintText"))}
+    view.innerHTML = `<section class="panel quiz-session-panel visual-refresh-session">${sessionHeader()}${hintHtml("effectiveness",t("session.multiHint"),t("session.multiHintText"))}
       <div class="quiz-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${t("session.chooseAnswer")}</p><h1>${t("session.effectQuestion",{relation:effective?t("session.veryEffective"):t("session.notEffective")})}</h1><p>${spec.correctTargets.length===1?t("session.answerCountOne"):t("session.answerCountMany",{count:spec.correctTargets.length})}</p><div class="question-role-label">${t("learn.attackType")}</div><div class="type-prompt question-type-prompt">${typeChip(spec.attackingType,"large")}</div></div>
         <div class="answer-grid">${spec.options.map(type=>`<button class="answer-button" data-answer="${type}" aria-pressed="false">${typeChip(type)}</button>`).join("")}</div>
@@ -2932,7 +3444,7 @@
   function renderMultiplierQuestion(spec) {
     spec.assignments=Object.fromEntries(TYPES.map(type=>[type,null])); spec.selectedType=null;
     const buckets=[0,.25,.5,1,2,4];
-    view.innerHTML=`<section class="panel quiz-session-panel multiplier-panel">${sessionHeader()}${hintHtml("multiplier",t("session.sortHint"),t("session.sortHintText"))}
+    view.innerHTML=`<section class="panel quiz-session-panel visual-refresh-session multiplier-panel">${sessionHeader()}${hintHtml("multiplier",t("session.sortHint"),t("session.sortHintText"))}
       <div class="quiz-question-stage multiplier-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${t("session.sortTypes")}</p><h1>${t("session.multiplierQuestion")}</h1><p>${t("session.multiplierSubtitle")}</p><div class="question-role-label">${t("learn.defendingType")}</div><div class="defender-types question-type-prompt">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div></div>
         <div class="bucket-grid">${buckets.map(value=>`<button class="bucket" data-bucket="${value}" aria-label="${escapeHtml(t("session.assignTo",{value:formatMultiplier(value)}))}"><span class="bucket-title">${formatMultiplier(value)}</span><span class="bucket-items"></span></button>`).join("")}</div>
@@ -3111,7 +3623,7 @@
 
   function renderImpactQuestion(spec) {
     spec.selectedMultiplier = null;
-    view.innerHTML = `<section class="panel quiz-session-panel">${sessionHeader()}${hintHtml("impact",t("session.impactHint"),t("session.impactHintText"))}
+    view.innerHTML = `<section class="panel quiz-session-panel visual-refresh-session">${sessionHeader()}${hintHtml("impact",t("session.impactHint"),t("session.impactHintText"))}
       <div class="quiz-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${spec.pokemon?t("path.pokemonImpactKicker"):t("session.calculateImpact")}</p><h1>${spec.pokemon?t("path.pokemonImpactQuestion"):t("session.impactQuestion")}</h1><p>${spec.pokemon?t("path.pokemonImpactSubtitle"):t("session.impactSubtitle")}</p>
         <div class="matchup-display ${spec.pokemon?"pokemon-application":""}"><div><small>${t("learn.attackType")}</small>${typeChip(spec.attackingType,"large")}</div><span class="matchup-arrow">→</span><div><small>${t("learn.defendingType")}</small>${spec.pokemon?`<div class="path-session-pokemon"><img src="${escapeHtml(spec.pokemon.image)}" alt="${escapeHtml(spec.pokemon.name)}"><div><strong>${escapeHtml(spec.pokemon.name)}</strong><span>${spec.defendingTypes.map(type=>typeChip(type,"small")).join("")}</span></div></div>`:`<div class="defender-types compact">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div>`}</div></div></div>
@@ -3157,7 +3669,7 @@
     const showImage=spec.display!=="name";
     const imageOnly=spec.display==="image";
     const showName=!imageOnly || !navigator.onLine;
-    view.innerHTML=`<section class="panel quiz-session-panel pokemon-stage">${sessionHeader()}${hintHtml("pokemon",t("session.pokemonHint"),t("session.pokemonHintText"))}
+    view.innerHTML=`<section class="panel quiz-session-panel visual-refresh-session pokemon-stage">${sessionHeader()}${hintHtml("pokemon",t("session.pokemonHint"),t("session.pokemonHintText"))}
       <div class="quiz-question-stage pokemon-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${t("session.identifyType")}</p><h1>${t("session.pokemonQuestion")}</h1><p>${t("session.chooseOneTwo")}</p></div>
         ${showImage?`<div class="pokemon-frame"><img class="pokemon-art" src="${escapeHtml(spec.pokemon.image)}" alt="${escapeHtml(spec.pokemon.name)}"><span class="pokemon-placeholder" hidden>?</span></div>`:""}
@@ -3535,7 +4047,7 @@
     addXp(baseXp+bonusXp+dailyGoal.bonusXp);
     if(dailyGoal.completedNow){
       setTimeout(()=>haptic("goal"),160);
-      enqueueToast("🔥",t("daily.completedTitle"),tp("daily.goalRewardToastOne","daily.goalRewardToast",dailyGoal.streak,{count:dailyGoal.bonusXp,streak:dailyGoal.streak}),"level");
+      enqueueToast("🔥",t("daily.completedTitle"),dailyGoalRewardToast(dailyGoal.streak,dailyGoal.bonusXp),"level");
     }
     checkAchievements();
     updateHeader();
@@ -3784,7 +4296,7 @@
     if(!session){setRoute("home");return;}
     const { total,rate,xpEarned,canReview,reviewComplete,verdict,visual,duration,levelInfo,unlockedItems,unlockCount,didLevelUp,nextReward,momentum,comparison,dailyGoal,wrongFocus }=buildSummaryContext();
 
-    view.innerHTML=`<section class="summary-shell cleanup-summary">
+    view.innerHTML=`<section class="summary-shell cleanup-summary visual-refresh-summary">
       <section class="summary-hero-card">
         <div class="summary-mode-pill"><span>${visual.icon}</span><strong>${escapeHtml(sessionModeName())}</strong></div>
         <div class="summary-hero-grid">
@@ -3808,7 +4320,7 @@
       ${unlockCount?`<section class="summary-unlock-card"><div class="summary-unlock-heading"><span aria-hidden="true">✦</span><div><p class="quiz-kicker">${t("summary.levelUp")}</p><h2>${t("rewards.newTitle")}</h2><p>${t("rewards.newText",{count:unlockCount})}</p></div><button id="openUnlockedRewards" class="secondary-button">${t("rewards.open")}</button></div><div class="reward-list-grid">${rewardListMarkup(unlockedItems)}</div></section>`:""}
 
       <details class="summary-secondary-details">
-        <summary><span><strong>${t("summary.details")}</strong><small>${t("summary.detailsHint")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <summary><span><strong>${t("summary.details")}</strong><small>${t("summary.detailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
         <section class="summary-metric-grid">
           <article><small>${t("summary.duration")}</small><strong>${formatDuration(duration)}</strong></article>
           <article><small>${t("summary.bestCombo")}</small><strong>×${Math.max(0,Number(session.bestCombo||0))}</strong></article>
@@ -3837,7 +4349,7 @@
   }
 
   function renderKnowledgePage() {
-    view.innerHTML=`<section class="learn-page knowledge-route-page">
+    view.innerHTML=`<section class="learn-page knowledge-route-page visual-refresh-knowledge">
       <section class="learn-workspace panel knowledge-route-workspace"><div id="learnContent"></div></section>
     </section>`;
     renderKnowledge();
@@ -3970,7 +4482,7 @@
         <label class="flashcard-source-select"><span>${t("flashcards.generationLabel")}</span><select data-flashcard-generation><option value="all" ${generationValue==="all"?"selected":""}>${escapeHtml(t("knowledge.generationFilter.all"))}</option>${QuizmonKnowledgeFilter.GENERATIONS.map(generation=>`<option value="${generation}" ${String(generation)===generationValue?"selected":""}>${escapeHtml(t("knowledge.generationFilter.option",{generation}))}</option>`).join("")}</select></label>
         <p class="flashcard-generation-note">${t("flashcards.generationNote")}</p>
       </section>`;
-    return `<section class="flashcards-setup" aria-labelledby="flashcardsSetupTitle">
+    return `<section class="flashcards-setup visual-refresh-flashcards-setup" aria-labelledby="flashcardsSetupTitle">
       <section class="flashcards-intro-card">
         <span aria-hidden="true">▤</span>
         <div><p class="quiz-kicker">${t("flashcards.kicker")}</p><h3 id="flashcardsSetupTitle">${t("flashcards.setupTitle")}</h3><p>${t("flashcards.setupTextPersonal")}</p></div>
@@ -4133,7 +4645,7 @@
     const resolved=Math.max(0,initiallyOpen-result.unresolved);
     const resultTitle=result.unresolved?t("flashcards.unresolvedTitle",{count:result.unresolved}):initiallyOpen?t("flashcards.allResolvedTitle"):t("flashcards.perfectTitle");
     const resultText=result.unresolved?t("flashcards.unresolvedText",{count:result.unresolved,resolved}):initiallyOpen?t("flashcards.allResolvedText",{resolved}):t("flashcards.perfectText",{count:result.total});
-    return `<section class="flashcard-summary" aria-labelledby="flashcardSummaryTitle">
+    return `<section class="flashcard-summary visual-refresh-flashcard-summary" aria-labelledby="flashcardSummaryTitle">
       <section class="flashcard-summary-hero"><span aria-hidden="true">✓</span><div><p class="quiz-kicker">${t("flashcards.summaryKicker")}</p><h3 id="flashcardSummaryTitle">${t("flashcards.summaryTitle")}</h3><p>${t("flashcards.summaryText",{count:result.total,source:flashcardSession.sourceLabel||flashcardKindName(flashcardSession.kind)})}</p></div></section>
       <div class="flashcard-summary-metrics"><article><small>${t("flashcards.ratingKnown")}</small><strong>${result.known}</strong></article><article><small>${t("flashcards.ratingUnsure")}</small><strong>${result.unsure}</strong></article><article><small>${t("flashcards.ratingUnknown")}</small><strong>${result.unknown}</strong></article></div>
       <section class="flashcard-review-result ${result.unresolved?"attention":"complete"}"><span aria-hidden="true">${result.unresolved?"↻":"★"}</span><div><strong>${resultTitle}</strong><p>${resultText}</p></div></section>
@@ -4159,7 +4671,7 @@
     const revealed=Boolean(flashcardSession.revealed);
     const rating=QuizmonFlashcards.ratingFor(flashcardSession,item);
     const review=flashcardSession.phase==="review";
-    root.innerHTML=`<section class="flashcard-session ${review?"is-review":""}" aria-labelledby="flashcardSessionTitle">
+    root.innerHTML=`<section class="flashcard-session visual-refresh-flashcard-session ${review?"is-review":""}" aria-labelledby="flashcardSessionTitle">
       <header class="flashcard-session-head">
         <div><p class="quiz-kicker">${review?t("flashcards.reviewKicker",{round:flashcardSession.reviewRound}):t("flashcards.sessionKicker")}</p><h3 id="flashcardSessionTitle">${escapeHtml(flashcardSession.sourceLabel||flashcardKindName(kind))}</h3><p>${t("flashcards.progressText",{current:progress.current,total:progress.total})} · ${escapeHtml(flashcardKindName(kind))}</p></div>
         <div><button type="button" class="secondary-button" data-flashcard-shuffle>↻ ${t("flashcards.shuffle")}</button><button type="button" class="ghost-button" data-flashcard-exit>${t("flashcards.changeSet")}</button></div>
@@ -4215,14 +4727,16 @@
     const flashcardReviewCount=state.learnTab==="cards"?flashcardReviewItems("types").length+flashcardReviewItems("pokemon").length+flashcardReviewItems("moves").length+flashcardReviewItems("abilities").length+flashcardReviewItems("items").length:0;
     const metrics=state.learnTab==="lab"?`<div class="learn-hero-metrics"><article><small>${t("learn.allTypes")}</small><strong>${TYPES.length}</strong></article><article><small>${t("learn.explored")}</small><strong>${explored}</strong></article><article><small>${t("learn.mastered")}</small><strong>${mastered}</strong></article><article><small>${t("learn.knowledgeRate")}</small><strong>${knowledgeRate}%</strong></article></div>`:state.learnTab==="cards"?`<div class="learn-hero-metrics"><article><small>${t("flashcards.sets")}</small><strong>${QuizmonFlashcards.KINDS.length}</strong></article><article><small>${t("flashcards.availableCards")}</small><strong>${flashcardItems("types").length+flashcardItems("pokemon").length+flashcardItems("moves").length+flashcardItems("abilities").length+flashcardItems("items").length}</strong></article><article><small>${t("flashcards.personalSets")}</small><strong>${flashcardPersonalSourceCount()}</strong></article><article><small>${t("flashcards.reviewCards")}</small><strong>${flashcardReviewCount}</strong></article></div>`:"";
 
-    view.innerHTML=`<section class="learn-page ${state.learnTab==="path"?"path-focused":""} ${state.learnTab==="cards"?"flashcards-focused":""}">
+    view.innerHTML=`<section class="learn-page visual-refresh-learn ${state.learnTab==="path"?"path-focused":""} ${state.learnTab==="cards"?"flashcards-focused":""}">
       <section class="learn-hero">
         <div class="learn-hero-copy"><p class="quiz-kicker">${t("learn.kicker")}</p><h1>${t("learn.title")}</h1><p>${t("learn.subtitleFocused")}</p></div>
         ${metrics}
       </section>
+      <button id="openKnowledgeWorldFromLearn" class="refresh-knowledge-launcher" type="button"><span aria-hidden="true">${iconSvg("knowledge")}</span><span><small>${t("knowledge.kicker")}</small><strong>${t("nav.knowledge")}</strong><em>${t("home.gameKnowledgeDesc")}</em></span><b aria-hidden="true">›</b></button>
       <section class="learn-workspace panel"><div class="learn-workspace-head"><div><p class="quiz-kicker">${t("learn.workspaceKicker")}</p><h2>${workspaceTitle}</h2></div><div class="tabs learn-tabs" role="tablist" style="--tab-count:3"><button class="tab-button ${state.learnTab==="path"?"active":""}" role="tab" aria-selected="${state.learnTab==="path"}" data-learn-tab="path">${t("path.tab")}</button><button class="tab-button ${state.learnTab==="lab"?"active":""}" role="tab" aria-selected="${state.learnTab==="lab"}" data-learn-tab="lab">${t("path.labTab")}</button><button class="tab-button ${state.learnTab==="cards"?"active":""}" role="tab" aria-selected="${state.learnTab==="cards"}" data-learn-tab="cards">${t("flashcards.tab")}</button></div></div><div id="learnContent"></div></section>
     </section>`;
     document.querySelectorAll("[data-learn-tab]").forEach(button=>button.addEventListener("click",()=>{state.learnTab=button.dataset.learnTab;saveState();renderLearn();}));
+    document.getElementById("openKnowledgeWorldFromLearn")?.addEventListener("click",()=>{knowledgeView="home";knowledgePokemonId=null;knowledgeContentKind=null;knowledgeContentId=null;learnType=null;knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;setRoute("knowledge");});
     if(state.learnTab==="lab")renderTypeLab();
     else if(state.learnTab==="cards"){if(flashcardSession)renderFlashcards();else renderFlashcardSetup();}
     else renderLearningPath();
@@ -4298,7 +4812,7 @@
     const status=done?t("cleanup2.stageCompleted"):active?t("cleanup2.stageCurrent"):t("cleanup2.stageLater");
     const progress=active&&!done?t("cleanup2.stageProgress",{completed,total:modules.length}):status;
     return `<details class="path-stage ${stage} ${done?"is-complete":active?"is-current":"is-later"}" ${open?"open":""}>
-      <summary class="path-stage-heading"><span>${PATH_STAGE_ICONS[stage]}</span><div><small>${t(`path.stage.${stage}.kicker`)}</small><h3>${t(`path.stage.${stage}.title`)}</h3><p>${t(`path.stage.${stage}.text`)}</p></div><strong>${escapeHtml(progress)}</strong><i aria-hidden="true">⌄</i></summary>
+      <summary class="path-stage-heading"><span>${PATH_STAGE_ICONS[stage]}</span><div><small>${t(`path.stage.${stage}.kicker`)}</small><h3>${t(`path.stage.${stage}.title`)}</h3><p>${t(`path.stage.${stage}.text`)}</p></div><strong>${escapeHtml(progress)}</strong><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
       <div class="path-module-list">${modules.map(pathModuleCard).join("")}</div>
     </details>`;
   }
@@ -4358,7 +4872,7 @@
     const percentDone=Math.round((completed/modules.length)*100);
     const next=pathNextModule();
     const placement=state.learningPath.placement;
-    root.innerHTML=`<section class="learning-path-shell cleanup-path">
+    root.innerHTML=`<section class="learning-path-shell cleanup-path visual-refresh-learning-path">
       <section class="path-overview-card" style="--path-progress:${percentDone}%">
         <div class="path-overview-copy"><p class="quiz-kicker">${t("path.kicker")}</p><h2>${t("path.title")}</h2><p>${t("path.subtitle")}</p><span class="path-placement ${placement.source}">${placement.source==="history"?"✓":"◎"} ${t(placement.source==="history"?"path.placementHistory":"path.placementNew")}</span></div>
         <div class="path-progress-summary"><div><strong>${completed}</strong><span>${t("path.ofModules",{total:modules.length})}</span></div><i><b></b></i></div>
@@ -4786,7 +5300,7 @@
     const candidates=trainingLists().filter(list=>list.kind===listKind);
     const entryName=trainingListEntryName(kind,id);
     if(!candidates.length){openTrainingListEditor(null,listKind,id);return;}
-    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="trainingListChooserTitle"><section class="modal-card training-list-chooser-modal" tabindex="-1"><header><span aria-hidden="true">☷</span><div><p class="quiz-kicker">${t("trainingLists.kicker")}</p><h2 id="trainingListChooserTitle">${t("trainingLists.chooseList")}</h2><p>${t("trainingLists.chooseListText",{name:entryName})}</p></div></header><div class="training-list-chooser-grid">${candidates.map(list=>{const included=QuizmonTrainingLists.contains(list,listKind==="pokemon"?Number(id):String(id));return `<button type="button" data-list-choice="${escapeHtml(list.id)}" class="${included?"included":""}"><span aria-hidden="true">${list.kind==="pokemon"?"◉":"◆"}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><b>${included?t("trainingLists.remove"):t("trainingLists.add")}</b></button>`;}).join("")}</div><div class="modal-actions"><button type="button" class="secondary-button" data-list-choice-close>${t("common.close")}</button><button type="button" class="primary-button" data-list-choice-new>${t("trainingLists.createNew")}</button></div></section></div>`,{initialFocus:"[data-list-choice]"});
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="trainingListChooserTitle"><section class="modal-card training-list-chooser-modal" tabindex="-1"><header><span aria-hidden="true">☷</span><div><p class="quiz-kicker">${t("trainingLists.kicker")}</p><h2 id="trainingListChooserTitle">${t("trainingLists.chooseList")}</h2><p>${t("trainingLists.chooseListText",{name:entryName})}</p></div></header><div class="training-list-chooser-grid">${candidates.map(list=>{const included=QuizmonTrainingLists.contains(list,listKind==="pokemon"?Number(id):String(id));return `<button type="button" data-list-choice="${escapeHtml(list.id)}" class="${included?"included":""}"><span aria-hidden="true">${list.kind==="pokemon"?iconSvg("pokemon"):iconSvg("list")}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><b>${included?t("trainingLists.remove"):t("trainingLists.add")}</b></button>`;}).join("")}</div><div class="modal-actions"><button type="button" class="secondary-button" data-list-choice-close>${t("common.close")}</button><button type="button" class="primary-button" data-list-choice-new>${t("trainingLists.createNew")}</button></div></section></div>`,{initialFocus:"[data-list-choice]"});
     document.querySelector("[data-list-choice-close]")?.addEventListener("click",()=>closeModal());
     document.querySelector("[data-list-choice-new]")?.addEventListener("click",()=>closeModal(()=>openTrainingListEditor(null,listKind,id)));
     document.querySelectorAll("[data-list-choice]").forEach(button=>button.addEventListener("click",()=>{addEntryToTrainingList(button.dataset.listChoice,kind,id);closeModal();}));
@@ -5212,7 +5726,7 @@
       ${knowledgeGenerationFilterMarkup()}
       ${knowledgeSearchMarkup()}
       <details class="knowledge-home-group knowledge-personal-hub" ${compact?"":"open"}>
-        <summary><span aria-hidden="true">${iconSvg("favorite")}</span><span><strong>${t("knowledge.personalHubTitle")}</strong><small>${t("knowledge.personalHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <summary><span aria-hidden="true">${iconSvg("favorite")}</span><span><strong>${t("knowledge.personalHubTitle")}</strong><small>${t("knowledge.personalHubText")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
         <section class="knowledge-personal-entry">
           ${knowledgeSectionButton("favorites",iconSvg("favorite"),t("favorites.title"),t("favorites.homeText"),t("favorites.meta",{count:favoritePokemonEntries().length+favoriteTypeEntries().length}))}
           ${knowledgeSectionButton("training-lists",iconSvg("list"),t("trainingLists.title"),t("trainingLists.homeText"),t("trainingLists.meta",{count:trainingLists().length}))}
@@ -5226,7 +5740,7 @@
         ${knowledgeSectionButton("items",iconSvg("item"),t("knowledge.items"),t("knowledge.itemsText"),t("knowledge.itemsMeta",{count:counts.items}))}
       </section>
       <details class="knowledge-home-group knowledge-world-hub" ${compact?"":"open"}>
-        <summary><span aria-hidden="true">${iconSvg("region")}</span><span><strong>${t("knowledge.worldTitle")}</strong><small>${t("knowledge.worldHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <summary><span aria-hidden="true">${iconSvg("region")}</span><span><strong>${t("knowledge.worldTitle")}</strong><small>${t("knowledge.worldHubText")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
         <section class="knowledge-category-grid knowledge-world-grid" aria-labelledby="knowledgeWorldTitle">
           <div class="knowledge-section-heading sr-only"><div><small>${t("knowledge.worldKicker")}</small><h3 id="knowledgeWorldTitle">${t("knowledge.worldTitle")}</h3></div></div>
           ${knowledgeSectionButton("regions",iconSvg("region"),t("knowledge.regionsTitle"),t("knowledge.regionsText"),t("knowledge.regionsMeta",{count:counts.regions}))}
@@ -5245,7 +5759,7 @@
   }
 
   function knowledgeSubpageHeader(title, text, meta) {
-    return `<header class="knowledge-subpage-head"><button class="knowledge-back-button" data-knowledge-home aria-label="${escapeHtml(t("knowledge.backHome"))}">‹</button><div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div><div class="knowledge-subpage-actions"><span>${escapeHtml(meta)}</span>${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup(true)}</div></header>`;
+    return `<header class="knowledge-subpage-head"><button class="knowledge-back-button" data-knowledge-home aria-label="${escapeHtml(t("knowledge.backHome"))}">${iconSvg("back")}</button><div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div><div class="knowledge-subpage-actions"><span>${escapeHtml(meta)}</span>${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup(true)}</div></header>`;
   }
 
   function bindKnowledgeHome(root) {
@@ -5900,7 +6414,7 @@
     const rate=percent(s.correct,s.total);
     const memory=memoryAid(learnType,attack,defense);
     const meta=TYPE_META[learnType];
-    view.innerHTML=`<section class="type-detail-page" style="--type-color:${meta.color}">
+    view.innerHTML=`<section class="type-detail-page visual-refresh-type-detail" style="--type-color:${meta.color}">
       <section class="type-detail-hero">
         <div class="type-detail-identity">
           <div class="type-detail-symbol">${meta.icon}</div>
@@ -6779,7 +7293,7 @@
     const accuracy=percent(state.stats.correct,state.stats.total);
     const openErrors=state.stats.mistakes.filter(item=>item.status!=="resolved").length;
     const heroMetrics=state.statsTab==="overview"?`<div class="progress-hero-metrics"><span><small>${t("stats.accuracy")}</small><strong>${accuracy}%</strong></span><span><small>${t("stats.bestStreak")}</small><strong>${state.stats.bestStreak}</strong></span><span><small>${t("stats.openErrors")}</small><strong>${openErrors}</strong></span></div>`:"";
-    view.innerHTML=`<section class="progress-page ${state.statsTab==="overview"?"overview-focused":"detail-focused"}">
+    view.innerHTML=`<section class="progress-page visual-refresh-progress ${state.statsTab==="overview"?"overview-focused":"detail-focused"}">
       <section class="progress-hero">
         <div class="progress-hero-copy"><p class="quiz-kicker">${t("stats.hubKicker")}</p><h1>${t("stats.hubTitle")}</h1><p>${t("stats.hubSubtitle")}</p></div>
         <div class="progress-level-card">
@@ -7007,7 +7521,7 @@
       <div class="error-analysis-heading"><div><p class="quiz-kicker">${t("cleanup2.patternSectionKicker")}</p><h2>${t("cleanup2.patternSectionTitle")}</h2><p>${t("cleanup2.patternSectionText")}</p></div><span class="error-analysis-stage ${stage}">${t(`errorAnalysis.stage.${stage}`)}</span></div>
       ${lead?`<div class="error-analysis-lead"><small>${t("cleanup2.mostImportantPattern")}</small>${errorPatternCard(lead)}</div>`:`<div class="error-analysis-empty"><span>◎</span><strong>${t("errorAnalysis.emptyTitle")}</strong><p>${analysis.analyzed?t("errorAnalysis.emptyBuilding"):t("errorAnalysis.emptyText")}</p></div>`}
       ${remaining.length?`<div class="section-title error-analysis-section-title"><h3>${t("cleanup2.otherPatterns")}</h3><p>${t("errorAnalysis.patternsHintDetailed")}</p></div><div class="error-pattern-grid">${remaining.map(errorPatternCard).join("")}</div>`:""}
-      <details class="error-analysis-details"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div class="error-analysis-metrics"><article><small>${t("errorAnalysis.analyzed")}</small><strong>${analysis.analyzed}</strong></article><article><small>${t("errorAnalysis.errorAnswers")}</small><strong>${analysis.errorAnswers}</strong></article><article><small>${t("errorAnalysis.recurring")}</small><strong>${analysis.recurring}</strong></article><article><small>${t("errorAnalysis.concrete")}</small><strong>${analysis.concrete}</strong></article></div><div class="error-analysis-note"><span>i</span><p>${t("errorAnalysis.note")}</p></div></details>
+      <details class="error-analysis-details"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><div class="error-analysis-metrics"><article><small>${t("errorAnalysis.analyzed")}</small><strong>${analysis.analyzed}</strong></article><article><small>${t("errorAnalysis.errorAnswers")}</small><strong>${analysis.errorAnswers}</strong></article><article><small>${t("errorAnalysis.recurring")}</small><strong>${analysis.recurring}</strong></article><article><small>${t("errorAnalysis.concrete")}</small><strong>${analysis.concrete}</strong></article></div><div class="error-analysis-note"><span>i</span><p>${t("errorAnalysis.note")}</p></div></details>
     </section>`;
   }
 
@@ -7041,7 +7555,7 @@
       <section class="error-detail-cause"><span>?</span><div><strong>${t("errorAnalysis.causeTitle")}</strong><p>${escapeHtml(errorPatternText(pattern))}</p></div></section>
       ${errorPatternDevelopmentMarkup(pattern)}
       <section class="error-detail-criterion"><strong>${t("errorAnalysis.statusTitle")}</strong><p>${escapeHtml(errorPatternCriterionText(pattern))}</p></section>
-      <details class="error-detail-data"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><section class="error-detail-metrics"><article><small>${t("errorAnalysis.wrongOfRelevant")}</small><strong>${pattern.errors}/${pattern.opportunities}</strong><span>${Math.round(pattern.rate*100)}%</span></article><article><small>${t("errorAnalysis.sessionsSeen")}</small><strong>${pattern.sessions}</strong><span>${t("errorAnalysis.trainingUnits")}</span></article><article><small>${t("errorAnalysis.correctStreak")}</small><strong>${pattern.development.correctStreak}</strong><span>${t("errorAnalysis.confirmations")}</span></article></section></details>
+      <details class="error-detail-data"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><section class="error-detail-metrics"><article><small>${t("errorAnalysis.wrongOfRelevant")}</small><strong>${pattern.errors}/${pattern.opportunities}</strong><span>${Math.round(pattern.rate*100)}%</span></article><article><small>${t("errorAnalysis.sessionsSeen")}</small><strong>${pattern.sessions}</strong><span>${t("errorAnalysis.trainingUnits")}</span></article><article><small>${t("errorAnalysis.correctStreak")}</small><strong>${pattern.development.correctStreak}</strong><span>${t("errorAnalysis.confirmations")}</span></article></section></details>
       <section class="error-detail-training ${canTrain?"":"locked"}"><div><small>${t("errorAnalysis.problemTrainingKicker")}</small><strong>${t("errorAnalysis.problemTrainingTitle")}</strong><p>${canTrain?t("errorAnalysis.problemTrainingText"):t("errorAnalysis.problemTrainingLocked")}</p></div><span>${tp("train.questionCountOne","train.questionCount",8)}</span></section>
       <div class="modal-actions"><button id="closeErrorPattern" class="secondary-button">${t("common.close")}</button><button id="startProblemTraining" class="primary-button" ${canTrain?"":"disabled"}>${t("errorAnalysis.startProblemTraining")}</button></div>
     </section></div>`,{initialFocus:canTrain?"#startProblemTraining":"#closeErrorPattern"});
@@ -7235,26 +7749,26 @@
     const dark=actualTheme()==="dark";
     const languageLabel=state.language==="de"?"Deutsch":"English";
     const themeLabel=dark?t("settings.dark"):t("settings.light");
-    view.innerHTML=`<section class="settings-page">
+    view.innerHTML=`<section class="settings-page visual-refresh-settings">
       <section class="settings-hero"><div><p class="quiz-kicker">${t("settings.centerKicker")}</p><h1>${t("settings.centerTitle")}</h1><p>${t("settings.centerSubtitle")}</p></div><div class="settings-current-overview"><div class="settings-current-heading"><small>${t("settings.currentTitle")}</small><p>${t("settings.currentHint")}</p></div><div class="settings-status-grid"><span><small>${t("settings.language")}</small><strong>${languageLabel}</strong></span><span><small>${t("settings.theme")}</small><strong>${themeLabel}</strong></span><span><small>${t("settings.animations")}</small><strong>${state.animations?t("settings.on"):t("settings.off")}</strong></span></div></div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>◐</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingSelectRow("languageSelect","文",t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
-        ${settingToggleRow("themeToggle","◐",t("settings.theme"),t("settings.themeDesc"),dark)}
-        ${settingToggleRow("animationToggle","↝",t("settings.animations"),t("settings.animationsDesc"),state.animations)}
-        ${settingToggleRow("hapticToggle","≈",t("settings.haptics"),t("settings.hapticsDesc"),state.haptics)}
+      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("settings")}</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingSelectRow("languageSelect",iconSvg("language"),t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
+        ${settingToggleRow("themeToggle",iconSvg("theme"),t("settings.theme"),t("settings.themeDesc"),dark)}
+        ${settingToggleRow("animationToggle",iconSvg("motion"),t("settings.animations"),t("settings.animationsDesc"),state.animations)}
+        ${settingToggleRow("hapticToggle",iconSvg("haptic"),t("settings.haptics"),t("settings.hapticsDesc"),state.haptics)}
       </div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>?</span><div><h2>${t("settings.guidance")}</h2><p>${t("settings.guidanceHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("restartTutorial","◎",t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
+      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("help")}</span><div><h2>${t("settings.guidance")}</h2><p>${t("settings.guidanceHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("restartTutorial",iconSvg("learn"),t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
       </div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>⇄</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("exportProgress","↓",t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
-        ${settingActionRow("importProgress","↑",t("settings.import"),t("settings.importDesc"),t("settings.importAction"))}
+      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("data")}</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("exportProgress",iconSvg("download"),t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
+        ${settingActionRow("importProgress",iconSvg("upload"),t("settings.import"),t("settings.importDesc"),t("settings.importAction"))}
         <input id="importFile" type="file" accept="application/json" hidden>
-        ${settingActionRow("exportFeedback","✎",t("settings.feedback"),t("settings.feedbackDesc"),t("settings.createReport"))}
-        ${settingActionRow("exportDiagnostics","⌁",t("settings.diagnostics"),t("settings.diagnosticsDesc"),t("settings.exportAction"))}
+        ${settingActionRow("exportFeedback",iconSvg("feedback"),t("settings.feedback"),t("settings.feedbackDesc"),t("settings.createReport"))}
+        ${settingActionRow("exportDiagnostics",iconSvg("diagnostics"),t("settings.diagnostics"),t("settings.diagnosticsDesc"),t("settings.exportAction"))}
       </div></section>
-      <section class="settings-group danger-zone"><div class="settings-group-heading"><span>!</span><div><h2>${t("settings.dangerZone")}</h2><p>${t("settings.dangerZoneHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("resetProgress","×",t("settings.reset"),t("settings.resetDesc"),t("settings.delete"),true)}
+      <section class="settings-group danger-zone"><div class="settings-group-heading"><span>${iconSvg("warning")}</span><div><h2>${t("settings.dangerZone")}</h2><p>${t("settings.dangerZoneHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("resetProgress",iconSvg("trash"),t("settings.reset"),t("settings.resetDesc"),t("settings.delete"),true)}
       </div></section>
     </section>`;
     document.getElementById("languageSelect").addEventListener("change",event=>{state.language=event.target.value;saveState();applyPreferences();renderSettings();});
@@ -7275,7 +7789,7 @@
   function settingActionRow(id,icon,title,description,label,danger=false){return `<div class="modern-setting-row"><span class="modern-setting-icon ${danger?"danger":""}" aria-hidden="true">${icon}</span><div class="modern-setting-copy"><h3>${title}</h3><p>${description}</p></div><button id="${id}" class="${danger?"danger-button":"secondary-button"}">${label}</button></div>`;}
 
   function downloadJson(data, filename) { const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url); }
-  function exportProgress(){ const payload={app:"Quizmon",exportVersion:BUILD_VERSION,schema:DATA_SCHEMA,exportedAt:new Date().toISOString(),state}; downloadJson(payload,`Quizmon-Beta-1.2-Fortschritt-${todayKey()}.json`); state.diagnostics.lastBackup=new Date().toISOString(); saveState(); enqueueToast("↓",t("settings.exportDone"),t("settings.exportDoneHint"),"success"); }
+  function exportProgress(){ const payload={app:"Quizmon",exportVersion:BUILD_VERSION,schema:DATA_SCHEMA,exportedAt:new Date().toISOString(),state}; downloadJson(payload,`Quizmon-Beta-1.3-Fortschritt-${todayKey()}.json`); state.diagnostics.lastBackup=new Date().toISOString(); saveState(); enqueueToast("↓",t("settings.exportDone"),t("settings.exportDoneHint"),"success"); }
   function exportDiagnostics(){ downloadJson({app:"Quizmon",version:PUBLIC_VERSION,build:BUILD_VERSION,schema:DATA_SCHEMA,createdAt:new Date().toISOString(),route:state.route,language:state.language,userAgent:navigator.userAgent,online:navigator.onLine,storage:{bytes:byteLength(state),learningEvents:state.stats.learning.events.length,errorEvents:state.stats.errorAnalysis.events.length,history:state.stats.history.length,pokemonCache:Object.keys(state.pokemonCache).length,importBackups:importBackupKeys().length},diagnostics:state.diagnostics},`Quizmon-Diagnose-${todayKey()}.json`); enqueueToast("↓",t("settings.diagnosticsDone"),t("settings.fileCreated"),"success"); }
   function exportFeedback(){ const report={category:"",description:"",expected:"",steps:"",appVersion:PUBLIC_VERSION,build:BUILD_VERSION,createdAt:new Date().toISOString(),route:state.route,language:state.language,userAgent:navigator.userAgent,recentErrors:state.diagnostics.errors.slice(-5)}; downloadJson(report,`Quizmon-Feedback-${todayKey()}.json`); enqueueToast("↓",t("settings.feedbackDone"),t("settings.fileCreated"),"success"); }
   function importBackupKeys() { return QuizmonStorage.listBackupKeys(localStorage, STORAGE_KEY); }
@@ -7564,7 +8078,7 @@
     enqueueToast(online ? "✓" : "⌁", online ? t("toast.online") : t("toast.offline"), online ? t("toast.onlineDesc") : t("toast.offlineDesc"), online ? "success" : "warning");
   }
 
-  window.addEventListener("online", () => applyNetworkStatus(true));
+  window.addEventListener("online", () => { applyNetworkStatus(true); syncWhosDailyResults(); });
   window.addEventListener("offline", () => applyNetworkStatus(true));
 
   if("serviceWorker"in navigator&&location.protocol.startsWith("http")){
@@ -7576,7 +8090,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=phase3-cleanup-v1",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=visual-refresh-sprint3-v1",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{
@@ -7597,5 +8111,6 @@
   initializeBrowserHistory();
   saveState();
   render();
+  syncWhosDailyResults();
   if (!navigator.onLine) setTimeout(() => applyNetworkStatus(true), 250);
 })();

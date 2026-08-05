@@ -1,0 +1,750 @@
+/* Quizmon Beta 1.3 — Visual Refresh Sprint 3
+   Wissenswelt, Fortschritt, Profil, Optionen and final responsive polish. */
+
+/* Shared finish across the remaining app areas */
+.visual-refresh-knowledge,
+.visual-refresh-progress,
+.visual-refresh-profile,
+.visual-refresh-settings,
+.visual-refresh-type-detail {
+  --vr3-card-border: color-mix(in srgb,var(--primary) 24%,var(--line));
+  --vr3-card-bg: linear-gradient(145deg,color-mix(in srgb,var(--surface-solid) 94%,var(--primary) 6%),color-mix(in srgb,var(--surface-solid) 98%,transparent));
+  --vr3-card-bg-soft: linear-gradient(145deg,color-mix(in srgb,var(--surface-solid) 96%,var(--primary-2) 4%),color-mix(in srgb,var(--surface-solid) 99%,transparent));
+  --vr3-card-shadow: 0 18px 44px color-mix(in srgb,var(--text-strong) 10%,transparent);
+  --vr3-card-shadow-hover: 0 24px 58px color-mix(in srgb,var(--primary) 18%,transparent);
+  display:grid;
+  gap:16px;
+}
+html[data-theme="dark"] :is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) {
+  --vr3-card-border: rgba(137,161,229,.2);
+  --vr3-card-bg: linear-gradient(145deg,rgba(15,27,61,.96),rgba(7,14,35,.98));
+  --vr3-card-bg-soft: linear-gradient(145deg,rgba(18,34,72,.9),rgba(8,17,41,.98));
+  --vr3-card-shadow: 0 20px 48px rgba(0,0,0,.35);
+  --vr3-card-shadow-hover: 0 28px 70px rgba(23,31,91,.46);
+}
+:is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) h1,
+:is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) h2,
+:is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) h3 {
+  color:var(--text-strong);
+  letter-spacing:-.035em;
+  text-wrap:balance;
+}
+:is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) :is(button,.knowledge-content-card,.knowledge-category-card,.progress-kpi-card,.profile-panel,.modern-setting-row) {
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* Knowledge world */
+.visual-refresh-knowledge .knowledge-route-workspace {
+  padding:0;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+}
+.visual-refresh-knowledge .knowledge-home {
+  display:grid;
+  gap:15px;
+}
+.visual-refresh-knowledge .knowledge-welcome {
+  min-height:235px;
+  padding:clamp(22px,4vw,38px);
+  position:relative;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(150px,.36fr);
+  align-items:center;
+  border:1px solid var(--vr3-card-border);
+  border-radius:clamp(27px,4vw,40px);
+  background:
+    radial-gradient(circle at 82% 18%,color-mix(in srgb,var(--qm-accent-cyan) 23%,transparent),transparent 18rem),
+    radial-gradient(circle at 95% 90%,color-mix(in srgb,var(--qm-accent-violet) 22%,transparent),transparent 18rem),
+    var(--vr3-card-bg);
+  box-shadow:var(--shadow-lg);
+}
+.visual-refresh-knowledge .knowledge-welcome::after {
+  content:"";
+  position:absolute;
+  width:250px;
+  height:250px;
+  right:-95px;
+  bottom:-125px;
+  border-radius:50%;
+  border:34px solid color-mix(in srgb,var(--primary) 9%,transparent);
+  pointer-events:none;
+}
+.visual-refresh-knowledge .knowledge-welcome h3 {
+  margin:0;
+  max-width:720px;
+  font-size:clamp(34px,5.6vw,58px);
+  line-height:.98;
+}
+.visual-refresh-knowledge .knowledge-welcome p:last-child {
+  max-width:680px;
+  margin:14px 0 0;
+  color:var(--muted);
+  line-height:1.55;
+  font-size:clamp(14px,1.8vw,17px);
+}
+.visual-refresh-knowledge .knowledge-welcome-mark {
+  width:clamp(110px,16vw,164px);
+  aspect-ratio:1;
+  justify-self:center;
+  position:relative;
+  display:grid;
+  place-items:center;
+  border-radius:34%;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-cyan),var(--qm-accent-violet) 58%,var(--qm-accent-pink));
+  box-shadow:0 10px 0 color-mix(in srgb,var(--primary-deep) 60%,#191040),0 30px 70px color-mix(in srgb,var(--primary) 35%,transparent);
+  transform:rotate(7deg);
+}
+.visual-refresh-knowledge .knowledge-welcome-mark::before {
+  content:"";
+  position:absolute;
+  inset:10px;
+  border:1px solid rgba(255,255,255,.3);
+  border-radius:28%;
+}
+.visual-refresh-knowledge .knowledge-welcome-mark svg { width:54%;height:54%;stroke-width:1.7; }
+.visual-refresh-knowledge :is(.knowledge-generation-filter,.knowledge-search-panel,.knowledge-home-group) {
+  border:1px solid var(--vr3-card-border);
+  background:var(--vr3-card-bg-soft);
+  box-shadow:var(--vr3-card-shadow);
+  backdrop-filter:blur(22px);
+}
+.visual-refresh-knowledge .knowledge-generation-filter {
+  border-radius:22px;
+  padding:13px 15px;
+}
+.visual-refresh-knowledge .knowledge-generation-select,
+.visual-refresh-knowledge .knowledge-search-field {
+  border-radius:17px;
+  border-color:color-mix(in srgb,var(--primary) 26%,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 91%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
+.visual-refresh-knowledge .knowledge-search-panel {
+  border-radius:27px;
+  padding:clamp(18px,3vw,28px);
+}
+.visual-refresh-knowledge .knowledge-search-heading>span {
+  width:58px;
+  height:58px;
+  display:grid;
+  place-items:center;
+  border-radius:19px;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-blue),var(--qm-accent-violet));
+  box-shadow:0 6px 0 color-mix(in srgb,var(--primary-deep) 70%,#1a205d),0 16px 35px color-mix(in srgb,var(--qm-accent-blue) 26%,transparent);
+}
+.visual-refresh-knowledge .knowledge-search-heading>span svg { width:29px;height:29px; }
+.visual-refresh-knowledge .knowledge-home-group {
+  border-radius:25px;
+  overflow:hidden;
+}
+.visual-refresh-knowledge .knowledge-home-group summary {
+  min-height:78px;
+  padding:15px 18px;
+  gap:14px;
+  cursor:pointer;
+}
+.visual-refresh-knowledge .knowledge-home-group summary>span:first-child {
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  border-radius:16px;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-violet),var(--qm-accent-pink));
+  box-shadow:0 5px 0 color-mix(in srgb,var(--primary-deep) 64%,#211149);
+}
+.visual-refresh-knowledge .knowledge-world-hub summary>span:first-child {
+  background:linear-gradient(145deg,var(--qm-accent-cyan),var(--qm-accent-blue));
+}
+.visual-refresh-knowledge .knowledge-home-group summary svg { width:25px;height:25px; }
+.visual-refresh-knowledge .knowledge-home-group summary>i { width:28px;height:28px;display:grid;place-items:center;transition:transform .2s ease; }
+.visual-refresh-knowledge .knowledge-home-group[open] summary>i { transform:rotate(180deg); }
+.visual-refresh-knowledge .knowledge-home-group summary>i svg { width:20px;height:20px; }
+.visual-refresh-knowledge .knowledge-category-grid,
+.visual-refresh-knowledge .knowledge-personal-entry,
+.visual-refresh-knowledge .knowledge-world-grid {
+  gap:12px;
+}
+.visual-refresh-knowledge .knowledge-category-card,
+.visual-refresh-knowledge .knowledge-world-card {
+  min-height:150px;
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--vr3-card-border);
+  border-radius:24px;
+  background:var(--vr3-card-bg);
+  box-shadow:var(--vr3-card-shadow);
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.visual-refresh-knowledge :is(.knowledge-category-card,.knowledge-world-card):hover {
+  transform:translateY(-3px);
+  border-color:color-mix(in srgb,var(--primary) 48%,var(--line));
+  box-shadow:var(--vr3-card-shadow-hover);
+}
+.visual-refresh-knowledge :is(.knowledge-category-card,.knowledge-world-card):active { transform:translateY(2px); }
+.visual-refresh-knowledge .knowledge-category-card::after,
+.visual-refresh-knowledge .knowledge-world-card::after {
+  content:"";
+  position:absolute;
+  width:95px;
+  height:95px;
+  right:-35px;
+  bottom:-42px;
+  border-radius:50%;
+  background:color-mix(in srgb,var(--primary) 10%,transparent);
+}
+.visual-refresh-knowledge .knowledge-section-icon,
+.visual-refresh-knowledge .knowledge-category-card>span:first-child {
+  border-radius:18px;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.12),0 10px 22px color-mix(in srgb,var(--primary) 16%,transparent);
+}
+.visual-refresh-knowledge .knowledge-subpage-head {
+  padding:clamp(18px,3vw,28px);
+  border:1px solid var(--vr3-card-border);
+  border-radius:28px;
+  background:var(--vr3-card-bg);
+  box-shadow:var(--vr3-card-shadow);
+}
+.visual-refresh-knowledge .knowledge-subpage-head h3 { font-size:clamp(28px,4vw,43px);line-height:1; }
+.visual-refresh-knowledge .knowledge-back-button {
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:16px;
+  border:1px solid color-mix(in srgb,var(--primary) 28%,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 92%,transparent);
+  box-shadow:0 5px 0 color-mix(in srgb,var(--surface-strong) 74%,transparent);
+}
+.visual-refresh-knowledge .knowledge-back-button svg { width:24px;height:24px; }
+.visual-refresh-knowledge :is(.knowledge-pokemon-card-shell,.knowledge-type-card-shell,.knowledge-content-card,.knowledge-region-card,.knowledge-trainer-card,.knowledge-topic-card,.training-list-card) {
+  border-radius:22px;
+  border-color:var(--vr3-card-border);
+  background:var(--vr3-card-bg);
+  box-shadow:var(--vr3-card-shadow);
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.visual-refresh-knowledge :is(.knowledge-pokemon-card-shell,.knowledge-type-card-shell,.knowledge-content-card,.knowledge-region-card,.knowledge-trainer-card,.knowledge-topic-card,.training-list-card):hover {
+  transform:translateY(-3px);
+  border-color:color-mix(in srgb,var(--primary) 48%,var(--line));
+  box-shadow:var(--vr3-card-shadow-hover);
+}
+.visual-refresh-knowledge .knowledge-pokemon-grid { grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:13px; }
+.visual-refresh-knowledge .knowledge-pokemon-card-shell { overflow:hidden; }
+.visual-refresh-knowledge .knowledge-content-grid { gap:13px; }
+.visual-refresh-knowledge .knowledge-content-card { min-height:146px; }
+.visual-refresh-knowledge .knowledge-content-icon {
+  border-radius:18px;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--entry-color,var(--primary)) 24%,var(--surface-solid)),color-mix(in srgb,var(--entry-color,var(--primary)) 10%,var(--surface-soft)));
+}
+.visual-refresh-knowledge :is(.knowledge-search-empty,.knowledge-generation-empty,.knowledge-favorites-empty,.training-lists-empty) {
+  border:1px dashed color-mix(in srgb,var(--primary) 35%,var(--line));
+  border-radius:25px;
+  background:color-mix(in srgb,var(--surface-solid) 75%,transparent);
+  padding:clamp(28px,5vw,52px);
+}
+.visual-refresh-knowledge :is(.knowledge-entry-hero,.knowledge-region-hero,.knowledge-trainer-hero,.knowledge-topic-hero) {
+  border:1px solid var(--vr3-card-border);
+  border-radius:clamp(28px,4vw,40px);
+  background:
+    radial-gradient(circle at 88% 18%,color-mix(in srgb,var(--primary) 18%,transparent),transparent 18rem),
+    var(--vr3-card-bg);
+  box-shadow:var(--shadow-lg);
+}
+.visual-refresh-knowledge :is(.knowledge-entry-facts,.knowledge-detail-grid,.knowledge-pokemon-tabs,.knowledge-version-picker,.knowledge-learnset-group,.knowledge-evolution-card,.knowledge-related-pokemon,.knowledge-related-topics) {
+  border-radius:22px;
+}
+.visual-refresh-knowledge .knowledge-pokemon-tabs .tab-button,
+.visual-refresh-knowledge .knowledge-search-filters button {
+  border-radius:15px;
+}
+
+/* Type detail */
+.visual-refresh-type-detail .type-detail-hero {
+  border:1px solid color-mix(in srgb,var(--type-color) 38%,var(--line));
+  border-radius:clamp(28px,4vw,40px);
+  background:
+    radial-gradient(circle at 88% 10%,color-mix(in srgb,var(--type-color) 22%,transparent),transparent 19rem),
+    var(--vr3-card-bg);
+  box-shadow:var(--shadow-lg);
+}
+.visual-refresh-type-detail .type-detail-symbol {
+  box-shadow:inset 0 -7px 0 rgba(0,0,0,.13),0 22px 45px color-mix(in srgb,var(--type-color) 28%,transparent);
+}
+.visual-refresh-type-detail :is(.memory-card,.matchup-column) {
+  border:1px solid color-mix(in srgb,var(--type-color) 22%,var(--line));
+  border-radius:25px;
+  background:var(--vr3-card-bg);
+  box-shadow:var(--vr3-card-shadow);
+}
+.visual-refresh-type-detail .matchup-group { border-radius:18px; }
+
+/* Progress hub */
+.visual-refresh-progress .progress-hero {
+  min-height:248px;
+  padding:clamp(22px,4vw,38px);
+  border:1px solid var(--vr3-card-border);
+  border-radius:clamp(28px,4vw,40px);
+  background:
+    radial-gradient(circle at 90% 8%,color-mix(in srgb,var(--qm-accent-orange) 15%,transparent),transparent 19rem),
+    radial-gradient(circle at 8% 95%,color-mix(in srgb,var(--qm-accent-violet) 14%,transparent),transparent 20rem),
+    var(--vr3-card-bg);
+  box-shadow:var(--shadow-lg);
+}
+.visual-refresh-progress .progress-hero-copy h1 {
+  margin:0;
+  font-size:clamp(36px,5.8vw,60px);
+  line-height:.98;
+}
+.visual-refresh-progress .progress-level-card {
+  border-radius:24px;
+  border-color:color-mix(in srgb,var(--qm-accent-violet) 30%,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 88%,transparent);
+  box-shadow:0 15px 38px color-mix(in srgb,var(--primary) 16%,transparent);
+}
+.visual-refresh-progress .progress-level-orb {
+  border-radius:18px;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-violet),var(--qm-accent-pink));
+  box-shadow:0 6px 0 color-mix(in srgb,var(--primary-deep) 66%,#1d124c),0 16px 34px color-mix(in srgb,var(--qm-accent-violet) 28%,transparent);
+}
+.visual-refresh-progress .progress-hero-metrics span {
+  border-radius:17px;
+  border:1px solid color-mix(in srgb,var(--primary) 20%,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 82%,transparent);
+}
+.visual-refresh-progress .progress-tabs {
+  padding:6px;
+  border:1px solid var(--vr3-card-border);
+  border-radius:21px;
+  background:color-mix(in srgb,var(--surface-solid) 88%,transparent);
+  box-shadow:var(--shadow-sm);
+  overflow:auto hidden;
+  scrollbar-width:none;
+}
+.visual-refresh-progress .progress-tabs::-webkit-scrollbar { display:none; }
+.visual-refresh-progress .progress-tabs .tab-button {
+  min-width:max-content;
+  border-radius:15px;
+}
+.visual-refresh-progress .progress-tabs .tab-button.active {
+  color:white;
+  background:linear-gradient(135deg,var(--qm-accent-violet),var(--qm-accent-blue));
+  box-shadow:0 4px 0 color-mix(in srgb,var(--primary-deep) 65%,#192059),0 11px 24px color-mix(in srgb,var(--primary) 22%,transparent);
+}
+.visual-refresh-progress :is(.progress-kpi-card,.mode-performance-card,.modern-history-card,.modern-type-stat-card,.modern-error-card,.modern-achievement-card,.consistency-card,.progress-recommendation,.error-analysis-panel,.mistake-book-hero,.achievement-summary-card) {
+  border:1px solid var(--vr3-card-border);
+  border-radius:22px;
+  background:var(--vr3-card-bg);
+  box-shadow:var(--vr3-card-shadow);
+}
+.visual-refresh-progress .progress-kpi-card {
+  min-height:122px;
+  padding:17px;
+}
+.visual-refresh-progress .progress-kpi-icon {
+  width:50px;
+  height:50px;
+  border-radius:17px;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-cyan),var(--qm-accent-blue));
+  box-shadow:0 5px 0 color-mix(in srgb,var(--qm-accent-blue) 62%,#143460);
+}
+.visual-refresh-progress .progress-kpi-icon svg { width:25px;height:25px; }
+.visual-refresh-progress :is(.mode-performance-card,.modern-history-card,.modern-type-stat-card,.modern-error-card,.modern-achievement-card):hover {
+  transform:translateY(-3px);
+  border-color:color-mix(in srgb,var(--primary) 47%,var(--line));
+  box-shadow:var(--vr3-card-shadow-hover);
+}
+.visual-refresh-progress .modern-history-card { transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease; }
+.visual-refresh-progress .history-rank {
+  color:var(--qm-accent-cyan);
+  font-variant-numeric:tabular-nums;
+}
+.visual-refresh-progress .consistency-icon {
+  width:52px;
+  height:52px;
+  display:grid;
+  place-items:center;
+  border-radius:17px;
+  background:linear-gradient(145deg,#ffbc54,var(--qm-accent-orange));
+  box-shadow:0 5px 0 #9f4c15;
+}
+.visual-refresh-progress .error-analysis-stage,
+.visual-refresh-progress .error-pattern-status {
+  border-radius:999px;
+}
+.visual-refresh-progress .error-pattern-card {
+  border-radius:20px;
+  background:color-mix(in srgb,var(--surface-solid) 86%,transparent);
+  box-shadow:var(--shadow-sm);
+}
+.visual-refresh-progress :is(.empty-state-card,.error-analysis-empty) {
+  border:1px dashed color-mix(in srgb,var(--primary) 36%,var(--line));
+  border-radius:24px;
+  background:color-mix(in srgb,var(--surface-solid) 73%,transparent);
+}
+
+/* Trainer profile and collection */
+.visual-refresh-profile .trainer-profile-hero {
+  border-radius:clamp(29px,4vw,42px);
+  border:1px solid color-mix(in srgb,var(--primary) 28%,var(--line));
+  box-shadow:var(--shadow-lg);
+  overflow:hidden;
+}
+.visual-refresh-profile .profile-hero-main { gap:20px; }
+.visual-refresh-profile .profile-main-avatar {
+  box-shadow:0 0 0 6px rgba(255,255,255,.13),0 24px 55px rgba(0,0,0,.3);
+}
+.visual-refresh-profile .profile-title-badge {
+  border-radius:999px;
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.12);
+}
+.visual-refresh-profile .profile-hero-actions :is(.primary-button,.ghost-button) { min-height:49px; }
+.visual-refresh-profile .profile-hero-meta {
+  border-radius:20px;
+  background:rgba(5,12,30,.22);
+  backdrop-filter:blur(18px);
+}
+.visual-refresh-profile :is(.profile-panel,.profile-collection-strip,.profile-favorites-section,.profile-kpi-card,.profile-activity-card) {
+  border:1px solid var(--vr3-card-border);
+  border-radius:24px;
+  background:var(--vr3-card-bg);
+  box-shadow:var(--vr3-card-shadow);
+}
+.visual-refresh-profile .profile-panel-heading>span {
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:16px;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-violet),var(--qm-accent-pink));
+  box-shadow:0 5px 0 color-mix(in srgb,var(--primary-deep) 62%,#201244);
+}
+.visual-refresh-profile .profile-record-panel .profile-panel-heading>span {
+  background:linear-gradient(145deg,#ffc34d,var(--qm-accent-orange));
+  box-shadow:0 5px 0 #9a521b;
+}
+.visual-refresh-profile .profile-panel-heading svg { width:25px;height:25px; }
+.visual-refresh-profile .profile-progress-track,
+.visual-refresh-profile .achievement-progress { height:11px; }
+.visual-refresh-profile .profile-next-reward {
+  border-radius:20px;
+  border:1px solid color-mix(in srgb,var(--primary) 22%,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 78%,transparent);
+}
+.visual-refresh-profile .profile-collection-strip>div,
+.visual-refresh-profile .profile-favorite-card {
+  border-radius:19px;
+  background:color-mix(in srgb,var(--surface-solid) 78%,transparent);
+  border:1px solid color-mix(in srgb,var(--primary) 15%,var(--line));
+}
+.visual-refresh-profile .profile-kpi-card {
+  min-height:118px;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.visual-refresh-profile .profile-kpi-card:hover {
+  transform:translateY(-3px);
+  border-color:color-mix(in srgb,var(--primary) 48%,var(--line));
+  box-shadow:var(--vr3-card-shadow-hover);
+}
+.visual-refresh-profile .profile-kpi-card>span:first-child {
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:16px;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-cyan),var(--qm-accent-blue));
+  box-shadow:0 5px 0 color-mix(in srgb,var(--qm-accent-blue) 60%,#14365f);
+}
+.visual-refresh-profile .profile-kpi-card>span:first-child svg { width:24px;height:24px; }
+.visual-refresh-profile .profile-activity-card {
+  background:
+    radial-gradient(circle at 92% 10%,color-mix(in srgb,var(--qm-accent-violet) 17%,transparent),transparent 15rem),
+    var(--vr3-card-bg);
+}
+.visual-refresh-profile :is(.profile-choice-card,.profile-set-card,.favorite-pokemon-picker-card) {
+  border-radius:21px;
+}
+.visual-refresh-profile :is(.profile-customizer-dialog,.profile-favorites-dialog,.profile-name-dialog) {
+  border:1px solid var(--vr3-card-border);
+  border-radius:29px;
+  background:color-mix(in srgb,var(--surface-solid) 96%,transparent);
+  box-shadow:0 35px 100px rgba(0,0,0,.45);
+}
+
+/* Settings */
+.visual-refresh-settings .settings-hero {
+  min-height:240px;
+  padding:clamp(22px,4vw,38px);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(300px,.75fr);
+  gap:22px;
+  align-items:center;
+  border:1px solid var(--vr3-card-border);
+  border-radius:clamp(28px,4vw,40px);
+  background:
+    radial-gradient(circle at 88% 8%,color-mix(in srgb,var(--qm-accent-cyan) 16%,transparent),transparent 17rem),
+    radial-gradient(circle at 4% 100%,color-mix(in srgb,var(--qm-accent-violet) 14%,transparent),transparent 18rem),
+    var(--vr3-card-bg);
+  box-shadow:var(--shadow-lg);
+}
+.visual-refresh-settings .settings-hero h1 {
+  margin:0;
+  font-size:clamp(36px,5.7vw,58px);
+  line-height:.98;
+}
+.visual-refresh-settings .settings-hero>div:first-child>p:last-child { max-width:620px;color:var(--muted);line-height:1.55; }
+.visual-refresh-settings .settings-current-overview {
+  border-radius:23px;
+  border:1px solid color-mix(in srgb,var(--primary) 25%,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 82%,transparent);
+  box-shadow:var(--shadow-sm);
+}
+.visual-refresh-settings .settings-status-grid span {
+  border-radius:16px;
+  background:color-mix(in srgb,var(--surface-soft) 82%,transparent);
+}
+.visual-refresh-settings .settings-group {
+  padding:0;
+  border:1px solid var(--vr3-card-border);
+  border-radius:25px;
+  background:var(--vr3-card-bg);
+  box-shadow:var(--vr3-card-shadow);
+  overflow:hidden;
+}
+.visual-refresh-settings .settings-group-heading {
+  margin:0;
+  padding:18px 20px;
+  align-items:center;
+  border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--surface-soft) 50%,transparent);
+}
+.visual-refresh-settings .settings-group-heading>span {
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  border-radius:16px;
+  color:white;
+  background:linear-gradient(145deg,var(--qm-accent-violet),var(--qm-accent-blue));
+  box-shadow:0 5px 0 color-mix(in srgb,var(--primary-deep) 62%,#17245b);
+}
+.visual-refresh-settings .settings-group-heading>span svg { width:25px;height:25px; }
+.visual-refresh-settings .modern-settings-list { gap:0; }
+.visual-refresh-settings .modern-setting-row {
+  min-height:82px;
+  padding:14px 19px;
+  border:0;
+  border-bottom:1px solid var(--line);
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  transition:background .17s ease;
+}
+.visual-refresh-settings .modern-setting-row:last-child { border-bottom:0; }
+.visual-refresh-settings .modern-setting-row:hover { background:color-mix(in srgb,var(--primary) 5%,transparent); }
+.visual-refresh-settings .modern-setting-icon {
+  width:44px;
+  height:44px;
+  display:grid;
+  place-items:center;
+  border-radius:15px;
+  color:var(--qm-accent-cyan);
+  background:color-mix(in srgb,var(--qm-accent-cyan) 12%,var(--surface-soft));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--qm-accent-cyan) 18%,transparent);
+}
+.visual-refresh-settings .modern-setting-icon svg { width:23px;height:23px; }
+.visual-refresh-settings .modern-setting-icon.danger {
+  color:var(--danger);
+  background:color-mix(in srgb,var(--danger) 12%,var(--surface-soft));
+}
+.visual-refresh-settings .select-control {
+  max-width:210px;
+  border-radius:15px;
+  background:color-mix(in srgb,var(--surface-solid) 90%,transparent);
+}
+.visual-refresh-settings .switch {
+  width:58px;
+  height:34px;
+  border:1px solid color-mix(in srgb,var(--primary) 20%,var(--line));
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.11);
+}
+.visual-refresh-settings .switch.on {
+  background:linear-gradient(90deg,var(--qm-accent-violet),var(--qm-accent-cyan));
+  border-color:transparent;
+}
+.visual-refresh-settings .danger-zone {
+  border-color:color-mix(in srgb,var(--danger) 30%,var(--line));
+}
+.visual-refresh-settings .danger-zone .settings-group-heading>span {
+  background:linear-gradient(145deg,#ff7f99,#d94a70);
+  box-shadow:0 5px 0 #842b4a;
+}
+
+/* Global empty/loading/error/modal states */
+:is(.empty-state-card,.knowledge-search-empty,.knowledge-generation-empty,.knowledge-favorites-empty,.training-lists-empty,.flashcard-empty,.learning-path-empty) {
+  text-align:center;
+}
+:is(.empty-state-card,.knowledge-search-empty,.knowledge-generation-empty,.knowledge-favorites-empty,.training-lists-empty) > span:first-child {
+  width:62px;
+  height:62px;
+  margin-inline:auto;
+  display:grid;
+  place-items:center;
+  border-radius:20px;
+  color:var(--qm-accent-cyan);
+  background:color-mix(in srgb,var(--qm-accent-cyan) 12%,var(--surface-soft));
+}
+.loading-state,
+.knowledge-learnset-deferred {
+  border-radius:22px;
+  border:1px solid var(--vr3-card-border,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 84%,transparent);
+  box-shadow:var(--shadow-sm);
+}
+.modal-card {
+  border-color:color-mix(in srgb,var(--primary) 28%,var(--line));
+  border-radius:28px;
+  background:color-mix(in srgb,var(--surface-solid) 96%,transparent);
+  box-shadow:0 35px 110px rgba(0,0,0,.48);
+}
+.toast {
+  border-radius:20px;
+  border-color:color-mix(in srgb,var(--primary) 24%,var(--line));
+  background:color-mix(in srgb,var(--surface-solid) 94%,transparent);
+  box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+
+/* Interaction polish */
+@media (hover:hover) and (pointer:fine) {
+  .visual-refresh-knowledge button,
+  .visual-refresh-progress button,
+  .visual-refresh-profile button,
+  .visual-refresh-settings button {
+    transition:transform .17s ease,border-color .17s ease,box-shadow .17s ease,background .17s ease,filter .17s ease;
+  }
+}
+:is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings) button:active {
+  transform:translateY(2px);
+}
+
+/* Responsive */
+@media (min-width:860px) {
+  .visual-refresh-knowledge .knowledge-category-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .visual-refresh-knowledge .knowledge-personal-entry { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .visual-refresh-knowledge .knowledge-world-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .visual-refresh-progress .progress-kpi-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .visual-refresh-profile .profile-kpi-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .visual-refresh-settings { grid-template-columns:repeat(2,minmax(0,1fr));align-items:start; }
+  .visual-refresh-settings .settings-hero { grid-column:1/-1; }
+  .visual-refresh-settings .danger-zone { grid-column:1/-1; }
+}
+@media (max-width:859px) {
+  .visual-refresh-settings .settings-hero { grid-template-columns:1fr; }
+  .visual-refresh-settings .settings-current-overview { width:100%; }
+  .visual-refresh-knowledge .knowledge-welcome { grid-template-columns:minmax(0,1fr) 130px; }
+}
+@media (max-width:620px) {
+  .visual-refresh-knowledge,
+  .visual-refresh-progress,
+  .visual-refresh-profile,
+  .visual-refresh-settings,
+  .visual-refresh-type-detail { gap:12px; }
+  .visual-refresh-knowledge .knowledge-welcome {
+    min-height:0;
+    grid-template-columns:minmax(0,1fr) 86px;
+    gap:8px;
+    padding:20px 17px;
+    border-radius:27px;
+  }
+  .visual-refresh-knowledge .knowledge-welcome h3 { font-size:32px; }
+  .visual-refresh-knowledge .knowledge-welcome-mark { width:76px;border-radius:24px; }
+  .visual-refresh-knowledge .knowledge-welcome p:last-child { font-size:13px;margin-top:10px; }
+  .visual-refresh-knowledge .knowledge-search-panel,
+  .visual-refresh-knowledge .knowledge-subpage-head { padding:16px;border-radius:22px; }
+  .visual-refresh-knowledge .knowledge-subpage-head { grid-template-columns:44px minmax(0,1fr); }
+  .visual-refresh-knowledge .knowledge-subpage-actions { grid-column:1/-1; }
+  .visual-refresh-knowledge .knowledge-back-button { width:44px;height:44px;border-radius:14px; }
+  .visual-refresh-knowledge .knowledge-category-grid,
+  .visual-refresh-knowledge .knowledge-world-grid { grid-template-columns:1fr; }
+  .visual-refresh-knowledge .knowledge-personal-entry { grid-template-columns:1fr; }
+  .visual-refresh-knowledge .knowledge-category-card,
+  .visual-refresh-knowledge .knowledge-world-card { min-height:116px;border-radius:20px; }
+  .visual-refresh-knowledge .knowledge-pokemon-grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+  .visual-refresh-knowledge .knowledge-content-grid { grid-template-columns:1fr; }
+  .visual-refresh-knowledge .knowledge-content-card { min-height:125px;border-radius:20px; }
+  .visual-refresh-progress .progress-hero,
+  .visual-refresh-settings .settings-hero { min-height:0;padding:20px 17px;border-radius:27px; }
+  .visual-refresh-progress .progress-hero-copy h1,
+  .visual-refresh-settings .settings-hero h1 { font-size:36px; }
+  .visual-refresh-progress .progress-hero-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .visual-refresh-progress .progress-kpi-grid,
+  .visual-refresh-profile .profile-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+  .visual-refresh-progress .progress-kpi-card,
+  .visual-refresh-profile .profile-kpi-card { min-height:108px;padding:14px; }
+  .visual-refresh-progress .progress-kpi-icon,
+  .visual-refresh-profile .profile-kpi-card>span:first-child { width:42px;height:42px;border-radius:14px; }
+  .visual-refresh-progress .progress-tabs { width:100%;justify-content:flex-start; }
+  .visual-refresh-profile .trainer-profile-hero { border-radius:28px; }
+  .visual-refresh-profile .profile-hero-main { gap:14px; }
+  .visual-refresh-profile .profile-hero-meta { grid-template-columns:1fr; }
+  .visual-refresh-profile .profile-dashboard-grid { grid-template-columns:1fr; }
+  .visual-refresh-profile .profile-collection-strip { grid-template-columns:1fr; }
+  .visual-refresh-profile .profile-favorites-grid { grid-template-columns:1fr; }
+  .visual-refresh-settings .settings-group { border-radius:21px; }
+  .visual-refresh-settings .settings-group-heading { padding:15px; }
+  .visual-refresh-settings .settings-group-heading>span { width:44px;height:44px;border-radius:14px; }
+  .visual-refresh-settings .modern-setting-row {
+    min-height:78px;
+    padding:13px 15px;
+    grid-template-columns:44px minmax(0,1fr) auto;
+  }
+  .visual-refresh-settings .modern-setting-copy p { font-size:12px; }
+  .visual-refresh-settings .modern-setting-row .secondary-button,
+  .visual-refresh-settings .modern-setting-row .danger-button { min-width:0;padding-inline:13px; }
+  .visual-refresh-settings .select-control { width:130px; }
+}
+@media (max-width:390px) {
+  .visual-refresh-knowledge .knowledge-welcome { grid-template-columns:1fr; }
+  .visual-refresh-knowledge .knowledge-welcome-mark { display:none; }
+  .visual-refresh-knowledge .knowledge-pokemon-grid { grid-template-columns:1fr; }
+  .visual-refresh-progress .progress-kpi-grid,
+  .visual-refresh-profile .profile-kpi-grid { grid-template-columns:1fr; }
+  .visual-refresh-settings .modern-setting-row {
+    grid-template-columns:42px minmax(0,1fr);
+  }
+  .visual-refresh-settings .modern-setting-row>:last-child {
+    grid-column:2;
+    justify-self:start;
+    margin-top:4px;
+  }
+  .visual-refresh-settings .select-control { width:100%;max-width:none; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion:reduce) {
+  :is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) *,
+  :is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) *::before,
+  :is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) *::after {
+    scroll-behavior:auto!important;
+    animation-duration:.001ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+  }
+}
+html[data-animations="off"] :is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) *,
+html[data-animations="off"] :is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) *::before,
+html[data-animations="off"] :is(.visual-refresh-knowledge,.visual-refresh-progress,.visual-refresh-profile,.visual-refresh-settings,.visual-refresh-type-detail) *::after {
+  animation:none!important;
+  transition:none!important;
+}

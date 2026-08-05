@@ -145,14 +145,24 @@ Exceptions: ${exceptions.join(" | ")}`);
       assert.ok(value <= 1, `${label} horizontal overflow: ${value}px`);
     }
     async function noInternalKeys(label) {
-      const keys = await evaluate(`document.body.innerText.split(/\\s+/).filter(value=>/^(knowledge|flashcards|trainingLists|favorites)\\.[A-Za-z]/.test(value)).slice(0,5)`);
+      const keys = await evaluate(`document.body.innerText.split(/\\s+/).filter(value=>/^(knowledge|flashcards|trainingLists|favorites|whos)\\.[A-Za-z]/.test(value)).slice(0,5)`);
       assert.deepEqual(keys, [], `${label} exposes translation keys`);
     }
+    async function capture(name) {
+      const directory = process.env.QUIZMON_SCREENSHOT_DIR;
+      if (!directory) return;
+      if (name.includes("mobile")) await sleep(3000);
+      fs.mkdirSync(directory, { recursive:true });
+      const { data } = await cdp.send("Page.captureScreenshot", { format:"png", captureBeyondViewport:false }, sessionId);
+      fs.writeFileSync(path.join(directory, `${name}.png`), Buffer.from(data, "base64"));
+    }
 
-    await waitFor('document.querySelector(".game-home")');
+    await waitFor('document.querySelector(".refresh-home")');
     await noOverflow("home desktop");
     await noInternalKeys("home desktop");
-    await click('[data-destination="knowledge"]');
+    await click('[data-route="learn"]');
+    await waitFor('document.querySelector(".learn-page")');
+    await click('#openKnowledgeWorldFromLearn');
     await waitFor('document.querySelector(".knowledge-home")');
     assert.match(await evaluate('document.querySelector(".brand small").textContent'), /Wissenswelt|Knowledge Hub/);
     await noOverflow("knowledge desktop");
@@ -168,17 +178,117 @@ Exceptions: ${exceptions.join(" | ")}`);
     await waitFor('document.querySelector(".knowledge-search-result")');
     await noInternalKeys("search desktop");
 
-    await cdp.send("Emulation.setDeviceMetricsOverride", { width:390,height:844,deviceScaleFactor:2,mobile:true }, sessionId);
     await evaluate('document.getElementById("homeButton").click()');
-    await waitFor('document.querySelector(".game-home")');
+    await waitFor('document.querySelector(".refresh-home")');
+    await click('[data-home-play="pokeidle"]');
+    await waitFor('document.querySelector(".whos-setup-page")');
+    assert.match(await evaluate('document.querySelector("#whosTitle").textContent'), /PokéIdle/);
+    await noOverflow("Who’s That setup desktop");
+    await noInternalKeys("Who’s That setup desktop");
+    await capture("whos-setup-desktop");
+    await click('[data-whos-difficulty="easy"]');
+    await click('#startWhosRound');
+    await waitFor('document.querySelector(".whos-round-page")');
+    await waitFor('document.querySelector(".whos-current-stage .whos-cry-hint")');
+    assert.equal(await evaluate('Boolean(document.querySelector(".whos-current-stage audio") && document.querySelector(".whos-current-stage [data-whos-cry-play]"))'), true, "Easy PokéIdle must start with a cry player");
+    await click('.whos-current-stage [data-whos-mute]');
+    assert.equal(await evaluate('document.querySelector(".whos-current-stage .whos-media-fallback").hidden'), false, "Muted easy cry must reveal its data fallback");
+    await capture("pokeidle-easy-cry-desktop");
+    for (let reveal = 2; reveal <= 4; reveal += 1) {
+      await evaluate(`(()=>{const saved=JSON.parse(localStorage.getItem("quizmon.beta1"));const used=new Set([saved.whosThat.round.targetId,...saved.whosThat.round.guesses]);const item=QuizmonKnowledgeData.POKEMON.find(row=>!used.has(row.id));const input=document.querySelector("#whosGuessInput");input.value=item[saved.language]||item.en;input.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#whosGuessSubmit").click();})()`);
+      await waitFor(`document.querySelectorAll(".whos-progress-step.unlocked").length === ${reveal}`);
+    }
+    assert.equal(await evaluate('Boolean(document.querySelector(".whos-current-stage .whos-shadow-hint.strength-full"))'), true, "Easy clue four must be the full shadow");
+    await capture("pokeidle-easy-shadow-desktop");
+    await evaluate(`(()=>{const saved=JSON.parse(localStorage.getItem("quizmon.beta1"));const used=new Set([saved.whosThat.round.targetId,...saved.whosThat.round.guesses]);const item=QuizmonKnowledgeData.POKEMON.find(row=>!used.has(row.id));const input=document.querySelector("#whosGuessInput");input.value=item[saved.language]||item.en;input.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#whosGuessSubmit").click();})()`);
+    await waitFor('document.querySelectorAll(".whos-progress-step.unlocked").length === 5');
+    assert.equal(await evaluate('Boolean(document.querySelector(".whos-current-stage .whos-crop-hint.strength-large"))'), true, "Easy clue five must be the large colour crop");
+    assert.equal(await evaluate('(()=>{const stage=document.querySelector(".whos-current-stage .whos-media-stage");const anchor=Number(stage?.style.getPropertyValue("--media-anchor").replace("%",""));return anchor>=42&&anchor<=58;})()'), true, "Easy final crop must stay centred on the artwork");
+    await capture("pokeidle-easy-crop-desktop");
+    await waitFor('document.querySelector("#leaveWhosRound")');
+    await click('#leaveWhosRound');
+    await waitFor('document.querySelector(".whos-setup-page")');
+    await click('[data-whos-difficulty="hard"]');
+    assert.equal(await evaluate('document.querySelector("[data-whos-difficulty=hard]").classList.contains("selected")'), true);
+    await click('#startWhosRound');
+    await waitFor('document.querySelector(".whos-round-page")');
+    assert.equal(await evaluate('document.querySelectorAll(".whos-lives>span").length'), 5);
+    assert.equal(await evaluate('document.querySelectorAll(".whos-progress-step").length'), 5);
+    assert.equal(await evaluate('document.querySelectorAll(".whos-progress-step.unlocked").length'), 1);
+    await evaluate(`(()=>{const saved=JSON.parse(localStorage.getItem("quizmon.beta1"));const target=saved.whosThat.round.targetId;const item=QuizmonKnowledgeData.POKEMON.find(row=>row.id!==target);const name=item[saved.language]||item.en;const input=document.querySelector("#whosGuessInput");input.value=name.slice(0,Math.max(2,name.length-1));input.dispatchEvent(new Event("input",{bubbles:true}));window.__quizmonWrongGuessId=item.id;})()`);
+    await waitFor('!document.querySelector("#whosSuggestions").hidden');
+    assert.equal(await evaluate('Boolean(document.querySelector("#whosGuessSubmit"))'), true, "Guess action disappeared while suggestions were open");
+    assert.equal(await evaluate('(()=>{const list=document.querySelector("#whosSuggestions").getBoundingClientRect();const submit=document.querySelector("#whosGuessSubmit").getBoundingClientRect();return list.bottom<=submit.top+1&&submit.height>=44;})()'), true, "Suggestions must stay in flow above the persistent guess action");
+    await capture("whos-search-open-desktop");
+    await click('[data-whos-suggestion="'+await evaluate('window.__quizmonWrongGuessId')+'"]');
+    assert.equal(await evaluate('document.querySelector("#whosGuessSubmit").disabled'), false, "Selecting a Pokémon must enable the guess action");
+    await click('#whosGuessSubmit');
+    await waitFor('document.querySelectorAll(".whos-progress-step.unlocked").length === 2');
+    await waitFor('document.querySelector(".whos-comparison")');
+    await sleep(350);
+    await capture("whos-comparison-desktop");
+    assert.equal(await evaluate('document.querySelectorAll(".whos-lives>span.available").length'), 4);
+    for (let reveal = 3; reveal <= 5; reveal += 1) {
+      await evaluate(`(()=>{const saved=JSON.parse(localStorage.getItem("quizmon.beta1"));const used=new Set([saved.whosThat.round.targetId,...saved.whosThat.round.guesses]);const item=QuizmonKnowledgeData.POKEMON.find(row=>!used.has(row.id));const input=document.querySelector("#whosGuessInput");input.value=item[saved.language]||item.en;input.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#whosGuessSubmit").click();})()`);
+      await waitFor(`document.querySelectorAll(".whos-progress-step.unlocked").length === ${reveal}`);
+    }
+    assert.ok(await evaluate('document.querySelectorAll(".whos-current-stage [data-whos-media],.whos-discovered [data-whos-media]").length') >= 1, "No media clue was revealed");
+    await noOverflow("Who’s That media desktop");
+    await capture("whos-media-desktop");
+    await evaluate(`(()=>{const saved=JSON.parse(localStorage.getItem("quizmon.beta1"));const item=QuizmonKnowledgeData.BY_ID.get(saved.whosThat.round.targetId);const input=document.querySelector("#whosGuessInput");input.value=item[saved.language]||item.en;input.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#whosGuessSubmit").click();})()`);
+    await waitFor('document.querySelector(".whos-result")');
+    await noOverflow("Who’s That result desktop");
+    await click('#nextWhosRound');
+    await waitFor('document.querySelector("#whosGuessInput")');
+
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width:390,height:844,deviceScaleFactor:2,mobile:true }, sessionId);
+    await noOverflow("Who’s That round mobile");
+    await capture("whos-round-mobile");
+    const playTouchFailures = await evaluate(`[...document.querySelectorAll('#whosGuessInput,#whosGuessSubmit,.whos-leave-round')].map(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height})).filter(size=>size.w<43.5||size.h<43.5)`);
+    assert.deepEqual(playTouchFailures, [], "Phase-4 play controls must be at least 44px");
+    await click('#leaveWhosRound');
+    await waitFor('document.querySelector(".whos-setup-page")');
+    await click('#startWhosDaily');
+    await waitFor('document.querySelector(".whos-round-page")');
+    assert.equal(await evaluate('Boolean(document.querySelector("#leaveWhosRound"))'), false, "Daily PokéIdle must not expose a restart loophole");
+    await evaluate(`(()=>{const saved=JSON.parse(localStorage.getItem("quizmon.beta1"));const item=QuizmonKnowledgeData.BY_ID.get(saved.whosThat.round.targetId);const input=document.querySelector("#whosGuessInput");input.value=item[saved.language]||item.en;input.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#whosGuessSubmit").click();})()`);
+    await waitFor('document.querySelector(".whos-result")');
+    await capture("pokeidle-daily-result-mobile");
+    await evaluate('document.getElementById("homeButton").click()');
+    await waitFor('document.querySelector(".refresh-home")');
+    assert.equal(await evaluate('document.querySelector(".refresh-motivation-card.daily").classList.contains("is-complete")'), true, "Daily PokéIdle win must complete the menu goal");
+    assert.equal(await evaluate('[...document.querySelectorAll(".daily-goal-week .is-today")].some(day=>day.classList.contains("is-complete"))'), true, "Today must be checked off");
+    await capture("home-daily-complete-mobile");
     await noOverflow("home mobile");
-    await click('[data-destination="knowledge"]');
+    await click('[data-route="learn"]');
+    await waitFor('document.querySelector(".learn-page")');
+    await click('#openKnowledgeWorldFromLearn');
     await waitFor('document.querySelector(".knowledge-home")');
     await noOverflow("knowledge mobile");
     const touchFailures = await evaluate(`[...document.querySelectorAll('.knowledge-favorite-button,.knowledge-training-list-button,.knowledge-search-field button')].map(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height})).filter(size=>size.w<43.5||size.h<43.5)`);
     assert.deepEqual(touchFailures, [], "Phase-3 touch controls must be at least 44px");
+
+    await click('[data-route="stats"]');
+    await waitFor('document.querySelector(".visual-refresh-progress")');
+    await noOverflow("progress mobile");
+    await capture("progress-mobile");
+
+    await click('[data-route="settings"]');
+    await waitFor('document.querySelector(".visual-refresh-settings")');
+    await noOverflow("settings mobile");
+    const beforeTheme = await evaluate('document.documentElement.dataset.theme');
+    await click('#themeToggle');
+    const afterTheme = await evaluate('document.documentElement.dataset.theme');
+    assert.notEqual(afterTheme, beforeTheme, "Theme toggle must update the active theme");
+    await capture("settings-mobile");
+
+    await click('#levelButton');
+    await waitFor('document.querySelector(".visual-refresh-profile")');
+    await noOverflow("profile mobile");
+    await capture("profile-mobile");
+
     assert.deepEqual(exceptions, [], `Browser exceptions: ${exceptions.join(" | ")}`);
-    console.log("Browser smoke passed: desktop/mobile, navigation, search, history, overflow, touch targets");
+    console.log("Browser smoke passed: desktop/mobile, play round, knowledge, progress, profile, settings, themes, overflow and touch targets");
   } finally {
     cdp.close();
     chrome.child.kill("SIGKILL");
