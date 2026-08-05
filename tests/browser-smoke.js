@@ -267,8 +267,28 @@ Exceptions: ${exceptions.join(" | ")}`);
     await noOverflow("knowledge mobile");
     const touchFailures = await evaluate(`[...document.querySelectorAll('.knowledge-favorite-button,.knowledge-training-list-button,.knowledge-search-field button')].map(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height})).filter(size=>size.w<43.5||size.h<43.5)`);
     assert.deepEqual(touchFailures, [], "Phase-3 touch controls must be at least 44px");
+
+    await click('[data-route="stats"]');
+    await waitFor('document.querySelector(".visual-refresh-progress")');
+    await noOverflow("progress mobile");
+    await capture("progress-mobile");
+
+    await click('[data-route="settings"]');
+    await waitFor('document.querySelector(".visual-refresh-settings")');
+    await noOverflow("settings mobile");
+    const beforeTheme = await evaluate('document.documentElement.dataset.theme');
+    await click('#themeToggle');
+    const afterTheme = await evaluate('document.documentElement.dataset.theme');
+    assert.notEqual(afterTheme, beforeTheme, "Theme toggle must update the active theme");
+    await capture("settings-mobile");
+
+    await click('#levelButton');
+    await waitFor('document.querySelector(".visual-refresh-profile")');
+    await noOverflow("profile mobile");
+    await capture("profile-mobile");
+
     assert.deepEqual(exceptions, [], `Browser exceptions: ${exceptions.join(" | ")}`);
-    console.log("Browser smoke passed: desktop/mobile, play round, five lives, navigation, search, history, overflow, touch targets");
+    console.log("Browser smoke passed: desktop/mobile, play round, knowledge, progress, profile, settings, themes, overflow and touch targets");
   } finally {
     cdp.close();
     chrome.child.kill("SIGKILL");

@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "visual-refresh-sprint2-v1";
+  const BUILD_VERSION = "visual-refresh-sprint3-v1";
   const PUBLIC_VERSION = "Beta 1.3";
   const DATA_SCHEMA = 19;
   const LEARNING_EVENT_LIMIT = 800;
@@ -16,6 +16,7 @@
   const LEARNING_EVENT_MODES = Object.freeze([...PLAYABLE_MODES, "weak", "daily", "review", "problem", "path"]);
   const ADAPTIVE_SESSION_MODES = Object.freeze(["weak", "problem"]);
   const SUPPORTED_CURRENT_VERSIONS = Object.freeze([
+    "visual-refresh-sprint2-v1", "visual-refresh-sprint1-v1",
     "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
     "4.1-sprint1-v1", "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
     "2.5-sprint3-v1", "2.5-sprint2-v1", "2.5-sprint1-v1", "2.4-sprint2-v1", "2.4-sprint1-v1",
@@ -932,7 +933,7 @@
   }
   function feedbackProgressiveDetails(html, open = false) {
     if (!html) return "";
-    return `<details class="feedback-progressive-details" ${open ? "open" : ""}><summary><span><strong>${t("cleanup2.feedbackDetails")}</strong><small>${t("cleanup2.feedbackDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div>${html}</div></details>`;
+    return `<details class="feedback-progressive-details" ${open ? "open" : ""}><summary><span><strong>${t("cleanup2.feedbackDetails")}</strong><small>${t("cleanup2.feedbackDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><div>${html}</div></details>`;
   }
 
   function feedbackHeading(correct, subtitle = "") {
@@ -2536,7 +2537,7 @@
     const nextReward = nextLevelRewardInfo(level.current.level);
 
     view.innerHTML = `
-      <section class="trainer-profile-page" aria-labelledby="trainerProfileTitle">
+      <section class="trainer-profile-page visual-refresh-profile" aria-labelledby="trainerProfileTitle">
         <section class="trainer-profile-hero profile-banner profile-banner-${banner.id}">
           <div class="profile-banner-pattern" aria-hidden="true"><i></i><i></i><i></i></div>
           <div class="profile-hero-main">
@@ -2565,7 +2566,7 @@
         <section class="profile-dashboard-grid profile-priority-grid">
           <article class="profile-panel profile-level-panel">
             <div class="profile-panel-heading">
-              <span>↗</span>
+              <span>${iconSvg("stats")}</span>
               <div><small>${t("profile.journey")}</small><h2>${t("profile.levelProgress")}</h2></div>
             </div>
             <div class="profile-level-summary">
@@ -2579,7 +2580,7 @@
 
           <article class="profile-panel profile-record-panel">
             <div class="profile-panel-heading">
-              <span>✦</span>
+              <span>${iconSvg("trophy")}</span>
               <div><small>${t("profile.personalBest")}</small><h2>${t("profile.records")}</h2></div>
             </div>
             <div class="profile-record-list">
@@ -2619,9 +2620,9 @@
 
         <section class="profile-kpi-grid" aria-label="${escapeHtml(t("profile.overview"))}">
           ${profileKpi("XP", t("profile.xp"), state.stats.xp, level.next ? t("profile.xpRemaining", { count: remainingXp }) : t("profile.maxLevel"))}
-          ${profileKpi("◎", t("profile.accuracy"), `${accuracy}%`, `${state.stats.correct}/${state.stats.total} ${t("common.correct").toLowerCase()}`)}
-          ${profileKpi("▦", t("profile.sessions"), state.stats.sessions, t("profile.completedSessions"))}
-          ${profileKpi("◇", t("profile.types"), `${mastered}/18`, t("profile.typesHint", { explored }))}
+          ${profileKpi(iconSvg("accuracy"), t("profile.accuracy"), `${accuracy}%`, `${state.stats.correct}/${state.stats.total} ${t("common.correct").toLowerCase()}`)}
+          ${profileKpi(iconSvg("sessions"), t("profile.sessions"), state.stats.sessions, t("profile.completedSessions"))}
+          ${profileKpi(iconSvg("knowledge"), t("profile.types"), `${mastered}/18`, t("profile.typesHint", { explored }))}
         </section>
 
         <section class="profile-activity-card">
@@ -2975,7 +2976,22 @@
       idle: `<svg ${attrs}><path d="M12 3.5 14 8l4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2z"></path><path d="M5 17.5h14"></path><path d="M7 20h10"></path></svg>`,
       campaign: `<svg ${attrs}><path d="M4 19c3.5-5.5 4.5-2 7-6s4-1 9-8"></path><circle cx="4" cy="19" r="2"></circle><circle cx="11" cy="13" r="2"></circle><circle cx="20" cy="5" r="2"></circle></svg>`,
       target: `<svg ${attrs}><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m14.5 9.5 5-5"></path><path d="M16.5 4.5h3v3"></path></svg>`,
-      flame: `<svg ${attrs}><path d="M13.5 3.5c.7 3.1-1.5 4.4-2.8 6.1-1.2-1-1.6-2.1-1.4-3.5C6.7 8 5 10.4 5 13.2A7 7 0 0 0 19 13c0-4-2.5-6.8-5.5-9.5z"></path><path d="M10 17.5c0-1.7 1.1-2.8 2.3-4.2.6 1.3 1.7 2.2 1.7 3.8a2 2 0 0 1-4 .4z"></path></svg>`
+      flame: `<svg ${attrs}><path d="M13.5 3.5c.7 3.1-1.5 4.4-2.8 6.1-1.2-1-1.6-2.1-1.4-3.5C6.7 8 5 10.4 5 13.2A7 7 0 0 0 19 13c0-4-2.5-6.8-5.5-9.5z"></path><path d="M10 17.5c0-1.7 1.1-2.8 2.3-4.2.6 1.3 1.7 2.2 1.7 3.8a2 2 0 0 1-4 .4z"></path></svg>`,
+      trophy: `<svg ${attrs}><path d="M8 4h8v4a4 4 0 0 1-8 0z"></path><path d="M8 6H5v1a4 4 0 0 0 4 4"></path><path d="M16 6h3v1a4 4 0 0 1-4 4"></path><path d="M12 12v5"></path><path d="M8 20h8"></path><path d="M9 17h6"></path></svg>`,
+      back: `<svg ${attrs}><path d="m15 18-6-6 6-6"></path></svg>`,
+      chevronDown: `<svg ${attrs}><path d="m7 10 5 5 5-5"></path></svg>`,
+      language: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path></svg>`,
+      theme: `<svg ${attrs}><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z"></path></svg>`,
+      motion: `<svg ${attrs}><path d="M4 12h9"></path><path d="m10 8 4 4-4 4"></path><path d="M17 7h3"></path><path d="M17 12h3"></path><path d="M17 17h3"></path></svg>`,
+      haptic: `<svg ${attrs}><path d="M8 5v14"></path><path d="M16 5v14"></path><path d="M4 9v6"></path><path d="M20 9v6"></path><path d="M11 7v10"></path><path d="M13 7v10"></path></svg>`,
+      help: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M9.7 9a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.3 1-1.3 1.7"></path><path d="M12 17h.01"></path></svg>`,
+      data: `<svg ${attrs}><ellipse cx="12" cy="5" rx="7" ry="3"></ellipse><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5"></path><path d="M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7"></path></svg>`,
+      download: `<svg ${attrs}><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
+      upload: `<svg ${attrs}><path d="M12 21V9"></path><path d="m7 14 5-5 5 5"></path><path d="M5 3h14"></path></svg>`,
+      feedback: `<svg ${attrs}><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>`,
+      diagnostics: `<svg ${attrs}><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 15 3-4 3 2 4-6"></path><circle cx="17" cy="7" r="1"></circle></svg>`,
+      warning: `<svg ${attrs}><path d="m12 3 10 18H2z"></path><path d="M12 9v5"></path><path d="M12 17h.01"></path></svg>`,
+      trash: `<svg ${attrs}><path d="M4 7h16"></path><path d="M9 3h6l1 4H8z"></path><path d="m6 7 1 14h10l1-14"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`
     };
     return icons[name] || icons.home;
   }
@@ -4304,7 +4320,7 @@
       ${unlockCount?`<section class="summary-unlock-card"><div class="summary-unlock-heading"><span aria-hidden="true">✦</span><div><p class="quiz-kicker">${t("summary.levelUp")}</p><h2>${t("rewards.newTitle")}</h2><p>${t("rewards.newText",{count:unlockCount})}</p></div><button id="openUnlockedRewards" class="secondary-button">${t("rewards.open")}</button></div><div class="reward-list-grid">${rewardListMarkup(unlockedItems)}</div></section>`:""}
 
       <details class="summary-secondary-details">
-        <summary><span><strong>${t("summary.details")}</strong><small>${t("summary.detailsHint")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <summary><span><strong>${t("summary.details")}</strong><small>${t("summary.detailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
         <section class="summary-metric-grid">
           <article><small>${t("summary.duration")}</small><strong>${formatDuration(duration)}</strong></article>
           <article><small>${t("summary.bestCombo")}</small><strong>×${Math.max(0,Number(session.bestCombo||0))}</strong></article>
@@ -4333,7 +4349,7 @@
   }
 
   function renderKnowledgePage() {
-    view.innerHTML=`<section class="learn-page knowledge-route-page">
+    view.innerHTML=`<section class="learn-page knowledge-route-page visual-refresh-knowledge">
       <section class="learn-workspace panel knowledge-route-workspace"><div id="learnContent"></div></section>
     </section>`;
     renderKnowledge();
@@ -4796,7 +4812,7 @@
     const status=done?t("cleanup2.stageCompleted"):active?t("cleanup2.stageCurrent"):t("cleanup2.stageLater");
     const progress=active&&!done?t("cleanup2.stageProgress",{completed,total:modules.length}):status;
     return `<details class="path-stage ${stage} ${done?"is-complete":active?"is-current":"is-later"}" ${open?"open":""}>
-      <summary class="path-stage-heading"><span>${PATH_STAGE_ICONS[stage]}</span><div><small>${t(`path.stage.${stage}.kicker`)}</small><h3>${t(`path.stage.${stage}.title`)}</h3><p>${t(`path.stage.${stage}.text`)}</p></div><strong>${escapeHtml(progress)}</strong><i aria-hidden="true">⌄</i></summary>
+      <summary class="path-stage-heading"><span>${PATH_STAGE_ICONS[stage]}</span><div><small>${t(`path.stage.${stage}.kicker`)}</small><h3>${t(`path.stage.${stage}.title`)}</h3><p>${t(`path.stage.${stage}.text`)}</p></div><strong>${escapeHtml(progress)}</strong><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
       <div class="path-module-list">${modules.map(pathModuleCard).join("")}</div>
     </details>`;
   }
@@ -5710,7 +5726,7 @@
       ${knowledgeGenerationFilterMarkup()}
       ${knowledgeSearchMarkup()}
       <details class="knowledge-home-group knowledge-personal-hub" ${compact?"":"open"}>
-        <summary><span aria-hidden="true">${iconSvg("favorite")}</span><span><strong>${t("knowledge.personalHubTitle")}</strong><small>${t("knowledge.personalHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <summary><span aria-hidden="true">${iconSvg("favorite")}</span><span><strong>${t("knowledge.personalHubTitle")}</strong><small>${t("knowledge.personalHubText")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
         <section class="knowledge-personal-entry">
           ${knowledgeSectionButton("favorites",iconSvg("favorite"),t("favorites.title"),t("favorites.homeText"),t("favorites.meta",{count:favoritePokemonEntries().length+favoriteTypeEntries().length}))}
           ${knowledgeSectionButton("training-lists",iconSvg("list"),t("trainingLists.title"),t("trainingLists.homeText"),t("trainingLists.meta",{count:trainingLists().length}))}
@@ -5724,7 +5740,7 @@
         ${knowledgeSectionButton("items",iconSvg("item"),t("knowledge.items"),t("knowledge.itemsText"),t("knowledge.itemsMeta",{count:counts.items}))}
       </section>
       <details class="knowledge-home-group knowledge-world-hub" ${compact?"":"open"}>
-        <summary><span aria-hidden="true">${iconSvg("region")}</span><span><strong>${t("knowledge.worldTitle")}</strong><small>${t("knowledge.worldHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
+        <summary><span aria-hidden="true">${iconSvg("region")}</span><span><strong>${t("knowledge.worldTitle")}</strong><small>${t("knowledge.worldHubText")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
         <section class="knowledge-category-grid knowledge-world-grid" aria-labelledby="knowledgeWorldTitle">
           <div class="knowledge-section-heading sr-only"><div><small>${t("knowledge.worldKicker")}</small><h3 id="knowledgeWorldTitle">${t("knowledge.worldTitle")}</h3></div></div>
           ${knowledgeSectionButton("regions",iconSvg("region"),t("knowledge.regionsTitle"),t("knowledge.regionsText"),t("knowledge.regionsMeta",{count:counts.regions}))}
@@ -5743,7 +5759,7 @@
   }
 
   function knowledgeSubpageHeader(title, text, meta) {
-    return `<header class="knowledge-subpage-head"><button class="knowledge-back-button" data-knowledge-home aria-label="${escapeHtml(t("knowledge.backHome"))}">‹</button><div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div><div class="knowledge-subpage-actions"><span>${escapeHtml(meta)}</span>${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup(true)}</div></header>`;
+    return `<header class="knowledge-subpage-head"><button class="knowledge-back-button" data-knowledge-home aria-label="${escapeHtml(t("knowledge.backHome"))}">${iconSvg("back")}</button><div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div><div class="knowledge-subpage-actions"><span>${escapeHtml(meta)}</span>${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup(true)}</div></header>`;
   }
 
   function bindKnowledgeHome(root) {
@@ -6398,7 +6414,7 @@
     const rate=percent(s.correct,s.total);
     const memory=memoryAid(learnType,attack,defense);
     const meta=TYPE_META[learnType];
-    view.innerHTML=`<section class="type-detail-page" style="--type-color:${meta.color}">
+    view.innerHTML=`<section class="type-detail-page visual-refresh-type-detail" style="--type-color:${meta.color}">
       <section class="type-detail-hero">
         <div class="type-detail-identity">
           <div class="type-detail-symbol">${meta.icon}</div>
@@ -7277,7 +7293,7 @@
     const accuracy=percent(state.stats.correct,state.stats.total);
     const openErrors=state.stats.mistakes.filter(item=>item.status!=="resolved").length;
     const heroMetrics=state.statsTab==="overview"?`<div class="progress-hero-metrics"><span><small>${t("stats.accuracy")}</small><strong>${accuracy}%</strong></span><span><small>${t("stats.bestStreak")}</small><strong>${state.stats.bestStreak}</strong></span><span><small>${t("stats.openErrors")}</small><strong>${openErrors}</strong></span></div>`:"";
-    view.innerHTML=`<section class="progress-page ${state.statsTab==="overview"?"overview-focused":"detail-focused"}">
+    view.innerHTML=`<section class="progress-page visual-refresh-progress ${state.statsTab==="overview"?"overview-focused":"detail-focused"}">
       <section class="progress-hero">
         <div class="progress-hero-copy"><p class="quiz-kicker">${t("stats.hubKicker")}</p><h1>${t("stats.hubTitle")}</h1><p>${t("stats.hubSubtitle")}</p></div>
         <div class="progress-level-card">
@@ -7505,7 +7521,7 @@
       <div class="error-analysis-heading"><div><p class="quiz-kicker">${t("cleanup2.patternSectionKicker")}</p><h2>${t("cleanup2.patternSectionTitle")}</h2><p>${t("cleanup2.patternSectionText")}</p></div><span class="error-analysis-stage ${stage}">${t(`errorAnalysis.stage.${stage}`)}</span></div>
       ${lead?`<div class="error-analysis-lead"><small>${t("cleanup2.mostImportantPattern")}</small>${errorPatternCard(lead)}</div>`:`<div class="error-analysis-empty"><span>◎</span><strong>${t("errorAnalysis.emptyTitle")}</strong><p>${analysis.analyzed?t("errorAnalysis.emptyBuilding"):t("errorAnalysis.emptyText")}</p></div>`}
       ${remaining.length?`<div class="section-title error-analysis-section-title"><h3>${t("cleanup2.otherPatterns")}</h3><p>${t("errorAnalysis.patternsHintDetailed")}</p></div><div class="error-pattern-grid">${remaining.map(errorPatternCard).join("")}</div>`:""}
-      <details class="error-analysis-details"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div class="error-analysis-metrics"><article><small>${t("errorAnalysis.analyzed")}</small><strong>${analysis.analyzed}</strong></article><article><small>${t("errorAnalysis.errorAnswers")}</small><strong>${analysis.errorAnswers}</strong></article><article><small>${t("errorAnalysis.recurring")}</small><strong>${analysis.recurring}</strong></article><article><small>${t("errorAnalysis.concrete")}</small><strong>${analysis.concrete}</strong></article></div><div class="error-analysis-note"><span>i</span><p>${t("errorAnalysis.note")}</p></div></details>
+      <details class="error-analysis-details"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><div class="error-analysis-metrics"><article><small>${t("errorAnalysis.analyzed")}</small><strong>${analysis.analyzed}</strong></article><article><small>${t("errorAnalysis.errorAnswers")}</small><strong>${analysis.errorAnswers}</strong></article><article><small>${t("errorAnalysis.recurring")}</small><strong>${analysis.recurring}</strong></article><article><small>${t("errorAnalysis.concrete")}</small><strong>${analysis.concrete}</strong></article></div><div class="error-analysis-note"><span>i</span><p>${t("errorAnalysis.note")}</p></div></details>
     </section>`;
   }
 
@@ -7539,7 +7555,7 @@
       <section class="error-detail-cause"><span>?</span><div><strong>${t("errorAnalysis.causeTitle")}</strong><p>${escapeHtml(errorPatternText(pattern))}</p></div></section>
       ${errorPatternDevelopmentMarkup(pattern)}
       <section class="error-detail-criterion"><strong>${t("errorAnalysis.statusTitle")}</strong><p>${escapeHtml(errorPatternCriterionText(pattern))}</p></section>
-      <details class="error-detail-data"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><section class="error-detail-metrics"><article><small>${t("errorAnalysis.wrongOfRelevant")}</small><strong>${pattern.errors}/${pattern.opportunities}</strong><span>${Math.round(pattern.rate*100)}%</span></article><article><small>${t("errorAnalysis.sessionsSeen")}</small><strong>${pattern.sessions}</strong><span>${t("errorAnalysis.trainingUnits")}</span></article><article><small>${t("errorAnalysis.correctStreak")}</small><strong>${pattern.development.correctStreak}</strong><span>${t("errorAnalysis.confirmations")}</span></article></section></details>
+      <details class="error-detail-data"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><section class="error-detail-metrics"><article><small>${t("errorAnalysis.wrongOfRelevant")}</small><strong>${pattern.errors}/${pattern.opportunities}</strong><span>${Math.round(pattern.rate*100)}%</span></article><article><small>${t("errorAnalysis.sessionsSeen")}</small><strong>${pattern.sessions}</strong><span>${t("errorAnalysis.trainingUnits")}</span></article><article><small>${t("errorAnalysis.correctStreak")}</small><strong>${pattern.development.correctStreak}</strong><span>${t("errorAnalysis.confirmations")}</span></article></section></details>
       <section class="error-detail-training ${canTrain?"":"locked"}"><div><small>${t("errorAnalysis.problemTrainingKicker")}</small><strong>${t("errorAnalysis.problemTrainingTitle")}</strong><p>${canTrain?t("errorAnalysis.problemTrainingText"):t("errorAnalysis.problemTrainingLocked")}</p></div><span>${tp("train.questionCountOne","train.questionCount",8)}</span></section>
       <div class="modal-actions"><button id="closeErrorPattern" class="secondary-button">${t("common.close")}</button><button id="startProblemTraining" class="primary-button" ${canTrain?"":"disabled"}>${t("errorAnalysis.startProblemTraining")}</button></div>
     </section></div>`,{initialFocus:canTrain?"#startProblemTraining":"#closeErrorPattern"});
@@ -7733,26 +7749,26 @@
     const dark=actualTheme()==="dark";
     const languageLabel=state.language==="de"?"Deutsch":"English";
     const themeLabel=dark?t("settings.dark"):t("settings.light");
-    view.innerHTML=`<section class="settings-page">
+    view.innerHTML=`<section class="settings-page visual-refresh-settings">
       <section class="settings-hero"><div><p class="quiz-kicker">${t("settings.centerKicker")}</p><h1>${t("settings.centerTitle")}</h1><p>${t("settings.centerSubtitle")}</p></div><div class="settings-current-overview"><div class="settings-current-heading"><small>${t("settings.currentTitle")}</small><p>${t("settings.currentHint")}</p></div><div class="settings-status-grid"><span><small>${t("settings.language")}</small><strong>${languageLabel}</strong></span><span><small>${t("settings.theme")}</small><strong>${themeLabel}</strong></span><span><small>${t("settings.animations")}</small><strong>${state.animations?t("settings.on"):t("settings.off")}</strong></span></div></div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>◐</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingSelectRow("languageSelect","文",t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
-        ${settingToggleRow("themeToggle","◐",t("settings.theme"),t("settings.themeDesc"),dark)}
-        ${settingToggleRow("animationToggle","↝",t("settings.animations"),t("settings.animationsDesc"),state.animations)}
-        ${settingToggleRow("hapticToggle","≈",t("settings.haptics"),t("settings.hapticsDesc"),state.haptics)}
+      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("settings")}</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingSelectRow("languageSelect",iconSvg("language"),t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
+        ${settingToggleRow("themeToggle",iconSvg("theme"),t("settings.theme"),t("settings.themeDesc"),dark)}
+        ${settingToggleRow("animationToggle",iconSvg("motion"),t("settings.animations"),t("settings.animationsDesc"),state.animations)}
+        ${settingToggleRow("hapticToggle",iconSvg("haptic"),t("settings.haptics"),t("settings.hapticsDesc"),state.haptics)}
       </div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>?</span><div><h2>${t("settings.guidance")}</h2><p>${t("settings.guidanceHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("restartTutorial","◎",t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
+      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("help")}</span><div><h2>${t("settings.guidance")}</h2><p>${t("settings.guidanceHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("restartTutorial",iconSvg("learn"),t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
       </div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>⇄</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("exportProgress","↓",t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
-        ${settingActionRow("importProgress","↑",t("settings.import"),t("settings.importDesc"),t("settings.importAction"))}
+      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("data")}</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("exportProgress",iconSvg("download"),t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
+        ${settingActionRow("importProgress",iconSvg("upload"),t("settings.import"),t("settings.importDesc"),t("settings.importAction"))}
         <input id="importFile" type="file" accept="application/json" hidden>
-        ${settingActionRow("exportFeedback","✎",t("settings.feedback"),t("settings.feedbackDesc"),t("settings.createReport"))}
-        ${settingActionRow("exportDiagnostics","⌁",t("settings.diagnostics"),t("settings.diagnosticsDesc"),t("settings.exportAction"))}
+        ${settingActionRow("exportFeedback",iconSvg("feedback"),t("settings.feedback"),t("settings.feedbackDesc"),t("settings.createReport"))}
+        ${settingActionRow("exportDiagnostics",iconSvg("diagnostics"),t("settings.diagnostics"),t("settings.diagnosticsDesc"),t("settings.exportAction"))}
       </div></section>
-      <section class="settings-group danger-zone"><div class="settings-group-heading"><span>!</span><div><h2>${t("settings.dangerZone")}</h2><p>${t("settings.dangerZoneHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("resetProgress","×",t("settings.reset"),t("settings.resetDesc"),t("settings.delete"),true)}
+      <section class="settings-group danger-zone"><div class="settings-group-heading"><span>${iconSvg("warning")}</span><div><h2>${t("settings.dangerZone")}</h2><p>${t("settings.dangerZoneHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("resetProgress",iconSvg("trash"),t("settings.reset"),t("settings.resetDesc"),t("settings.delete"),true)}
       </div></section>
     </section>`;
     document.getElementById("languageSelect").addEventListener("change",event=>{state.language=event.target.value;saveState();applyPreferences();renderSettings();});
@@ -8074,7 +8090,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=visual-refresh-sprint2-v1",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=visual-refresh-sprint3-v1",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{

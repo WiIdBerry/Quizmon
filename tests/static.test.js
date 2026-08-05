@@ -18,7 +18,8 @@ test("CSS imports preserve the intended app-wide cascade", () => {
   assert.deepEqual(imports, [
     "./styles-base.css", "./styles-home.css", "./styles-play.css", "./styles-training.css", "./styles-learning.css",
     "./styles-knowledge.css", "./styles-progress.css", "./styles-profile.css", "./styles-motion.css", "./styles-feedback.css",
-    "./styles-motivation.css", "./styles-intelligence.css", "./styles-visual-refresh.css", "./styles-visual-refresh-sprint2.css"
+    "./styles-motivation.css", "./styles-intelligence.css", "./styles-visual-refresh.css", "./styles-visual-refresh-sprint2.css",
+    "./styles-visual-refresh-sprint3.css"
   ]);
   for (const ref of imports) assert.ok(fs.existsSync(path.resolve(ROOT, ref)), `missing ${ref}`);
 });
@@ -198,12 +199,12 @@ test("current build and the single service-worker registration are consistent", 
   const pkg = JSON.parse(read("package.json"));
   const combined = `${html}
 ${app}`;
-  assert.match(app, /const BUILD_VERSION = "visual-refresh-sprint2-v1"/);
-  assert.match(app, /service-worker\.js\?build=visual-refresh-sprint2-v1/);
+  assert.match(app, /const BUILD_VERSION = "visual-refresh-sprint3-v1"/);
+  assert.match(app, /service-worker\.js\?build=visual-refresh-sprint3-v1/);
   assert.doesNotMatch(html, /navigator\.serviceWorker\.register/);
   assert.equal((combined.match(/navigator\.serviceWorker\.register/g) || []).length, 1);
-  assert.match(sw, /const BUILD = "visual-refresh-sprint2-v1"/);
-  assert.equal(pkg.version, "1.3.0-visual-refresh-sprint2.1");
+  assert.match(sw, /const BUILD = "visual-refresh-sprint3-v1"/);
+  assert.equal(pkg.version, "1.3.0-visual-refresh-sprint3.1");
   assert.match(app, /"3\.5-sprint2-v2"/);
 });
 
