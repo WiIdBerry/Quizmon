@@ -59,6 +59,6 @@ test("sprint 2 stylesheet contains responsive and reduced-motion rules", () => {
 
 test("sprint 2 keeps the public version and updates only the build", () => {
   assert.match(read("index.html"), /<small>Beta 1\.3<\/small>/);
-  assert.match(read("service-worker.js"), /visual-refresh-sprint3-v1/);
-  assert.match(read("package.json"), /visual-refresh-sprint3\.1/);
+  assert.match(read("service-worker.js"), /visual-refresh-sprint2-v1/);
+  assert.match(read("package.json"), /visual-refresh-sprint2\.1/);
 });

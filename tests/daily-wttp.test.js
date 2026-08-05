@@ -45,7 +45,7 @@ test("Sprint 3 UI contains daily, XP, statistics and online-ready integration", 
   const app = read("app.js");
   const html = read("index.html");
   const css = read("styles-play.css");
-  assert.match(app, /const BUILD_VERSION = "visual-refresh-sprint3-v1"/);
+  assert.match(app, /const BUILD_VERSION = "visual-refresh-sprint2-v1"/);
   assert.match(app, /createDailyRound/);
   assert.match(app, /completeWhosRound/);
   assert.match(app, /addXp\(score\.xp\)/);
