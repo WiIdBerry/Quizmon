@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "quizmon-beta-1-3";
-const BUILD = "visual-refresh-sprint3-v1";
+const BUILD = "4.1-sprint3-v4";
 const SHELL_CACHE = `${CACHE_PREFIX}-${BUILD}-shell`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}-${BUILD}-runtime`;
 const CURRENT_CACHES = new Set([SHELL_CACHE, RUNTIME_CACHE]);
@@ -23,9 +23,6 @@ const SHELL = Object.freeze([
   "./styles-feedback.css",
   "./styles-motivation.css",
   "./styles-intelligence.css",
-  "./styles-visual-refresh.css",
-  "./styles-visual-refresh-sprint2.css",
-  "./styles-visual-refresh-sprint3.css",
   "./data.js",
   "./cosmetics.js",
   "./i18n.js",

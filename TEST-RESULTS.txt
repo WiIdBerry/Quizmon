@@ -1,41 +1,95 @@
-Quizmon Beta 1.3 – Visual Refresh Sprint 2 v1
-============================================================
+Quizmon Beta 1.3 – Phase 4.1 Sprint 3 v4
+Build: 4.1-sprint3-v4
+Datenschema: 19
+Lernpfadversion: 3
 
-Automatische Prüfung
---------------------
-Build: visual-refresh-sprint2-v1
-Paketversion: 1.3.0-visual-refresh-sprint2.1
-Öffentliche Version: Beta 1.3
+Verbindliche Korrekturgrundlage:
+- Quizmon-Beta-1.3-Phase-4.1-Sprint-3-v3-Windows.zip
 
-npm run check
-- täglicher Service: Syntax bestanden
-- zentrale JavaScript-Dateien: Syntax bestanden
-- Node-Tests: 185 von 185 bestanden
+Automatische Modul- und Strukturprüfung:
+- npm run check: bestanden
+- 170 von 170 Tests bestanden
+- sämtliche JavaScript-Syntaxprüfungen bestanden
+- CSS-Kaskadenprüfung bestanden
+- Deutsch-/Englisch-Schlüsselparität bestanden
+- Übersetzungs-Platzhalterparität bestanden
+- keine fehlenden lokalen HTML-, CSS-, Script-, Manifest- oder Service-Worker-Dateien
+- Datenschema 19 und Lernpfadversion 3 unverändert
+- Service Worker, App-Build und Paketversion konsistent auf 4.1-sprint3-v4
 
-Zusätzliche Prüfung
--------------------
-- styles.css: mit tinycss2 ohne Parse-Fehler geprüft
-- styles-visual-refresh.css: ohne Parse-Fehler geprüft
-- styles-visual-refresh-sprint2.css: ohne Parse-Fehler geprüft
-- neue Sprint-2-CSS-Datei wird in der korrekten Kaskadenreihenfolge geladen
-- neue Sprint-2-CSS-Datei ist Teil des Service-Worker-Kerncaches
-- Service-Worker-Build und Registrierungsparameter stimmen überein
-- öffentliche Versionsanzeige bleibt Beta 1.3
-- Daten- und Speicherschema wurden nicht geändert
+Phase-4.1-v4-Balancingprüfungen:
+- alle 1.025 einfachen Runden verwenden exakt Ruf – leichter Fakt – deutlicher Fakt – Schatten – Farbausschnitt
+- der einfache Ruf läuft vollständig und besitzt bei Stummschaltung oder Medienfehler einen eigenen Faktenersatz
+- Hinweis 4 verwendet immer den vollständigen klaren Schatten
+- Hinweis 5 verwendet immer einen großen farbigen Ausschnitt mit zentralem Fokus von 42 bis 58 Prozent
+- alle drei einfachen Medienhinweise besitzen unterschiedliche datenbasierte Ersatzhinweise
+- Normal, Schwer und die tägliche Runde behalten ihre bisherige Auswahl- und Schwierigkeitslogik
+- 1.025 Pokémon × 3 Schwierigkeiten vollständig geprüft
+- insgesamt 3.075 Hinweispakete ohne Fehler erzeugt
+- 559 Pakete mit zwei zufälligen Medienhinweisen in Normal und Schwer ohne rückwärts angeordnete Kombination
 
-Browser-Smoke-Test
-------------------
-Das vorhandene Browser-Smoke-Skript wurde gestartet. Die lokale Umgebung
-überspringt den Lauf kontrolliert, weil eine verwaltete Browserrichtlinie
-Loopback- und file:-Seiten blockiert. Die GitHub-Veröffentlichungssperre mit
-Browser-Smoke-Test bleibt im Projekt aktiviert.
+Phase-4.1-v3-UX- und Spielflussprüfungen:
+- Suchvorschläge liegen im normalen Seitenfluss und können den Bestätigungsbutton nicht überdecken
+- der Bestätigungsbutton bleibt bei geöffneter Vorschlagsliste sichtbar
+- eine vollständige Auswahl zeigt Name und Pokédex-Nummer und aktiviert die Bestätigung
+- Enter und Mausklick verwenden denselben geprüften Antwortweg
+- aktueller Hinweis wird als zentrale Spielfläche dargestellt
+- fünfstufige Fortschrittsspur ersetzt die großen gesperrten Platzhalterkarten
+- aktuelles Punktepotenzial wird passend zu Schwierigkeit und Hinweis angezeigt
+- ältere Hinweise bleiben in einer kompakten Spur einsehbar
+- Fehlversuche erzeugen Vergleichsinformationen zu Generation, Typen, Größe und Gewicht
+- Richtungsangaben und exakte beziehungsweise teilweise Typübereinstimmungen geprüft
+- mobile Reihenfolge zeigt aktuellen Hinweis, Antwortbereich und danach ältere Hinweise
 
-Manuell auf echtem Gerät zu prüfen
-----------------------------------
-- Desktop- und iPhone-Darstellung aller erneuerten Kernabläufe
-- Hell- und Dunkelmodus
-- Trainingskonfiguration und alle vier Quizmodi
-- richtige und falsche Antwortauswertung
-- XP-, Combo- und Ergebnisdarstellung
-- Lernpfad und Lernkarten
-- PWA-Aktualisierung und Offline-Start
+Phase-4.1-Korrekturprüfungen:
+- öffentlicher Modusname in Deutsch und Englisch einheitlich PokéIdle
+- Startseite, Modusauswahl, freie Runde, Tagesrunde und Statistik verwenden den neuen Namen
+- laufende freie Runde besitzt einen direkten Rückweg zur Schwierigkeitswahl
+- Abbruch verwirft nur die freie Runde und ermöglicht sofort eine neue Schwierigkeit
+- Tagesrunde zeigt keinen Abbruchweg, der die Einmalwertung umgehen könnte
+- zufällige Medienpaare in Normal und Schwer werden weiterhin nach steigender Aussagekraft sortiert
+- die feste einfache Folge verwendet bewusst einen klaren Schatten vor dem großen Farbausschnitt
+- 1.025 Pokémon × 3 Schwierigkeiten vollständig geprüft
+- insgesamt 3.075 Hinweispakete ohne Fehler erzeugt
+- darunter 559 zufällige Medienpaare in Normal und Schwer ohne eine rückwärts angeordnete Kombination
+- jedes Paket enthält genau fünf Hinweise und bleibt nach Hinweis 1 und 2 eindeutig
+- ein gewonnenes Tages-PokéIdle schließt das Tagestraining ab
+- Tagesfortschritt wird auf 10/10 gesetzt und der heutige Kalendertag abgehakt
+- Lernserie, Bestserie, Tageserfolg und 25-XP-Tagesbonus werden höchstens einmal aktualisiert
+- verlorenes Tages-PokéIdle schließt das Tagestraining nicht ab
+- gespeicherte Sprint-3-v1-Spielstände bleiben import- und reparaturfähig
+
+Erhaltene Daten- und Regressionstests:
+- 1.025 Pokémon, 919 Attacken, 313 Fähigkeiten und 2.176 Items geprüft
+- 340 Entwicklungslinien, 9 Regionen und 145 Trainer beziehungsweise Figuren geprüft
+- 21 Learnset-Spielgruppen weiterhin strikt getrennt
+- Typenberechnung, Lernintelligenz, Schwierigkeit, Fehleranalyse, Motivation und Fortschritt geprüft
+- Suche, Generationenfilter, Favoriten, Trainingslisten und Lernkarten geprüft
+- fünf Leben, gültige Namenssuche, Doppelratenschutz sowie Gewinn- und Verlustwege geprüft
+- tägliche Runde bleibt je UTC-Datum deterministisch und einmalig gewertet
+- XP-, Punkte-, Statistik-, Offline-Warteschlangen- und Online-Schnittstellenlogik geprüft
+- Import-Guard, Zustandsreparatur, Bildfallbacks und PWA-App-Shell geprüft
+
+Browserprüfung:
+- isolierter Chromium-Lauf bestanden
+- Desktop 1.440 × 1.000 und Smartphone 390 × 844 geprüft
+- PokéIdle-Name auf der Modusauswahl sichtbar
+- freie Runde gestartet, verlassen und mit anderer Schwierigkeit neu gestartet
+- fünf Leben, Hinweise, Namenssuche, Medienhinweis, Lösung und Rundenauswertung geprüft
+- Tages-PokéIdle gewonnen und Einmalwertung kontrolliert
+- Hauptmenü danach als Tagesziel abgeschlossen und heutiger Tag abgehakt
+- kein horizontaler Überlauf
+- relevante Touchziele mindestens 44 Pixel
+- keine Laufzeit-Ausnahmen und keine sichtbaren internen Übersetzungsschlüssel
+
+ZIP-Prüfung:
+- ZIP-Integrität ohne Fehler
+- frisch entpackter Build bytegleich zur geprüften Arbeitsfassung
+- 170/170 Tests aus der frischen Entpackung bestanden
+- Desktop-/iPhone-Browserlauf aus der frischen Entpackung bestanden
+
+Auf echter Hardware weiterhin manuell zu prüfen:
+- physisches iPhone und Safari
+- installierte PWA auf einem echten Gerät
+- reales GitHub-Pages-Service-Worker-Update
+- echter Import des persönlichen Nutzerexports

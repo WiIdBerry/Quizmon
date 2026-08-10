@@ -157,12 +157,10 @@ Exceptions: ${exceptions.join(" | ")}`);
       fs.writeFileSync(path.join(directory, `${name}.png`), Buffer.from(data, "base64"));
     }
 
-    await waitFor('document.querySelector(".refresh-home")');
+    await waitFor('document.querySelector(".game-home")');
     await noOverflow("home desktop");
     await noInternalKeys("home desktop");
-    await click('[data-route="learn"]');
-    await waitFor('document.querySelector(".learn-page")');
-    await click('#openKnowledgeWorldFromLearn');
+    await click('[data-destination="knowledge"]');
     await waitFor('document.querySelector(".knowledge-home")');
     assert.match(await evaluate('document.querySelector(".brand small").textContent'), /Wissenswelt|Knowledge Hub/);
     await noOverflow("knowledge desktop");
@@ -179,8 +177,8 @@ Exceptions: ${exceptions.join(" | ")}`);
     await noInternalKeys("search desktop");
 
     await evaluate('document.getElementById("homeButton").click()');
-    await waitFor('document.querySelector(".refresh-home")');
-    await click('[data-home-play="pokeidle"]');
+    await waitFor('document.querySelector(".game-home")');
+    await click('[data-destination="play"]');
     await waitFor('document.querySelector(".whos-setup-page")');
     assert.match(await evaluate('document.querySelector("#whosTitle").textContent'), /PokéIdle/);
     await noOverflow("Who’s That setup desktop");
@@ -255,40 +253,18 @@ Exceptions: ${exceptions.join(" | ")}`);
     await waitFor('document.querySelector(".whos-result")');
     await capture("pokeidle-daily-result-mobile");
     await evaluate('document.getElementById("homeButton").click()');
-    await waitFor('document.querySelector(".refresh-home")');
-    assert.equal(await evaluate('document.querySelector(".refresh-motivation-card.daily").classList.contains("is-complete")'), true, "Daily PokéIdle win must complete the menu goal");
+    await waitFor('document.querySelector(".game-home")');
+    assert.equal(await evaluate('document.querySelector(".daily-goal-card").classList.contains("is-complete")'), true, "Daily PokéIdle win must complete the menu goal");
     assert.equal(await evaluate('[...document.querySelectorAll(".daily-goal-week .is-today")].some(day=>day.classList.contains("is-complete"))'), true, "Today must be checked off");
     await capture("home-daily-complete-mobile");
     await noOverflow("home mobile");
-    await click('[data-route="learn"]');
-    await waitFor('document.querySelector(".learn-page")');
-    await click('#openKnowledgeWorldFromLearn');
+    await click('[data-destination="knowledge"]');
     await waitFor('document.querySelector(".knowledge-home")');
     await noOverflow("knowledge mobile");
     const touchFailures = await evaluate(`[...document.querySelectorAll('.knowledge-favorite-button,.knowledge-training-list-button,.knowledge-search-field button')].map(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height})).filter(size=>size.w<43.5||size.h<43.5)`);
     assert.deepEqual(touchFailures, [], "Phase-3 touch controls must be at least 44px");
-
-    await click('[data-route="stats"]');
-    await waitFor('document.querySelector(".visual-refresh-progress")');
-    await noOverflow("progress mobile");
-    await capture("progress-mobile");
-
-    await click('[data-route="settings"]');
-    await waitFor('document.querySelector(".visual-refresh-settings")');
-    await noOverflow("settings mobile");
-    const beforeTheme = await evaluate('document.documentElement.dataset.theme');
-    await click('#themeToggle');
-    const afterTheme = await evaluate('document.documentElement.dataset.theme');
-    assert.notEqual(afterTheme, beforeTheme, "Theme toggle must update the active theme");
-    await capture("settings-mobile");
-
-    await click('#levelButton');
-    await waitFor('document.querySelector(".visual-refresh-profile")');
-    await noOverflow("profile mobile");
-    await capture("profile-mobile");
-
     assert.deepEqual(exceptions, [], `Browser exceptions: ${exceptions.join(" | ")}`);
-    console.log("Browser smoke passed: desktop/mobile, play round, knowledge, progress, profile, settings, themes, overflow and touch targets");
+    console.log("Browser smoke passed: desktop/mobile, play round, five lives, navigation, search, history, overflow, touch targets");
   } finally {
     cdp.close();
     chrome.child.kill("SIGKILL");

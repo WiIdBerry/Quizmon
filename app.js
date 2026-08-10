@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "visual-refresh-sprint3-v1";
+  const BUILD_VERSION = "4.1-sprint3-v4";
   const PUBLIC_VERSION = "Beta 1.3";
   const DATA_SCHEMA = 19;
   const LEARNING_EVENT_LIMIT = 800;
@@ -16,7 +16,6 @@
   const LEARNING_EVENT_MODES = Object.freeze([...PLAYABLE_MODES, "weak", "daily", "review", "problem", "path"]);
   const ADAPTIVE_SESSION_MODES = Object.freeze(["weak", "problem"]);
   const SUPPORTED_CURRENT_VERSIONS = Object.freeze([
-    "visual-refresh-sprint2-v1", "visual-refresh-sprint1-v1",
     "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
     "4.1-sprint1-v1", "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
     "2.5-sprint3-v1", "2.5-sprint2-v1", "2.5-sprint1-v1", "2.4-sprint2-v1", "2.4-sprint1-v1",
@@ -933,7 +932,7 @@
   }
   function feedbackProgressiveDetails(html, open = false) {
     if (!html) return "";
-    return `<details class="feedback-progressive-details" ${open ? "open" : ""}><summary><span><strong>${t("cleanup2.feedbackDetails")}</strong><small>${t("cleanup2.feedbackDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><div>${html}</div></details>`;
+    return `<details class="feedback-progressive-details" ${open ? "open" : ""}><summary><span><strong>${t("cleanup2.feedbackDetails")}</strong><small>${t("cleanup2.feedbackDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div>${html}</div></details>`;
   }
 
   function feedbackHeading(correct, subtitle = "") {
@@ -1248,7 +1247,7 @@
     document.documentElement.dataset.animations = state.animations ? "on" : "off";
     document.documentElement.lang = state.language;
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-      meta.setAttribute("content", actualTheme() === "dark" ? "#05091a" : "#f3f6ff");
+      meta.setAttribute("content", actualTheme() === "dark" ? "#10171b" : "#f4f6f8");
       meta.removeAttribute("media");
     });
     document.querySelectorAll("[data-nav-label]").forEach(item => item.textContent = t(`nav.${item.dataset.navLabel}`));
@@ -1787,7 +1786,6 @@
     const goal = dailyGoalInfo();
     levelNumber.textContent = `Lv. ${level.current.level}`;
     headerStreak.textContent = `🔥 ${goal.streak}`;
-    levelButton?.style.setProperty("--header-level-progress", `${level.progress}%`);
     if(brandVersion)brandVersion.textContent=["knowledge","learn-detail"].includes(state.route)?`${PUBLIC_VERSION} · ${t("nav.knowledge")}`:PUBLIC_VERSION;
     headerStreak.setAttribute("title", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
     headerStreak.setAttribute("aria-label", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
@@ -2438,86 +2436,75 @@
     document.querySelectorAll("[data-future-destination]").forEach(button=>button.addEventListener("click",()=>setRoute(button.dataset.futureDestination)));
   }
 
-
-  function refreshedHomeHeroVisualMarkup() {
-    return `<div class="refresh-hero-visual" aria-hidden="true"><span class="refresh-hero-orb"><i></i></span><span class="refresh-hero-pedestal"><i></i><i></i><i></i></span><span class="refresh-hero-spark spark-one"></span><span class="refresh-hero-spark spark-two"></span><span class="refresh-hero-spark spark-three"></span></div>`;
-  }
-
-  function refreshedHomePlayMarkup() {
-    return `<section class="refresh-play-panel" aria-labelledby="refreshPlayTitle">
-      <div class="refresh-section-heading"><span class="refresh-section-icon">${iconSvg("play")}</span><div><small>${t("home.refreshEyebrow")}</small><h2 id="refreshPlayTitle">${t("home.refreshPlayTitle")}</h2></div></div>
-      <div class="refresh-play-grid">
-        <button class="refresh-play-card pokeidle" type="button" data-home-play="pokeidle" aria-label="${escapeHtml(t("home.refreshPokeidleAction"))}: ${escapeHtml(t("home.refreshPokeidleTitle"))}">
-          <span class="refresh-play-card-head"><span class="refresh-play-card-icon">${iconSvg("idle")}</span><strong>${t("home.refreshPokeidleTitle")}</strong></span>
-          <span class="refresh-play-art idle-art" aria-hidden="true"><i class="idle-orb"></i><i class="idle-crystal one"></i><i class="idle-crystal two"></i><i class="idle-ground"></i></span>
-          <span class="refresh-play-copy">${t("home.refreshPokeidleDesc")}</span>
-          <span class="refresh-play-action">${t("home.refreshPokeidleAction")}<i aria-hidden="true">›</i></span>
-        </button>
-        <article class="refresh-play-card campaign is-coming" aria-labelledby="campaignCardTitle">
-          <span class="refresh-play-card-head"><span class="refresh-play-card-icon">${iconSvg("campaign")}</span><strong id="campaignCardTitle">${t("home.refreshCampaignTitle")}</strong></span>
-          <span class="refresh-play-art campaign-art" aria-hidden="true"><i class="campaign-path"></i><i class="campaign-node node-one"></i><i class="campaign-node node-two"></i><i class="campaign-node node-three"></i><i class="campaign-gate"></i></span>
-          <span class="refresh-play-copy">${t("home.refreshCampaignDesc")}</span>
-          <span class="refresh-coming-badge">${t("home.refreshCampaignComing")}</span>
-        </article>
-      </div>
-    </section>`;
-  }
-
-  function refreshedHomeMotivationMarkup() {
-    const goal = dailyGoalInfo();
-    const activeFlames = Math.min(6, Math.max(0, goal.streak));
-    const flames = Array.from({ length: 6 }, (_, index) => `<i class="${index < activeFlames ? "is-active" : ""}">${iconSvg("flame")}</i>`).join("");
-    return `<section class="refresh-motivation-grid" aria-label="${escapeHtml(t("home.refreshDailyHint"))}">
-      <button id="homeDailyGoal" class="refresh-motivation-card daily ${goal.completed ? "is-complete" : ""}" type="button" style="--refresh-goal-progress:${goal.percent}%">
-        <span class="refresh-motivation-icon">${goal.completed ? iconSvg("accuracy") : iconSvg("target")}</span>
-        <span class="refresh-motivation-copy"><small>${t("daily.kicker")}</small><strong>${goal.completed ? t("daily.completedTitle") : t("daily.title")}</strong><em>${t("daily.progressText", { progress: goal.progress, target: goal.target })}</em></span>
-        <span class="refresh-goal-track" aria-label="${goal.percent}%"><i></i></span>
-        ${dailyGoalWeekMarkup()}
-        <span class="refresh-motivation-link">${goal.completed ? t("daily.keepTraining") : t("daily.continue")}<b aria-hidden="true">›</b></span>
-      </button>
-      <article class="refresh-motivation-card streak">
-        <span class="refresh-motivation-icon">${iconSvg("flame")}</span>
-        <span class="refresh-motivation-copy"><small>${t("home.refreshStreakTitle")}</small><strong>${tp("home.refreshStreakDaysOne", "home.refreshStreakDays", goal.streak)}</strong><em>${t("home.refreshStreakHint")}</em></span>
-        <span class="refresh-streak-flames" aria-hidden="true">${flames}</span>
-      </article>
-    </section>`;
-  }
-
   function renderHome() {
     session = null;
     const level = getLevelInfo();
     const homeBanner = selectedBanner();
-    const nextXp = level.next ? level.next.xp : state.stats.xp;
+    const recommendationContext = buildRecommendationContext();
+    const recommendation = primaryLearningRecommendation(recommendationContext);
 
     view.innerHTML = `
-      <section class="refresh-home" aria-labelledby="refreshHomeTitle">
-        <section class="refresh-home-stage">
+      <section class="game-home restored-home" aria-labelledby="gameHomeTitle">
+        <section class="game-home-stage">
           <div class="home-banner-layer profile-banner profile-banner-${homeBanner.id}" aria-hidden="true"><i></i><i></i><i></i></div>
-          <section class="refresh-home-hero">
-            <div class="refresh-home-intro">
-              <p class="refresh-home-eyebrow">${t("home.refreshEyebrow")}</p>
-              <h1 id="refreshHomeTitle"><span>${t("home.refreshTitleLead")}</span><strong>${t("home.refreshTitleAccent")}</strong></h1>
-              <p>${t("home.refreshSubtitle")}</p>
+          <div class="game-home-decoration" aria-hidden="true"><span></span><span></span><span></span></div>
+
+          <div class="game-home-header restored-home-header">
+            <div class="game-home-intro">
+              <p class="game-home-eyebrow">${t("home.gameEyebrow")}</p>
+              <h1 id="gameHomeTitle">${t("home.gameTitle")}</h1>
+              <p>${t("home.gameSubtitle")}</p>
             </div>
-            ${refreshedHomeHeroVisualMarkup()}
-          </section>
 
-          <button class="refresh-trainer-card" id="openTrainerProfile" type="button" aria-label="${escapeHtml(t("profile.openLabel"))}">
-            <span class="refresh-profile-avatar-wrap">${profileAvatarMarkup(selectedAvatar().id, "refresh-profile-avatar")}<b>Lv. ${level.current.level}</b></span>
-            <span class="refresh-trainer-copy"><small>${t("profile.homeLabel")}</small><strong>${escapeHtml(trainerName())}</strong><em>${escapeHtml(cosmeticName(selectedTitle()))}</em><span class="refresh-level-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></span><span class="refresh-level-xp">${state.stats.xp} / ${nextXp} XP</span></span>
-            <span class="refresh-trainer-arrow" aria-hidden="true">›</span>
-          </button>
+            <button class="game-trainer-card compact" id="openTrainerProfile" type="button" aria-label="${escapeHtml(t("profile.openLabel"))}">
+              <div class="game-profile-avatar-wrap">${profileAvatarMarkup(selectedAvatar().id, "game-profile-avatar")}<span>Lv. ${level.current.level}</span></div>
+              <div class="game-trainer-copy"><small>${t("profile.homeLabel")}</small><strong>${escapeHtml(trainerName())}</strong><span>${escapeHtml(cosmeticName(selectedTitle()))}</span><div class="game-level-track" aria-label="${level.progress}%"><i style="width:${level.progress}%"></i></div></div>
+              <span class="game-trainer-arrow" aria-hidden="true">›</span>
+            </button>
+          </div>
 
-          ${refreshedHomePlayMarkup()}
-          ${refreshedHomeMotivationMarkup()}
+          <div class="game-home-layout restored-home-layout">
+            <section class="game-menu-panel expanded-main-menu-panel" aria-labelledby="gameMenuTitle">
+              <div class="game-panel-heading">
+                <span id="gameMenuTitle">${t("home.gameMenuTitle")}</span>
+                <small>${t("home.gameMenuHint")}</small>
+              </div>
+              <div class="game-menu-list expanded-main-menu">
+                ${gameMenuButton("play", iconSvg("play"), "01", t("home.gamePlay"), t("home.gamePlayDesc"))}
+                ${gameMenuButton("train", iconSvg("train"), "02", t("home.gameTrain"), t("home.gameTrainDesc"))}
+                ${gameMenuButton("learn", iconSvg("learn"), "03", t("home.gameLearn"), t("home.gameLearnDesc"))}
+                ${gameMenuButton("knowledge", iconSvg("knowledge"), "04", t("home.gameKnowledge"), t("home.gameKnowledgeDesc"))}
+                ${gameMenuButton("stats", iconSvg("stats"), "05", t("home.gameProgress"), t("home.gameProgressDesc"))}
+                ${gameMenuButton("settings", iconSvg("settings"), "06", t("home.gameSettings"), t("home.gameSettingsDesc"))}
+                ${gameMenuButton("support", iconSvg("support"), "07", t("home.gameSupport"), t("home.gameSupportDesc"))}
+              </div>
+            </section>
+
+            <aside class="game-command-panel modern-home-command" aria-labelledby="gameTodayTitle">
+              <div class="game-panel-heading">
+                <span id="gameTodayTitle">${t("home.gameToday")}</span>
+                <small>${t("home.gameTodayHint")}</small>
+              </div>
+              ${homeAdaptiveCardMarkup(recommendation)}
+              ${dailyGoalCardMarkup("homeDailyGoal")}
+            </aside>
+          </div>
         </section>
         ${deferredInstallPrompt ? `<button class="game-install-card" id="installApp"><span>＋</span><strong>${t("home.install")}</strong><small>${t("home.installDesc")}</small><i>›</i></button>` : ""}
       </section>`;
 
-    document.querySelector("[data-home-play='pokeidle']")?.addEventListener("click", () => setRoute("play"));
-    document.getElementById("homeDailyGoal")?.addEventListener("click", startDailyGoalTraining);
-    document.getElementById("openTrainerProfile")?.addEventListener("click", () => setRoute("profile"));
-    document.getElementById("installApp")?.addEventListener("click", installApp);
+    document.querySelectorAll("[data-destination]").forEach(button=>button.addEventListener("click",()=>{
+      const destination=button.dataset.destination;
+      if(destination==="knowledge"){
+        knowledgeView="home";knowledgePokemonId=null;knowledgeContentKind=null;knowledgeContentId=null;learnType=null;knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;
+      }
+      setRoute(destination);
+    }));
+    document.querySelector("[data-primary-recommendation]")?.addEventListener("click",()=>activatePrimaryRecommendation(recommendation));
+    document.querySelector("[data-primary-reason]")?.addEventListener("click",()=>showPrimaryRecommendationReason(recommendation));
+    document.getElementById("homeDailyGoal")?.addEventListener("click",startDailyGoalTraining);
+    document.getElementById("openTrainerProfile")?.addEventListener("click",()=>setRoute("profile"));
+    document.getElementById("installApp")?.addEventListener("click",installApp);
   }
 
   function renderProfile() {
@@ -2537,7 +2524,7 @@
     const nextReward = nextLevelRewardInfo(level.current.level);
 
     view.innerHTML = `
-      <section class="trainer-profile-page visual-refresh-profile" aria-labelledby="trainerProfileTitle">
+      <section class="trainer-profile-page" aria-labelledby="trainerProfileTitle">
         <section class="trainer-profile-hero profile-banner profile-banner-${banner.id}">
           <div class="profile-banner-pattern" aria-hidden="true"><i></i><i></i><i></i></div>
           <div class="profile-hero-main">
@@ -2566,7 +2553,7 @@
         <section class="profile-dashboard-grid profile-priority-grid">
           <article class="profile-panel profile-level-panel">
             <div class="profile-panel-heading">
-              <span>${iconSvg("stats")}</span>
+              <span>↗</span>
               <div><small>${t("profile.journey")}</small><h2>${t("profile.levelProgress")}</h2></div>
             </div>
             <div class="profile-level-summary">
@@ -2580,7 +2567,7 @@
 
           <article class="profile-panel profile-record-panel">
             <div class="profile-panel-heading">
-              <span>${iconSvg("trophy")}</span>
+              <span>✦</span>
               <div><small>${t("profile.personalBest")}</small><h2>${t("profile.records")}</h2></div>
             </div>
             <div class="profile-record-list">
@@ -2620,9 +2607,9 @@
 
         <section class="profile-kpi-grid" aria-label="${escapeHtml(t("profile.overview"))}">
           ${profileKpi("XP", t("profile.xp"), state.stats.xp, level.next ? t("profile.xpRemaining", { count: remainingXp }) : t("profile.maxLevel"))}
-          ${profileKpi(iconSvg("accuracy"), t("profile.accuracy"), `${accuracy}%`, `${state.stats.correct}/${state.stats.total} ${t("common.correct").toLowerCase()}`)}
-          ${profileKpi(iconSvg("sessions"), t("profile.sessions"), state.stats.sessions, t("profile.completedSessions"))}
-          ${profileKpi(iconSvg("knowledge"), t("profile.types"), `${mastered}/18`, t("profile.typesHint", { explored }))}
+          ${profileKpi("◎", t("profile.accuracy"), `${accuracy}%`, `${state.stats.correct}/${state.stats.total} ${t("common.correct").toLowerCase()}`)}
+          ${profileKpi("▦", t("profile.sessions"), state.stats.sessions, t("profile.completedSessions"))}
+          ${profileKpi("◇", t("profile.types"), `${mastered}/18`, t("profile.typesHint", { explored }))}
         </section>
 
         <section class="profile-activity-card">
@@ -2972,26 +2959,7 @@
       answered: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M9.2 9.5a3 3 0 1 1 4.3 2.7c-.9.4-1.5 1.1-1.5 1.8"></path><path d="M12 17h.01"></path></svg>`,
       accuracy: `<svg ${attrs}><path d="M20 6 9 17l-5-5"></path></svg>`,
       time: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>`,
-      sessions: `<svg ${attrs}><rect x="5" y="4" width="14" height="16" rx="2"></rect><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>`,
-      idle: `<svg ${attrs}><path d="M12 3.5 14 8l4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2z"></path><path d="M5 17.5h14"></path><path d="M7 20h10"></path></svg>`,
-      campaign: `<svg ${attrs}><path d="M4 19c3.5-5.5 4.5-2 7-6s4-1 9-8"></path><circle cx="4" cy="19" r="2"></circle><circle cx="11" cy="13" r="2"></circle><circle cx="20" cy="5" r="2"></circle></svg>`,
-      target: `<svg ${attrs}><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><path d="m14.5 9.5 5-5"></path><path d="M16.5 4.5h3v3"></path></svg>`,
-      flame: `<svg ${attrs}><path d="M13.5 3.5c.7 3.1-1.5 4.4-2.8 6.1-1.2-1-1.6-2.1-1.4-3.5C6.7 8 5 10.4 5 13.2A7 7 0 0 0 19 13c0-4-2.5-6.8-5.5-9.5z"></path><path d="M10 17.5c0-1.7 1.1-2.8 2.3-4.2.6 1.3 1.7 2.2 1.7 3.8a2 2 0 0 1-4 .4z"></path></svg>`,
-      trophy: `<svg ${attrs}><path d="M8 4h8v4a4 4 0 0 1-8 0z"></path><path d="M8 6H5v1a4 4 0 0 0 4 4"></path><path d="M16 6h3v1a4 4 0 0 1-4 4"></path><path d="M12 12v5"></path><path d="M8 20h8"></path><path d="M9 17h6"></path></svg>`,
-      back: `<svg ${attrs}><path d="m15 18-6-6 6-6"></path></svg>`,
-      chevronDown: `<svg ${attrs}><path d="m7 10 5 5 5-5"></path></svg>`,
-      language: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path></svg>`,
-      theme: `<svg ${attrs}><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z"></path></svg>`,
-      motion: `<svg ${attrs}><path d="M4 12h9"></path><path d="m10 8 4 4-4 4"></path><path d="M17 7h3"></path><path d="M17 12h3"></path><path d="M17 17h3"></path></svg>`,
-      haptic: `<svg ${attrs}><path d="M8 5v14"></path><path d="M16 5v14"></path><path d="M4 9v6"></path><path d="M20 9v6"></path><path d="M11 7v10"></path><path d="M13 7v10"></path></svg>`,
-      help: `<svg ${attrs}><circle cx="12" cy="12" r="9"></circle><path d="M9.7 9a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.3 1-1.3 1.7"></path><path d="M12 17h.01"></path></svg>`,
-      data: `<svg ${attrs}><ellipse cx="12" cy="5" rx="7" ry="3"></ellipse><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5"></path><path d="M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7"></path></svg>`,
-      download: `<svg ${attrs}><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
-      upload: `<svg ${attrs}><path d="M12 21V9"></path><path d="m7 14 5-5 5 5"></path><path d="M5 3h14"></path></svg>`,
-      feedback: `<svg ${attrs}><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>`,
-      diagnostics: `<svg ${attrs}><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 15 3-4 3 2 4-6"></path><circle cx="17" cy="7" r="1"></circle></svg>`,
-      warning: `<svg ${attrs}><path d="m12 3 10 18H2z"></path><path d="M12 9v5"></path><path d="M12 17h.01"></path></svg>`,
-      trash: `<svg ${attrs}><path d="M4 7h16"></path><path d="M9 3h6l1 4H8z"></path><path d="m6 7 1 14h10l1-14"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`
+      sessions: `<svg ${attrs}><rect x="5" y="4" width="14" height="16" rx="2"></rect><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>`
     };
     return icons[name] || icons.home;
   }
@@ -3042,12 +3010,12 @@
     if(openMistakes.length) targeted.push(`<button class="training-focus-card" id="reviewOpenMistakes"><span class="training-focus-icon">${iconSvg("review")}</span><span class="training-focus-copy"><small>${t("cleanup.target.mistakes")}</small><strong>${t("train.review")}</strong><p>${t("train.reviewDesc")}</p></span><span class="training-focus-count">${openMistakes.length}</span></button>`);
     if(state.lastMode&&state.lastConfig&&targeted.length<3) targeted.push(`<button class="training-focus-card" id="repeatLastTraining"><span class="training-focus-icon">${iconSvg("repeat")}</span><span class="training-focus-copy"><small>${t("train.continueLabel")}</small><strong>${t("home.continue")}</strong><p>${t("home.continueDesc",{mode:modeName(state.lastMode)})}</p></span><span class="training-focus-arrow">›</span></button>`);
 
-    view.innerHTML=`<section class="training-hub adaptive-training-hub visual-refresh-training">
-      <section class="training-command-hero simplified"><div class="training-command-copy"><p class="quiz-kicker">${t("cleanup.trainEyebrow")}</p><h1>${t("cleanup.trainTitle")}</h1><p>${t("cleanup.trainSubtitle")}</p></div><div class="training-hero-visual" aria-hidden="true"><span>${iconSvg("train")}</span><i></i><i></i><i></i></div><span class="training-adaptive-seal">${iconSvg("weak")} ${t("cleanup.adaptiveBadge")}</span></section>
+    view.innerHTML=`<section class="training-hub adaptive-training-hub">
+      <section class="training-command-hero simplified"><div class="training-command-copy"><p class="quiz-kicker">${t("cleanup.trainEyebrow")}</p><h1>${t("cleanup.trainTitle")}</h1><p>${t("cleanup.trainSubtitle")}</p></div><span class="training-adaptive-seal">◎ ${t("cleanup.adaptiveBadge")}</span></section>
       ${adaptiveHeroMarkup(recommendation,"training")}
       ${compactDailyProgressMarkup("trainingDailyMix")}
       ${targeted.length?`<section class="training-section" aria-labelledby="targetedTrainingTitle"><div class="training-section-heading"><div><small>${t("cleanup.targetedKicker")}</small><h2 id="targetedTrainingTitle">${t("cleanup.targetedTitle")}</h2></div><p>${t("cleanup.targetedHint")}</p></div><div class="training-focus-grid targeted">${targeted.slice(0,3).join("")}</div></section>`:""}
-      ${customLists.length?`<section class="training-section" aria-labelledby="customTrainingListsTitle"><div class="training-section-heading"><div><small>${t("trainingLists.kicker")}</small><h2 id="customTrainingListsTitle">${t("trainingLists.title")}</h2></div><button type="button" class="ghost-button training-list-manage-link" data-manage-training-lists>${t("trainingLists.manage")}</button></div><div class="training-list-quick-grid">${customLists.slice(0,3).map(list=>`<button type="button" class="training-list-quick-card" data-start-training-list="${escapeHtml(list.id)}"><span aria-hidden="true">${list.kind==="pokemon"?iconSvg("pokemon"):iconSvg("list")}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t(`trainingLists.kind.${list.kind}`)} · ${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><i aria-hidden="true">›</i></button>`).join("")}</div></section>`:""}
+      ${customLists.length?`<section class="training-section" aria-labelledby="customTrainingListsTitle"><div class="training-section-heading"><div><small>${t("trainingLists.kicker")}</small><h2 id="customTrainingListsTitle">${t("trainingLists.title")}</h2></div><button type="button" class="ghost-button training-list-manage-link" data-manage-training-lists>${t("trainingLists.manage")}</button></div><div class="training-list-quick-grid">${customLists.slice(0,3).map(list=>`<button type="button" class="training-list-quick-card" data-start-training-list="${escapeHtml(list.id)}"><span aria-hidden="true">${list.kind==="pokemon"?"◉":"◆"}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t(`trainingLists.kind.${list.kind}`)} · ${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><i aria-hidden="true">›</i></button>`).join("")}</div></section>`:""}
       <section class="training-section" aria-labelledby="trainingModesTitle"><div class="training-section-heading"><div><small>${t("cleanup.freeKicker")}</small><h2 id="trainingModesTitle">${t("train.free")}</h2></div><p>${t("cleanup.freeHint")}</p></div><div class="training-mode-grid simplified">${trainingModeCard("effectiveness",t("mode.effectivenessDesc"))}${trainingModeCard("multiplier",t("mode.multiplierDesc"))}${trainingModeCard("impact",t("mode.impactDesc"))}${trainingModeCard("pokemon",t("mode.pokemonDesc"))}</div></section>
     </section>`;
 
@@ -3066,7 +3034,7 @@
   function trainingModeCard(mode, description) {
     const visual=modeVisual(mode);
     const modeStats=state.stats.modes[mode]||blankModeStats();
-    return `<button class="training-mode-card simplified mode-${mode}" data-mode="${mode}"><span class="training-mode-icon">${visual.icon}</span><span class="training-mode-copy"><strong>${escapeHtml(modeName(mode))}</strong><p>${escapeHtml(description)}</p><small>${modeStats.total?t("cleanup.freePlayed"):t("cleanup.freeConfigure")}</small></span><span class="training-mode-arrow">›</span></button>`;
+    return `<button class="training-mode-card simplified" data-mode="${mode}"><span class="training-mode-icon">${visual.icon}</span><span class="training-mode-copy"><strong>${escapeHtml(modeName(mode))}</strong><p>${escapeHtml(description)}</p><small>${modeStats.total?t("cleanup.freePlayed"):t("cleanup.freeConfigure")}</small></span><span class="training-mode-arrow">›</span></button>`;
   }
 
   function renderSetup(mode) {
@@ -3074,9 +3042,9 @@
     const modeDescription = t(`mode.${mode}Desc`);
     const visual = modeVisual(mode);
     view.innerHTML = `
-      <section class="setup-shell visual-refresh-setup mode-${mode}">
+      <section class="setup-shell">
         <aside class="setup-mode-preview">
-          <div class="setup-preview-top"><span class="setup-preview-number">${visual.number}</span><span class="setup-preview-icon">${visual.icon}</span><span class="setup-preview-orbit" aria-hidden="true"><i></i><i></i><i></i></span></div>
+          <div class="setup-preview-top"><span class="setup-preview-number">${visual.number}</span><span class="setup-preview-icon">${visual.icon}</span></div>
           <p class="quiz-kicker">${t("setup.kicker")}</p>
           <h1>${escapeHtml(modeName(mode))}</h1>
           <p>${escapeHtml(modeDescription)}</p>
@@ -3336,7 +3304,7 @@
 
   function renderSessionLoading() {
     if (!session) return;
-    view.innerHTML = `<section class="panel quiz-session-panel visual-refresh-session session-loading-panel" aria-busy="true">${sessionHeader()}<div class="loading-state-card"><span class="loading-orbit" aria-hidden="true"><i></i></span><h1>${t("session.loadingPokemon")}</h1><p>${t("session.loadingHint")}</p></div></section>`;
+    view.innerHTML = `<section class="panel quiz-session-panel session-loading-panel" aria-busy="true">${sessionHeader()}<div class="loading-state-card"><span class="loading-orbit" aria-hidden="true"><i></i></span><h1>${t("session.loadingPokemon")}</h1><p>${t("session.loadingHint")}</p></div></section>`;
   }
 
   async function renderQuestion() {
@@ -3403,7 +3371,7 @@
   function renderEffectivenessQuestion(spec) {
     const effective = spec.questionKind === "effective";
     spec.selected = new Set();
-    view.innerHTML = `<section class="panel quiz-session-panel visual-refresh-session">${sessionHeader()}${hintHtml("effectiveness",t("session.multiHint"),t("session.multiHintText"))}
+    view.innerHTML = `<section class="panel quiz-session-panel">${sessionHeader()}${hintHtml("effectiveness",t("session.multiHint"),t("session.multiHintText"))}
       <div class="quiz-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${t("session.chooseAnswer")}</p><h1>${t("session.effectQuestion",{relation:effective?t("session.veryEffective"):t("session.notEffective")})}</h1><p>${spec.correctTargets.length===1?t("session.answerCountOne"):t("session.answerCountMany",{count:spec.correctTargets.length})}</p><div class="question-role-label">${t("learn.attackType")}</div><div class="type-prompt question-type-prompt">${typeChip(spec.attackingType,"large")}</div></div>
         <div class="answer-grid">${spec.options.map(type=>`<button class="answer-button" data-answer="${type}" aria-pressed="false">${typeChip(type)}</button>`).join("")}</div>
@@ -3444,7 +3412,7 @@
   function renderMultiplierQuestion(spec) {
     spec.assignments=Object.fromEntries(TYPES.map(type=>[type,null])); spec.selectedType=null;
     const buckets=[0,.25,.5,1,2,4];
-    view.innerHTML=`<section class="panel quiz-session-panel visual-refresh-session multiplier-panel">${sessionHeader()}${hintHtml("multiplier",t("session.sortHint"),t("session.sortHintText"))}
+    view.innerHTML=`<section class="panel quiz-session-panel multiplier-panel">${sessionHeader()}${hintHtml("multiplier",t("session.sortHint"),t("session.sortHintText"))}
       <div class="quiz-question-stage multiplier-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${t("session.sortTypes")}</p><h1>${t("session.multiplierQuestion")}</h1><p>${t("session.multiplierSubtitle")}</p><div class="question-role-label">${t("learn.defendingType")}</div><div class="defender-types question-type-prompt">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div></div>
         <div class="bucket-grid">${buckets.map(value=>`<button class="bucket" data-bucket="${value}" aria-label="${escapeHtml(t("session.assignTo",{value:formatMultiplier(value)}))}"><span class="bucket-title">${formatMultiplier(value)}</span><span class="bucket-items"></span></button>`).join("")}</div>
@@ -3623,7 +3591,7 @@
 
   function renderImpactQuestion(spec) {
     spec.selectedMultiplier = null;
-    view.innerHTML = `<section class="panel quiz-session-panel visual-refresh-session">${sessionHeader()}${hintHtml("impact",t("session.impactHint"),t("session.impactHintText"))}
+    view.innerHTML = `<section class="panel quiz-session-panel">${sessionHeader()}${hintHtml("impact",t("session.impactHint"),t("session.impactHintText"))}
       <div class="quiz-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${spec.pokemon?t("path.pokemonImpactKicker"):t("session.calculateImpact")}</p><h1>${spec.pokemon?t("path.pokemonImpactQuestion"):t("session.impactQuestion")}</h1><p>${spec.pokemon?t("path.pokemonImpactSubtitle"):t("session.impactSubtitle")}</p>
         <div class="matchup-display ${spec.pokemon?"pokemon-application":""}"><div><small>${t("learn.attackType")}</small>${typeChip(spec.attackingType,"large")}</div><span class="matchup-arrow">→</span><div><small>${t("learn.defendingType")}</small>${spec.pokemon?`<div class="path-session-pokemon"><img src="${escapeHtml(spec.pokemon.image)}" alt="${escapeHtml(spec.pokemon.name)}"><div><strong>${escapeHtml(spec.pokemon.name)}</strong><span>${spec.defendingTypes.map(type=>typeChip(type,"small")).join("")}</span></div></div>`:`<div class="defender-types compact">${spec.defendingTypes.map(type=>typeChip(type,"large")).join("")}</div>`}</div></div></div>
@@ -3669,7 +3637,7 @@
     const showImage=spec.display!=="name";
     const imageOnly=spec.display==="image";
     const showName=!imageOnly || !navigator.onLine;
-    view.innerHTML=`<section class="panel quiz-session-panel visual-refresh-session pokemon-stage">${sessionHeader()}${hintHtml("pokemon",t("session.pokemonHint"),t("session.pokemonHintText"))}
+    view.innerHTML=`<section class="panel quiz-session-panel pokemon-stage">${sessionHeader()}${hintHtml("pokemon",t("session.pokemonHint"),t("session.pokemonHintText"))}
       <div class="quiz-question-stage pokemon-question-stage">
         <div class="quiz-head"><p class="quiz-kicker">${t("session.identifyType")}</p><h1>${t("session.pokemonQuestion")}</h1><p>${t("session.chooseOneTwo")}</p></div>
         ${showImage?`<div class="pokemon-frame"><img class="pokemon-art" src="${escapeHtml(spec.pokemon.image)}" alt="${escapeHtml(spec.pokemon.name)}"><span class="pokemon-placeholder" hidden>?</span></div>`:""}
@@ -4296,7 +4264,7 @@
     if(!session){setRoute("home");return;}
     const { total,rate,xpEarned,canReview,reviewComplete,verdict,visual,duration,levelInfo,unlockedItems,unlockCount,didLevelUp,nextReward,momentum,comparison,dailyGoal,wrongFocus }=buildSummaryContext();
 
-    view.innerHTML=`<section class="summary-shell cleanup-summary visual-refresh-summary">
+    view.innerHTML=`<section class="summary-shell cleanup-summary">
       <section class="summary-hero-card">
         <div class="summary-mode-pill"><span>${visual.icon}</span><strong>${escapeHtml(sessionModeName())}</strong></div>
         <div class="summary-hero-grid">
@@ -4320,7 +4288,7 @@
       ${unlockCount?`<section class="summary-unlock-card"><div class="summary-unlock-heading"><span aria-hidden="true">✦</span><div><p class="quiz-kicker">${t("summary.levelUp")}</p><h2>${t("rewards.newTitle")}</h2><p>${t("rewards.newText",{count:unlockCount})}</p></div><button id="openUnlockedRewards" class="secondary-button">${t("rewards.open")}</button></div><div class="reward-list-grid">${rewardListMarkup(unlockedItems)}</div></section>`:""}
 
       <details class="summary-secondary-details">
-        <summary><span><strong>${t("summary.details")}</strong><small>${t("summary.detailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
+        <summary><span><strong>${t("summary.details")}</strong><small>${t("summary.detailsHint")}</small></span><i aria-hidden="true">⌄</i></summary>
         <section class="summary-metric-grid">
           <article><small>${t("summary.duration")}</small><strong>${formatDuration(duration)}</strong></article>
           <article><small>${t("summary.bestCombo")}</small><strong>×${Math.max(0,Number(session.bestCombo||0))}</strong></article>
@@ -4349,7 +4317,7 @@
   }
 
   function renderKnowledgePage() {
-    view.innerHTML=`<section class="learn-page knowledge-route-page visual-refresh-knowledge">
+    view.innerHTML=`<section class="learn-page knowledge-route-page">
       <section class="learn-workspace panel knowledge-route-workspace"><div id="learnContent"></div></section>
     </section>`;
     renderKnowledge();
@@ -4482,7 +4450,7 @@
         <label class="flashcard-source-select"><span>${t("flashcards.generationLabel")}</span><select data-flashcard-generation><option value="all" ${generationValue==="all"?"selected":""}>${escapeHtml(t("knowledge.generationFilter.all"))}</option>${QuizmonKnowledgeFilter.GENERATIONS.map(generation=>`<option value="${generation}" ${String(generation)===generationValue?"selected":""}>${escapeHtml(t("knowledge.generationFilter.option",{generation}))}</option>`).join("")}</select></label>
         <p class="flashcard-generation-note">${t("flashcards.generationNote")}</p>
       </section>`;
-    return `<section class="flashcards-setup visual-refresh-flashcards-setup" aria-labelledby="flashcardsSetupTitle">
+    return `<section class="flashcards-setup" aria-labelledby="flashcardsSetupTitle">
       <section class="flashcards-intro-card">
         <span aria-hidden="true">▤</span>
         <div><p class="quiz-kicker">${t("flashcards.kicker")}</p><h3 id="flashcardsSetupTitle">${t("flashcards.setupTitle")}</h3><p>${t("flashcards.setupTextPersonal")}</p></div>
@@ -4645,7 +4613,7 @@
     const resolved=Math.max(0,initiallyOpen-result.unresolved);
     const resultTitle=result.unresolved?t("flashcards.unresolvedTitle",{count:result.unresolved}):initiallyOpen?t("flashcards.allResolvedTitle"):t("flashcards.perfectTitle");
     const resultText=result.unresolved?t("flashcards.unresolvedText",{count:result.unresolved,resolved}):initiallyOpen?t("flashcards.allResolvedText",{resolved}):t("flashcards.perfectText",{count:result.total});
-    return `<section class="flashcard-summary visual-refresh-flashcard-summary" aria-labelledby="flashcardSummaryTitle">
+    return `<section class="flashcard-summary" aria-labelledby="flashcardSummaryTitle">
       <section class="flashcard-summary-hero"><span aria-hidden="true">✓</span><div><p class="quiz-kicker">${t("flashcards.summaryKicker")}</p><h3 id="flashcardSummaryTitle">${t("flashcards.summaryTitle")}</h3><p>${t("flashcards.summaryText",{count:result.total,source:flashcardSession.sourceLabel||flashcardKindName(flashcardSession.kind)})}</p></div></section>
       <div class="flashcard-summary-metrics"><article><small>${t("flashcards.ratingKnown")}</small><strong>${result.known}</strong></article><article><small>${t("flashcards.ratingUnsure")}</small><strong>${result.unsure}</strong></article><article><small>${t("flashcards.ratingUnknown")}</small><strong>${result.unknown}</strong></article></div>
       <section class="flashcard-review-result ${result.unresolved?"attention":"complete"}"><span aria-hidden="true">${result.unresolved?"↻":"★"}</span><div><strong>${resultTitle}</strong><p>${resultText}</p></div></section>
@@ -4671,7 +4639,7 @@
     const revealed=Boolean(flashcardSession.revealed);
     const rating=QuizmonFlashcards.ratingFor(flashcardSession,item);
     const review=flashcardSession.phase==="review";
-    root.innerHTML=`<section class="flashcard-session visual-refresh-flashcard-session ${review?"is-review":""}" aria-labelledby="flashcardSessionTitle">
+    root.innerHTML=`<section class="flashcard-session ${review?"is-review":""}" aria-labelledby="flashcardSessionTitle">
       <header class="flashcard-session-head">
         <div><p class="quiz-kicker">${review?t("flashcards.reviewKicker",{round:flashcardSession.reviewRound}):t("flashcards.sessionKicker")}</p><h3 id="flashcardSessionTitle">${escapeHtml(flashcardSession.sourceLabel||flashcardKindName(kind))}</h3><p>${t("flashcards.progressText",{current:progress.current,total:progress.total})} · ${escapeHtml(flashcardKindName(kind))}</p></div>
         <div><button type="button" class="secondary-button" data-flashcard-shuffle>↻ ${t("flashcards.shuffle")}</button><button type="button" class="ghost-button" data-flashcard-exit>${t("flashcards.changeSet")}</button></div>
@@ -4727,16 +4695,14 @@
     const flashcardReviewCount=state.learnTab==="cards"?flashcardReviewItems("types").length+flashcardReviewItems("pokemon").length+flashcardReviewItems("moves").length+flashcardReviewItems("abilities").length+flashcardReviewItems("items").length:0;
     const metrics=state.learnTab==="lab"?`<div class="learn-hero-metrics"><article><small>${t("learn.allTypes")}</small><strong>${TYPES.length}</strong></article><article><small>${t("learn.explored")}</small><strong>${explored}</strong></article><article><small>${t("learn.mastered")}</small><strong>${mastered}</strong></article><article><small>${t("learn.knowledgeRate")}</small><strong>${knowledgeRate}%</strong></article></div>`:state.learnTab==="cards"?`<div class="learn-hero-metrics"><article><small>${t("flashcards.sets")}</small><strong>${QuizmonFlashcards.KINDS.length}</strong></article><article><small>${t("flashcards.availableCards")}</small><strong>${flashcardItems("types").length+flashcardItems("pokemon").length+flashcardItems("moves").length+flashcardItems("abilities").length+flashcardItems("items").length}</strong></article><article><small>${t("flashcards.personalSets")}</small><strong>${flashcardPersonalSourceCount()}</strong></article><article><small>${t("flashcards.reviewCards")}</small><strong>${flashcardReviewCount}</strong></article></div>`:"";
 
-    view.innerHTML=`<section class="learn-page visual-refresh-learn ${state.learnTab==="path"?"path-focused":""} ${state.learnTab==="cards"?"flashcards-focused":""}">
+    view.innerHTML=`<section class="learn-page ${state.learnTab==="path"?"path-focused":""} ${state.learnTab==="cards"?"flashcards-focused":""}">
       <section class="learn-hero">
         <div class="learn-hero-copy"><p class="quiz-kicker">${t("learn.kicker")}</p><h1>${t("learn.title")}</h1><p>${t("learn.subtitleFocused")}</p></div>
         ${metrics}
       </section>
-      <button id="openKnowledgeWorldFromLearn" class="refresh-knowledge-launcher" type="button"><span aria-hidden="true">${iconSvg("knowledge")}</span><span><small>${t("knowledge.kicker")}</small><strong>${t("nav.knowledge")}</strong><em>${t("home.gameKnowledgeDesc")}</em></span><b aria-hidden="true">›</b></button>
       <section class="learn-workspace panel"><div class="learn-workspace-head"><div><p class="quiz-kicker">${t("learn.workspaceKicker")}</p><h2>${workspaceTitle}</h2></div><div class="tabs learn-tabs" role="tablist" style="--tab-count:3"><button class="tab-button ${state.learnTab==="path"?"active":""}" role="tab" aria-selected="${state.learnTab==="path"}" data-learn-tab="path">${t("path.tab")}</button><button class="tab-button ${state.learnTab==="lab"?"active":""}" role="tab" aria-selected="${state.learnTab==="lab"}" data-learn-tab="lab">${t("path.labTab")}</button><button class="tab-button ${state.learnTab==="cards"?"active":""}" role="tab" aria-selected="${state.learnTab==="cards"}" data-learn-tab="cards">${t("flashcards.tab")}</button></div></div><div id="learnContent"></div></section>
     </section>`;
     document.querySelectorAll("[data-learn-tab]").forEach(button=>button.addEventListener("click",()=>{state.learnTab=button.dataset.learnTab;saveState();renderLearn();}));
-    document.getElementById("openKnowledgeWorldFromLearn")?.addEventListener("click",()=>{knowledgeView="home";knowledgePokemonId=null;knowledgeContentKind=null;knowledgeContentId=null;learnType=null;knowledgeSearchOpenedResult=false;knowledgeSearchOrigin=null;setRoute("knowledge");});
     if(state.learnTab==="lab")renderTypeLab();
     else if(state.learnTab==="cards"){if(flashcardSession)renderFlashcards();else renderFlashcardSetup();}
     else renderLearningPath();
@@ -4812,7 +4778,7 @@
     const status=done?t("cleanup2.stageCompleted"):active?t("cleanup2.stageCurrent"):t("cleanup2.stageLater");
     const progress=active&&!done?t("cleanup2.stageProgress",{completed,total:modules.length}):status;
     return `<details class="path-stage ${stage} ${done?"is-complete":active?"is-current":"is-later"}" ${open?"open":""}>
-      <summary class="path-stage-heading"><span>${PATH_STAGE_ICONS[stage]}</span><div><small>${t(`path.stage.${stage}.kicker`)}</small><h3>${t(`path.stage.${stage}.title`)}</h3><p>${t(`path.stage.${stage}.text`)}</p></div><strong>${escapeHtml(progress)}</strong><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
+      <summary class="path-stage-heading"><span>${PATH_STAGE_ICONS[stage]}</span><div><small>${t(`path.stage.${stage}.kicker`)}</small><h3>${t(`path.stage.${stage}.title`)}</h3><p>${t(`path.stage.${stage}.text`)}</p></div><strong>${escapeHtml(progress)}</strong><i aria-hidden="true">⌄</i></summary>
       <div class="path-module-list">${modules.map(pathModuleCard).join("")}</div>
     </details>`;
   }
@@ -4872,7 +4838,7 @@
     const percentDone=Math.round((completed/modules.length)*100);
     const next=pathNextModule();
     const placement=state.learningPath.placement;
-    root.innerHTML=`<section class="learning-path-shell cleanup-path visual-refresh-learning-path">
+    root.innerHTML=`<section class="learning-path-shell cleanup-path">
       <section class="path-overview-card" style="--path-progress:${percentDone}%">
         <div class="path-overview-copy"><p class="quiz-kicker">${t("path.kicker")}</p><h2>${t("path.title")}</h2><p>${t("path.subtitle")}</p><span class="path-placement ${placement.source}">${placement.source==="history"?"✓":"◎"} ${t(placement.source==="history"?"path.placementHistory":"path.placementNew")}</span></div>
         <div class="path-progress-summary"><div><strong>${completed}</strong><span>${t("path.ofModules",{total:modules.length})}</span></div><i><b></b></i></div>
@@ -5300,7 +5266,7 @@
     const candidates=trainingLists().filter(list=>list.kind===listKind);
     const entryName=trainingListEntryName(kind,id);
     if(!candidates.length){openTrainingListEditor(null,listKind,id);return;}
-    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="trainingListChooserTitle"><section class="modal-card training-list-chooser-modal" tabindex="-1"><header><span aria-hidden="true">☷</span><div><p class="quiz-kicker">${t("trainingLists.kicker")}</p><h2 id="trainingListChooserTitle">${t("trainingLists.chooseList")}</h2><p>${t("trainingLists.chooseListText",{name:entryName})}</p></div></header><div class="training-list-chooser-grid">${candidates.map(list=>{const included=QuizmonTrainingLists.contains(list,listKind==="pokemon"?Number(id):String(id));return `<button type="button" data-list-choice="${escapeHtml(list.id)}" class="${included?"included":""}"><span aria-hidden="true">${list.kind==="pokemon"?iconSvg("pokemon"):iconSvg("list")}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><b>${included?t("trainingLists.remove"):t("trainingLists.add")}</b></button>`;}).join("")}</div><div class="modal-actions"><button type="button" class="secondary-button" data-list-choice-close>${t("common.close")}</button><button type="button" class="primary-button" data-list-choice-new>${t("trainingLists.createNew")}</button></div></section></div>`,{initialFocus:"[data-list-choice]"});
+    setModalMarkup(`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="trainingListChooserTitle"><section class="modal-card training-list-chooser-modal" tabindex="-1"><header><span aria-hidden="true">☷</span><div><p class="quiz-kicker">${t("trainingLists.kicker")}</p><h2 id="trainingListChooserTitle">${t("trainingLists.chooseList")}</h2><p>${t("trainingLists.chooseListText",{name:entryName})}</p></div></header><div class="training-list-chooser-grid">${candidates.map(list=>{const included=QuizmonTrainingLists.contains(list,listKind==="pokemon"?Number(id):String(id));return `<button type="button" data-list-choice="${escapeHtml(list.id)}" class="${included?"included":""}"><span aria-hidden="true">${list.kind==="pokemon"?"◉":"◆"}</span><span><strong>${escapeHtml(list.name)}</strong><small>${t("trainingLists.entryCount",{count:list.entries.length})}</small></span><b>${included?t("trainingLists.remove"):t("trainingLists.add")}</b></button>`;}).join("")}</div><div class="modal-actions"><button type="button" class="secondary-button" data-list-choice-close>${t("common.close")}</button><button type="button" class="primary-button" data-list-choice-new>${t("trainingLists.createNew")}</button></div></section></div>`,{initialFocus:"[data-list-choice]"});
     document.querySelector("[data-list-choice-close]")?.addEventListener("click",()=>closeModal());
     document.querySelector("[data-list-choice-new]")?.addEventListener("click",()=>closeModal(()=>openTrainingListEditor(null,listKind,id)));
     document.querySelectorAll("[data-list-choice]").forEach(button=>button.addEventListener("click",()=>{addEntryToTrainingList(button.dataset.listChoice,kind,id);closeModal();}));
@@ -5726,7 +5692,7 @@
       ${knowledgeGenerationFilterMarkup()}
       ${knowledgeSearchMarkup()}
       <details class="knowledge-home-group knowledge-personal-hub" ${compact?"":"open"}>
-        <summary><span aria-hidden="true">${iconSvg("favorite")}</span><span><strong>${t("knowledge.personalHubTitle")}</strong><small>${t("knowledge.personalHubText")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
+        <summary><span aria-hidden="true">${iconSvg("favorite")}</span><span><strong>${t("knowledge.personalHubTitle")}</strong><small>${t("knowledge.personalHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
         <section class="knowledge-personal-entry">
           ${knowledgeSectionButton("favorites",iconSvg("favorite"),t("favorites.title"),t("favorites.homeText"),t("favorites.meta",{count:favoritePokemonEntries().length+favoriteTypeEntries().length}))}
           ${knowledgeSectionButton("training-lists",iconSvg("list"),t("trainingLists.title"),t("trainingLists.homeText"),t("trainingLists.meta",{count:trainingLists().length}))}
@@ -5740,7 +5706,7 @@
         ${knowledgeSectionButton("items",iconSvg("item"),t("knowledge.items"),t("knowledge.itemsText"),t("knowledge.itemsMeta",{count:counts.items}))}
       </section>
       <details class="knowledge-home-group knowledge-world-hub" ${compact?"":"open"}>
-        <summary><span aria-hidden="true">${iconSvg("region")}</span><span><strong>${t("knowledge.worldTitle")}</strong><small>${t("knowledge.worldHubText")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary>
+        <summary><span aria-hidden="true">${iconSvg("region")}</span><span><strong>${t("knowledge.worldTitle")}</strong><small>${t("knowledge.worldHubText")}</small></span><i aria-hidden="true">⌄</i></summary>
         <section class="knowledge-category-grid knowledge-world-grid" aria-labelledby="knowledgeWorldTitle">
           <div class="knowledge-section-heading sr-only"><div><small>${t("knowledge.worldKicker")}</small><h3 id="knowledgeWorldTitle">${t("knowledge.worldTitle")}</h3></div></div>
           ${knowledgeSectionButton("regions",iconSvg("region"),t("knowledge.regionsTitle"),t("knowledge.regionsText"),t("knowledge.regionsMeta",{count:counts.regions}))}
@@ -5759,7 +5725,7 @@
   }
 
   function knowledgeSubpageHeader(title, text, meta) {
-    return `<header class="knowledge-subpage-head"><button class="knowledge-back-button" data-knowledge-home aria-label="${escapeHtml(t("knowledge.backHome"))}">${iconSvg("back")}</button><div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div><div class="knowledge-subpage-actions"><span>${escapeHtml(meta)}</span>${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup(true)}</div></header>`;
+    return `<header class="knowledge-subpage-head"><button class="knowledge-back-button" data-knowledge-home aria-label="${escapeHtml(t("knowledge.backHome"))}">‹</button><div><p class="quiz-kicker">${t("knowledge.kicker")}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div><div class="knowledge-subpage-actions"><span>${escapeHtml(meta)}</span>${knowledgeGenerationFilterMarkup(true)}${knowledgeSearchLauncherMarkup(true)}</div></header>`;
   }
 
   function bindKnowledgeHome(root) {
@@ -6414,7 +6380,7 @@
     const rate=percent(s.correct,s.total);
     const memory=memoryAid(learnType,attack,defense);
     const meta=TYPE_META[learnType];
-    view.innerHTML=`<section class="type-detail-page visual-refresh-type-detail" style="--type-color:${meta.color}">
+    view.innerHTML=`<section class="type-detail-page" style="--type-color:${meta.color}">
       <section class="type-detail-hero">
         <div class="type-detail-identity">
           <div class="type-detail-symbol">${meta.icon}</div>
@@ -7293,7 +7259,7 @@
     const accuracy=percent(state.stats.correct,state.stats.total);
     const openErrors=state.stats.mistakes.filter(item=>item.status!=="resolved").length;
     const heroMetrics=state.statsTab==="overview"?`<div class="progress-hero-metrics"><span><small>${t("stats.accuracy")}</small><strong>${accuracy}%</strong></span><span><small>${t("stats.bestStreak")}</small><strong>${state.stats.bestStreak}</strong></span><span><small>${t("stats.openErrors")}</small><strong>${openErrors}</strong></span></div>`:"";
-    view.innerHTML=`<section class="progress-page visual-refresh-progress ${state.statsTab==="overview"?"overview-focused":"detail-focused"}">
+    view.innerHTML=`<section class="progress-page ${state.statsTab==="overview"?"overview-focused":"detail-focused"}">
       <section class="progress-hero">
         <div class="progress-hero-copy"><p class="quiz-kicker">${t("stats.hubKicker")}</p><h1>${t("stats.hubTitle")}</h1><p>${t("stats.hubSubtitle")}</p></div>
         <div class="progress-level-card">
@@ -7521,7 +7487,7 @@
       <div class="error-analysis-heading"><div><p class="quiz-kicker">${t("cleanup2.patternSectionKicker")}</p><h2>${t("cleanup2.patternSectionTitle")}</h2><p>${t("cleanup2.patternSectionText")}</p></div><span class="error-analysis-stage ${stage}">${t(`errorAnalysis.stage.${stage}`)}</span></div>
       ${lead?`<div class="error-analysis-lead"><small>${t("cleanup2.mostImportantPattern")}</small>${errorPatternCard(lead)}</div>`:`<div class="error-analysis-empty"><span>◎</span><strong>${t("errorAnalysis.emptyTitle")}</strong><p>${analysis.analyzed?t("errorAnalysis.emptyBuilding"):t("errorAnalysis.emptyText")}</p></div>`}
       ${remaining.length?`<div class="section-title error-analysis-section-title"><h3>${t("cleanup2.otherPatterns")}</h3><p>${t("errorAnalysis.patternsHintDetailed")}</p></div><div class="error-pattern-grid">${remaining.map(errorPatternCard).join("")}</div>`:""}
-      <details class="error-analysis-details"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><div class="error-analysis-metrics"><article><small>${t("errorAnalysis.analyzed")}</small><strong>${analysis.analyzed}</strong></article><article><small>${t("errorAnalysis.errorAnswers")}</small><strong>${analysis.errorAnswers}</strong></article><article><small>${t("errorAnalysis.recurring")}</small><strong>${analysis.recurring}</strong></article><article><small>${t("errorAnalysis.concrete")}</small><strong>${analysis.concrete}</strong></article></div><div class="error-analysis-note"><span>i</span><p>${t("errorAnalysis.note")}</p></div></details>
+      <details class="error-analysis-details"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><div class="error-analysis-metrics"><article><small>${t("errorAnalysis.analyzed")}</small><strong>${analysis.analyzed}</strong></article><article><small>${t("errorAnalysis.errorAnswers")}</small><strong>${analysis.errorAnswers}</strong></article><article><small>${t("errorAnalysis.recurring")}</small><strong>${analysis.recurring}</strong></article><article><small>${t("errorAnalysis.concrete")}</small><strong>${analysis.concrete}</strong></article></div><div class="error-analysis-note"><span>i</span><p>${t("errorAnalysis.note")}</p></div></details>
     </section>`;
   }
 
@@ -7555,7 +7521,7 @@
       <section class="error-detail-cause"><span>?</span><div><strong>${t("errorAnalysis.causeTitle")}</strong><p>${escapeHtml(errorPatternText(pattern))}</p></div></section>
       ${errorPatternDevelopmentMarkup(pattern)}
       <section class="error-detail-criterion"><strong>${t("errorAnalysis.statusTitle")}</strong><p>${escapeHtml(errorPatternCriterionText(pattern))}</p></section>
-      <details class="error-detail-data"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">${iconSvg("chevronDown")}</i></summary><section class="error-detail-metrics"><article><small>${t("errorAnalysis.wrongOfRelevant")}</small><strong>${pattern.errors}/${pattern.opportunities}</strong><span>${Math.round(pattern.rate*100)}%</span></article><article><small>${t("errorAnalysis.sessionsSeen")}</small><strong>${pattern.sessions}</strong><span>${t("errorAnalysis.trainingUnits")}</span></article><article><small>${t("errorAnalysis.correctStreak")}</small><strong>${pattern.development.correctStreak}</strong><span>${t("errorAnalysis.confirmations")}</span></article></section></details>
+      <details class="error-detail-data"><summary><span><strong>${t("cleanup2.analysisDetails")}</strong><small>${t("cleanup2.analysisDetailsHint")}</small></span><i aria-hidden="true">⌄</i></summary><section class="error-detail-metrics"><article><small>${t("errorAnalysis.wrongOfRelevant")}</small><strong>${pattern.errors}/${pattern.opportunities}</strong><span>${Math.round(pattern.rate*100)}%</span></article><article><small>${t("errorAnalysis.sessionsSeen")}</small><strong>${pattern.sessions}</strong><span>${t("errorAnalysis.trainingUnits")}</span></article><article><small>${t("errorAnalysis.correctStreak")}</small><strong>${pattern.development.correctStreak}</strong><span>${t("errorAnalysis.confirmations")}</span></article></section></details>
       <section class="error-detail-training ${canTrain?"":"locked"}"><div><small>${t("errorAnalysis.problemTrainingKicker")}</small><strong>${t("errorAnalysis.problemTrainingTitle")}</strong><p>${canTrain?t("errorAnalysis.problemTrainingText"):t("errorAnalysis.problemTrainingLocked")}</p></div><span>${tp("train.questionCountOne","train.questionCount",8)}</span></section>
       <div class="modal-actions"><button id="closeErrorPattern" class="secondary-button">${t("common.close")}</button><button id="startProblemTraining" class="primary-button" ${canTrain?"":"disabled"}>${t("errorAnalysis.startProblemTraining")}</button></div>
     </section></div>`,{initialFocus:canTrain?"#startProblemTraining":"#closeErrorPattern"});
@@ -7749,26 +7715,26 @@
     const dark=actualTheme()==="dark";
     const languageLabel=state.language==="de"?"Deutsch":"English";
     const themeLabel=dark?t("settings.dark"):t("settings.light");
-    view.innerHTML=`<section class="settings-page visual-refresh-settings">
+    view.innerHTML=`<section class="settings-page">
       <section class="settings-hero"><div><p class="quiz-kicker">${t("settings.centerKicker")}</p><h1>${t("settings.centerTitle")}</h1><p>${t("settings.centerSubtitle")}</p></div><div class="settings-current-overview"><div class="settings-current-heading"><small>${t("settings.currentTitle")}</small><p>${t("settings.currentHint")}</p></div><div class="settings-status-grid"><span><small>${t("settings.language")}</small><strong>${languageLabel}</strong></span><span><small>${t("settings.theme")}</small><strong>${themeLabel}</strong></span><span><small>${t("settings.animations")}</small><strong>${state.animations?t("settings.on"):t("settings.off")}</strong></span></div></div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("settings")}</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingSelectRow("languageSelect",iconSvg("language"),t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
-        ${settingToggleRow("themeToggle",iconSvg("theme"),t("settings.theme"),t("settings.themeDesc"),dark)}
-        ${settingToggleRow("animationToggle",iconSvg("motion"),t("settings.animations"),t("settings.animationsDesc"),state.animations)}
-        ${settingToggleRow("hapticToggle",iconSvg("haptic"),t("settings.haptics"),t("settings.hapticsDesc"),state.haptics)}
+      <section class="settings-group"><div class="settings-group-heading"><span>◐</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingSelectRow("languageSelect","文",t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
+        ${settingToggleRow("themeToggle","◐",t("settings.theme"),t("settings.themeDesc"),dark)}
+        ${settingToggleRow("animationToggle","↝",t("settings.animations"),t("settings.animationsDesc"),state.animations)}
+        ${settingToggleRow("hapticToggle","≈",t("settings.haptics"),t("settings.hapticsDesc"),state.haptics)}
       </div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("help")}</span><div><h2>${t("settings.guidance")}</h2><p>${t("settings.guidanceHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("restartTutorial",iconSvg("learn"),t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
+      <section class="settings-group"><div class="settings-group-heading"><span>?</span><div><h2>${t("settings.guidance")}</h2><p>${t("settings.guidanceHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("restartTutorial","◎",t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
       </div></section>
-      <section class="settings-group"><div class="settings-group-heading"><span>${iconSvg("data")}</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("exportProgress",iconSvg("download"),t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
-        ${settingActionRow("importProgress",iconSvg("upload"),t("settings.import"),t("settings.importDesc"),t("settings.importAction"))}
+      <section class="settings-group"><div class="settings-group-heading"><span>⇄</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("exportProgress","↓",t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
+        ${settingActionRow("importProgress","↑",t("settings.import"),t("settings.importDesc"),t("settings.importAction"))}
         <input id="importFile" type="file" accept="application/json" hidden>
-        ${settingActionRow("exportFeedback",iconSvg("feedback"),t("settings.feedback"),t("settings.feedbackDesc"),t("settings.createReport"))}
-        ${settingActionRow("exportDiagnostics",iconSvg("diagnostics"),t("settings.diagnostics"),t("settings.diagnosticsDesc"),t("settings.exportAction"))}
+        ${settingActionRow("exportFeedback","✎",t("settings.feedback"),t("settings.feedbackDesc"),t("settings.createReport"))}
+        ${settingActionRow("exportDiagnostics","⌁",t("settings.diagnostics"),t("settings.diagnosticsDesc"),t("settings.exportAction"))}
       </div></section>
-      <section class="settings-group danger-zone"><div class="settings-group-heading"><span>${iconSvg("warning")}</span><div><h2>${t("settings.dangerZone")}</h2><p>${t("settings.dangerZoneHint")}</p></div></div><div class="settings-list modern-settings-list">
-        ${settingActionRow("resetProgress",iconSvg("trash"),t("settings.reset"),t("settings.resetDesc"),t("settings.delete"),true)}
+      <section class="settings-group danger-zone"><div class="settings-group-heading"><span>!</span><div><h2>${t("settings.dangerZone")}</h2><p>${t("settings.dangerZoneHint")}</p></div></div><div class="settings-list modern-settings-list">
+        ${settingActionRow("resetProgress","×",t("settings.reset"),t("settings.resetDesc"),t("settings.delete"),true)}
       </div></section>
     </section>`;
     document.getElementById("languageSelect").addEventListener("change",event=>{state.language=event.target.value;saveState();applyPreferences();renderSettings();});
@@ -8090,7 +8056,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=visual-refresh-sprint3-v1",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=4.1-sprint3-v4",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{
