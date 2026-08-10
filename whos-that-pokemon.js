@@ -8,6 +8,8 @@
   const DIFFICULTIES = Object.freeze(["easy", "medium", "hard"]);
   const MAX_LIVES = 5;
   const HINT_COUNT = 5;
+  const POINTS_BY_HINT = Object.freeze([0, 1000, 760, 540, 360, 220]);
+  const DIFFICULTY_MULTIPLIERS = Object.freeze({ easy: .85, medium: 1, hard: 1.35 });
   const STAT_KEYS = Object.freeze(["hp", "attack", "defense", "spAttack", "spDefense", "speed"]);
   const HINT_KINDS = Object.freeze([
     "statSignature", "abilityProfile", "measurements", "originProfile", "defenseProfile",
@@ -17,6 +19,14 @@
     "weightBand", "namePattern", "evolutionGap", "shadow", "pixel", "crop", "cry"
   ]);
   const HINT_KIND_SET = new Set(HINT_KINDS);
+  const MEDIA_REVEAL_RANK = Object.freeze({ crop: 1, cry: 2, shadow: 3, pixel: 4 });
+  const EASY_LIGHT_FACT_KINDS = new Set([
+    "generation", "dexRange", "typeCount", "evolutionStage", "familySize", "heightBand", "weightBand"
+  ]);
+  const EASY_CLEAR_FACT_KINDS = new Set([
+    "typeCombo", "evolutionNeighbor", "singleAbility", "evolutionMethod", "specialGroup",
+    "measurements", "originProfile", "abilityProfile", "statSignature"
+  ]);
   const DAILY_EPOCH = "2026-08-01";
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -168,17 +178,23 @@
       shadow: { easy: "full", medium: "partial", hard: "detail" },
       pixel: { easy: "light", medium: "medium", hard: "strong" },
       crop: { easy: "large", medium: "medium", hard: "small" },
-      cry: { easy: "long", medium: "medium", hard: "short" }
+      cry: { easy: "full", medium: "medium", hard: "short" }
     };
     return levels[kind]?.[validDifficulty(difficulty)] || levels[kind]?.medium || "medium";
   }
   function mediaDescriptor(kind, target, difficulty, position) {
+    const safeDifficulty = validDifficulty(difficulty);
+    const generatedAnchor = (Number(target.id) * 37 + position * 19) % 100;
+    const anchor = kind === "crop" && safeDifficulty === "easy"
+      ? 42 + (Number(target.id) * 17 + position * 11) % 17
+      : generatedAnchor;
     return hint(kind, {
       pokemonId: Number(target.id),
-      strength: mediaStrength(kind, difficulty),
-      anchor: (Number(target.id) * 37 + position * 19) % 100
+      strength: mediaStrength(kind, safeDifficulty),
+      anchor
     }, `media-${kind}`, ["media"], [position]);
   }
+  function mediaRevealRank(kind) { return MEDIA_REVEAL_RANK[kind] || 0; }
   function sameObject(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 
   function createContext(options = {}) {
@@ -326,6 +342,46 @@
   function eligible(pool, position, selected, strictTopics = true) {
     return pool.filter(row => row.positions.includes(position) && !selected.some(chosen => chosen.family === row.family) && (!strictTopics || !topicConflict(row, selected)));
   }
+  function selectEasyFact(pool, kinds, desired, random, excludedFamilies = new Set()) {
+    const candidates = pool.filter(row => kinds.has(row.kind) && !excludedFamilies.has(row.family));
+    return selectByTargetCount(candidates, desired, random) || candidates.sort((left, right) => left.candidateCount - right.candidateCount)[0] || null;
+  }
+  function selectEasyFallback(pool, desired, random, excludedFamilies) {
+    const candidates = pool.filter(row => !excludedFamilies.has(row.family));
+    const chosen = selectByTargetCount(candidates, desired, random) || candidates.sort((left, right) => left.candidateCount - right.candidateCount)[0] || null;
+    if (chosen) excludedFamilies.add(chosen.family);
+    return chosen;
+  }
+  function easyMediaHint(kind, target, position, fallback, context) {
+    const descriptor = mediaDescriptor(kind, target, "easy", position);
+    descriptor.value.fallback = clone(fallback);
+    return decorateHint(descriptor, context);
+  }
+  function selectEasyHints(target, context, pool, random) {
+    const usedFamilies = new Set();
+    const lightFact = selectEasyFact(pool, EASY_LIGHT_FACT_KINDS, 100, random, usedFamilies);
+    if (lightFact) usedFamilies.add(lightFact.family);
+    const clearFact = selectEasyFact(pool, EASY_CLEAR_FACT_KINDS, 8, random, usedFamilies);
+    if (clearFact) usedFamilies.add(clearFact.family);
+
+    const cryFallback = selectEasyFallback(pool, 140, random, usedFamilies);
+    const shadowFallback = selectEasyFallback(pool, 12, random, usedFamilies);
+    const cropFallback = selectEasyFallback(pool, 2, random, usedFamilies);
+    if (!lightFact || !clearFact || !cryFallback || !shadowFallback || !cropFallback) return null;
+
+    const hints = [
+      easyMediaHint("cry", target, 1, cryFallback, context),
+      lightFact,
+      clearFact,
+      easyMediaHint("shadow", target, 4, shadowFallback, context),
+      easyMediaHint("crop", target, 5, cropFallback, context)
+    ].map((row, index) => ({ ...clone(row), position: index + 1 }));
+    return {
+      hints,
+      candidatesAfterFirst: matchingPokemon(hints.slice(0, 1), context).length,
+      candidatesAfterSecond: matchingPokemon(hints.slice(0, 2), context).length
+    };
+  }
   function ensureSecondHint(pool, first, target, context, difficulty, random) {
     const desired = difficulty === "easy" ? 18 : difficulty === "hard" ? 90 : 45;
     const find = strictTopics => pool.filter(row => row.positions.includes(2) && row.family !== first.family && (!strictTopics || !topicConflict(row, [first])))
@@ -346,6 +402,10 @@
   function selectHints(target, context, difficulty = "medium", random = Math.random) {
     const safeDifficulty = validDifficulty(difficulty);
     const pool = buildHintPool(target, context, safeDifficulty).map(row => decorateHint(row, context));
+    if (safeDifficulty === "easy") {
+      const easySelection = selectEasyHints(target, context, pool, random);
+      if (easySelection) return easySelection;
+    }
     const firstLimit = safeDifficulty === "easy" ? 12 : safeDifficulty === "hard" ? 60 : 28;
     const desiredFirst = safeDifficulty === "easy" ? 4 : safeDifficulty === "hard" ? 24 : 10;
     let firstPool = pool.filter(row => row.positions.includes(1) && row.candidateCount > 0 && row.candidateCount <= firstLimit);
@@ -371,8 +431,9 @@
     const mediaKinds = shuffle(["shadow", "pixel", "crop", "cry"], random);
     const mediaCount = random() < 0.28 ? 2 : 1;
     const mediaPositions = mediaCount === 2 ? [4, 5] : [random() < 0.56 ? 4 : 5];
+    const selectedMediaKinds = mediaKinds.slice(0, mediaCount).sort((left, right) => mediaRevealRank(left) - mediaRevealRank(right));
     mediaPositions.forEach((position, index) => {
-      const descriptor = mediaDescriptor(mediaKinds[index], target, safeDifficulty, position);
+      const descriptor = mediaDescriptor(selectedMediaKinds[index], target, safeDifficulty, position);
       descriptor.value.fallback = clone(selected[position - 1]);
       selected[position - 1] = decorateHint(descriptor, context);
     });
@@ -397,7 +458,7 @@
     return {
       id: `wttp-${new Date(now).getTime()}-${target.id}`,
       targetId: Number(target.id), difficulty, maxLives: MAX_LIVES, lives: MAX_LIVES,
-      revealed: 1, guesses: [], status: "active", createdAt: new Date(now).toISOString(), completedAt: null,
+      revealed: 1, skippedHints: 0, guesses: [], forfeited: false, status: "active", createdAt: new Date(now).toISOString(), completedAt: null,
       hints: selection.hints,
       balance: { afterFirst: selection.candidatesAfterFirst, afterSecond: selection.candidatesAfterSecond }
     };
@@ -419,8 +480,8 @@
     if (!round || !["won", "lost"].includes(round.status)) return { points: 0, xp: 0, solvedAtHint: null };
     const solvedAtHint = round.status === "won" ? Math.min(HINT_COUNT, Math.max(1, Number(round.revealed) || 1)) : null;
     if (!solvedAtHint) return { points: 0, xp: 5, solvedAtHint: null };
-    const multiplier = round.difficulty === "hard" ? 1.35 : round.difficulty === "easy" ? .85 : 1;
-    const base = [0, 1000, 760, 540, 360, 220][solvedAtHint];
+    const multiplier = DIFFICULTY_MULTIPLIERS[validDifficulty(round.difficulty)];
+    const base = POINTS_BY_HINT[solvedAtHint];
     const dailyBonus = round.mode === "daily" ? 150 : 0;
     const points = Math.round(base * multiplier + dailyBonus);
     const xp = Math.max(10, Math.round(points / 20));
@@ -480,6 +541,26 @@
     return { accepted: true, correct, round: next };
   }
 
+  function skipHint(round) {
+    if (!round || round.status !== "active") return { accepted: false, reason: "finished", round };
+    if (Number(round.revealed) >= HINT_COUNT) return { accepted: false, reason: "lastHint", round };
+    const next = clone(round);
+    next.skippedHints = Math.min(HINT_COUNT - 1, Math.max(0, Math.floor(Number(next.skippedHints) || 0)) + 1);
+    next.revealed = Math.min(HINT_COUNT, Math.max(1, Number(next.revealed) || 1) + 1);
+    return { accepted: true, round: next };
+  }
+
+  function giveUp(round, options = {}) {
+    if (!round || round.status !== "active") return { accepted: false, reason: "finished", round };
+    if (Number(round.revealed) < HINT_COUNT) return { accepted: false, reason: "hintsRemaining", round };
+    const next = clone(round);
+    const now = typeof options.now === "function" ? options.now() : new Date();
+    next.forfeited = true;
+    next.status = "lost";
+    next.completedAt = new Date(now).toISOString();
+    return { accepted: true, round: next };
+  }
+
   function sanitizeRound(value, context) {
     if (!value || typeof value !== "object" || !context?.byId?.has(Number(value.targetId))) return null;
     const targetId = Number(value.targetId);
@@ -488,15 +569,18 @@
     const guesses = unique((Array.isArray(value.guesses) ? value.guesses : []).map(Number).filter(id => context.byId.has(id))).slice(0, MAX_LIVES);
     const won = guesses.includes(targetId);
     const wrongCount = guesses.filter(id => id !== targetId).length;
-    const lost = !won && wrongCount >= MAX_LIVES;
+    const skippedHints = Math.min(HINT_COUNT - 1, Math.max(0, Math.floor(Number(value.skippedHints) || 0)));
+    const revealed = Math.min(HINT_COUNT, wrongCount + skippedHints + 1);
+    const forfeited = !won && value.forfeited === true && revealed >= HINT_COUNT;
+    const lost = !won && (wrongCount >= MAX_LIVES || forfeited);
     const status = won ? "won" : lost ? "lost" : "active";
     const created = new Date(value.createdAt || "");
     const completed = new Date(value.completedAt || "");
     return {
       id: typeof value.id === "string" ? value.id.slice(0, 100) : `wttp-restored-${targetId}`,
       targetId, difficulty: validDifficulty(value.difficulty), maxLives: MAX_LIVES,
-      lives: Math.max(0, MAX_LIVES - wrongCount), revealed: Math.min(HINT_COUNT, wrongCount + 1),
-      guesses, status, createdAt: Number.isNaN(created.getTime()) ? new Date(0).toISOString() : created.toISOString(),
+      lives: Math.max(0, MAX_LIVES - wrongCount), revealed, skippedHints,
+      guesses, forfeited, status, createdAt: Number.isNaN(created.getTime()) ? new Date(0).toISOString() : created.toISOString(),
       completedAt: status === "active" || Number.isNaN(completed.getTime()) ? null : completed.toISOString(),
       hints, mode: value.mode === "daily" ? "daily" : "free",
       dailyDate: value.mode === "daily" ? utcDateKey(value.dailyDate) : null,
@@ -516,11 +600,11 @@
   }
 
   return Object.freeze({
-    DIFFICULTIES, MAX_LIVES, HINT_COUNT, HINT_KINDS, STAT_KEYS, DAILY_EPOCH,
+    DIFFICULTIES, MAX_LIVES, HINT_COUNT, HINT_KINDS, STAT_KEYS, DAILY_EPOCH, POINTS_BY_HINT, DIFFICULTY_MULTIPLIERS,
     createContext, buildHintPool, matchesHint, matchingPokemon, selectHints,
-    createRound, createDailyRound, submitGuess, sanitizeRound, findPokemonByName, normalizedName,
+    createRound, createDailyRound, submitGuess, skipHint, giveUp, sanitizeRound, findPokemonByName, normalizedName,
     hashString, seededRandom, utcDateKey, scoreRound, blankStatistics, recordStatistics, sanitizeStatistics,
     statTotal, statEdge, evolutionStage, defenseProfile, battleStyle, heightBand, weightBand, methodValue,
-    mediaStrength, mediaDescriptor
+    mediaStrength, mediaDescriptor, mediaRevealRank
   });
 });

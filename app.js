@@ -2,9 +2,9 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "4.1-sprint3-v1";
+  const BUILD_VERSION = "4.1-sprint3-v8";
   const PUBLIC_VERSION = "Beta 1.3";
-  const DATA_SCHEMA = 19;
+  const DATA_SCHEMA = 20;
   const LEARNING_EVENT_LIMIT = 800;
   const ERROR_EVENT_LIMIT = 600;
   const HISTORY_LIMIT = 30;
@@ -16,7 +16,7 @@
   const LEARNING_EVENT_MODES = Object.freeze([...PLAYABLE_MODES, "weak", "daily", "review", "problem", "path"]);
   const ADAPTIVE_SESSION_MODES = Object.freeze(["weak", "problem"]);
   const SUPPORTED_CURRENT_VERSIONS = Object.freeze([
-    "4.1-sprint3-v1", "4.1-sprint2-v1",
+    "4.1-sprint3-v8", "4.1-sprint3-v7", "4.1-sprint3-v6", "4.1-sprint3-v5", "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
     "4.1-sprint1-v1", "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
     "2.5-sprint3-v1", "2.5-sprint2-v1", "2.5-sprint1-v1", "2.4-sprint2-v1", "2.4-sprint1-v1",
     "2.3-sprint2-v3", "2.3-sprint2-v2", "2.3-sprint2-v1", "2.3-sprint1-v1",
@@ -208,6 +208,7 @@
   let flashcardSwipeStartX = null;
   let flashcardSwipeHandled = false;
   let whosSuggestionQuery = "";
+  let whosSelectedPokemonId = null;
   let profileCustomizerTab = "avatar";
   let profileCustomizerQuery = "";
   let profileCustomizerCategory = "all";
@@ -771,6 +772,10 @@
   function tp(singularKey, pluralKey, count, vars = {}) {
     return t(QuizmonI18n.pluralKey(state.language, count, singularKey, pluralKey), { ...vars, count });
   }
+  function dailyGoalRewardToast(streak, bonusXp) {
+    const key = QuizmonI18n.pluralKey(state.language, streak, "daily.goalRewardToastOne", "daily.goalRewardToast");
+    return t(key, { count:bonusXp, streak });
+  }
 
   function escapeHtml(value) { return QuizmonCore.escapeHtml(value); }
 
@@ -1180,6 +1185,23 @@
     }
     state.daily.history[todayKey()] = { progress: finiteNonNegative(state.daily.goalProgress), completed: Boolean(state.daily.goalCompleted) };
     return { ...dailyGoalInfo(), completedNow, bonusXp, show: !beforeCompleted || completedNow };
+  }
+  function completeDailyGoalFromPokeidle(round) {
+    if (round?.mode !== "daily" || round.status !== "won") return { completedNow:false, bonusXp:0, streak:dailyGoalInfo().streak };
+    normalizeDailyState(false);
+    const completion = QuizmonMotivation.completeDailyGoal(state.daily, {
+      today:todayKey(),
+      yesterday:offsetDateKey(-1),
+      result:{ source:"pokeidle", solvedAtHint:Math.min(5, Math.max(1, Number(round.revealed) || 1)), lives:Math.max(0, Number(round.lives) || 0) }
+    });
+    state.daily = completion.state;
+    if (completion.bonusXp) addXp(completion.bonusXp);
+    unlockAchievement("daily_first", true);
+    updateHeader();
+    if (completion.completedNow) {
+      enqueueToast("🔥", t("daily.completedTitle"), dailyGoalRewardToast(completion.streak, completion.bonusXp), "level");
+    }
+    return completion;
   }
   function dailyGoalWeekMarkup() {
     return `<div class="daily-goal-week" aria-label="${escapeHtml(t("daily.weekLabel"))}">${weeklyGoalEntries().map(day => `<span class="${day.completed ? "is-complete" : ""} ${day.isToday ? "is-today" : ""}" title="${escapeHtml(day.key)}"><small>${escapeHtml(day.label)}</small><i>${day.completed ? "✓" : ""}</i></span>`).join("")}</div>`;
@@ -2031,8 +2053,12 @@
     return "";
   }
 
-  function whosCryUrl(target) {
-    return `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${Number(target.id)}.ogg`;
+  function whosCryUrls(target) {
+    const slug = String(target?.slug || target?.en || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    return {
+      mp3: `https://play.pokemonshowdown.com/audio/cries/${encodeURIComponent(slug)}.mp3`,
+      ogg: `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${Number(target.id)}.ogg`
+    };
   }
   function whosMediaFallbackMarkup(descriptor, target) {
     const fallback = descriptor?.value?.fallback;
@@ -2043,11 +2069,14 @@
     const strength = escapeHtml(descriptor.value?.strength || "medium");
     const artwork = escapeHtml(`${knowledgeArtwork(target)}?quizmon-media=1`);
     const fallback = whosMediaFallbackMarkup(descriptor, target);
-    if (descriptor.kind === "cry") return `<div class="whos-media-hint whos-cry-hint" data-whos-media>
-      <audio preload="metadata" src="${escapeHtml(whosCryUrl(target))}"></audio>
+    if (descriptor.kind === "cry") {
+      const cry = whosCryUrls(target);
+      return `<div class="whos-media-hint whos-cry-hint" data-whos-media>
+      <audio preload="none" playsinline><source src="${escapeHtml(cry.mp3)}" type="audio/mpeg"><source src="${escapeHtml(cry.ogg)}" type="audio/ogg"></audio>
       <button type="button" class="whos-cry-play" data-whos-cry-play><span aria-hidden="true">▶</span>${t("whos.media.playCry")}</button>
       <label><span>${t("whos.media.volume")}</span><input type="range" min="0" max="100" value="70" data-whos-volume aria-label="${escapeHtml(t("whos.media.volume"))}"></label>
       <button type="button" class="whos-cry-mute" data-whos-mute aria-pressed="false">${t("whos.media.mute")}</button>${fallback}</div>`;
+    }
     return `<div class="whos-media-hint whos-${descriptor.kind}-hint strength-${strength}" data-whos-media>
       <div class="whos-media-stage" style="--media-anchor:${Number(descriptor.value?.anchor) || 50}%"><img src="${artwork}" alt="${escapeHtml(t(`whos.media.${descriptor.kind}Alt`))}" crossorigin="anonymous"></div>${fallback}</div>`;
   }
@@ -2055,6 +2084,7 @@
   function bindWhosMediaHints(root = view) {
     root.querySelectorAll("[data-whos-media] img").forEach(image => image.addEventListener("error", () => {
       image.closest(".whos-media-stage")?.setAttribute("hidden", "");
+      image.closest(".whos-current-stage")?.classList.add("media-failed");
       const fallback = image.closest("[data-whos-media]")?.querySelector(".whos-media-fallback");
       if (fallback) fallback.hidden = false;
     }, { once: true }));
@@ -2065,22 +2095,34 @@
       const mute = container.querySelector("[data-whos-mute]");
       if (!audio || !play || !volume || !mute) return;
       const difficulty = container.closest("[data-whos-difficulty]")?.dataset.whosDifficulty;
-      const limit = difficulty === "hard" ? 0.55 : difficulty === "easy" ? 3.5 : 1.6;
-      const fail = () => { container.querySelector(".whos-media-fallback").hidden = false; play.disabled = true; };
+      const limit = difficulty === "easy" ? Number.POSITIVE_INFINITY : difficulty === "hard" ? 0.55 : 1.6;
+      const setVolume = value => { try { audio.volume = Math.min(1, Math.max(0, Number(value) / 100)); } catch {} };
+      const resetPosition = () => {
+        if (audio.readyState === 0) return;
+        try { audio.currentTime = 0; } catch {}
+      };
+      const fail = () => { const fallback = container.querySelector(".whos-media-fallback"); if (fallback) fallback.hidden = false; play.disabled = true; play.querySelector("span").textContent = "▶"; };
       audio.addEventListener("error", fail, { once: true });
-      audio.addEventListener("timeupdate", () => { if (audio.currentTime >= limit) { audio.pause(); audio.currentTime = 0; play.querySelector("span").textContent = "▶"; } });
+      audio.addEventListener("timeupdate", () => { if (audio.currentTime >= limit) { audio.pause(); resetPosition(); play.querySelector("span").textContent = "▶"; } });
       audio.addEventListener("ended", () => { play.querySelector("span").textContent = "▶"; });
-      play.addEventListener("click", () => { audio.currentTime = 0; audio.play().then(() => { play.querySelector("span").textContent = "■"; }).catch(fail); });
-      volume.addEventListener("input", () => { audio.volume = Number(volume.value) / 100; audio.muted = false; mute.setAttribute("aria-pressed", "false"); mute.textContent = t("whos.media.mute"); });
+      play.addEventListener("click", () => {
+        resetPosition();
+        try {
+          const playback = audio.play();
+          if (playback && typeof playback.then === "function") playback.then(() => { play.querySelector("span").textContent = "■"; }).catch(fail);
+          else play.querySelector("span").textContent = "■";
+        } catch { fail(); }
+      });
+      volume.addEventListener("input", () => { setVolume(volume.value); audio.muted = false; mute.setAttribute("aria-pressed", "false"); mute.textContent = t("whos.media.mute"); });
       mute.addEventListener("click", () => { audio.muted = !audio.muted; mute.setAttribute("aria-pressed", String(audio.muted)); mute.textContent = t(audio.muted ? "whos.media.unmute" : "whos.media.mute"); const fallback = container.querySelector(".whos-media-fallback"); if (fallback) fallback.hidden = !audio.muted; });
-      audio.volume = .7;
+      setVolume(70);
     });
   }
 
   function whosDifficultyCard(difficulty, numeral) {
     const selected = state.whosThat.difficulty === difficulty;
     return `<button type="button" class="whos-difficulty-card ${selected ? "selected" : ""}" data-whos-difficulty="${difficulty}" aria-pressed="${selected}">
-      <span aria-hidden="true">${numeral}</span><div><strong>${t(`whos.difficulty.${difficulty}`)}</strong><p>${t(`whos.difficulty.${difficulty}Desc`)}</p></div><i aria-hidden="true">${selected ? "✓" : ""}</i>
+      <span aria-hidden="true">${numeral}</span><strong>${t(`whos.difficulty.${difficulty}`)}</strong><i aria-hidden="true">${selected ? "✓" : ""}</i>
     </button>`;
   }
 
@@ -2106,6 +2148,7 @@
     }
     state.whosThat.round = QuizmonWhosThatPokemon.createDailyRound({ context: WHOS_CONTEXT, date: `${dateKey}T12:00:00.000Z` });
     whosSuggestionQuery = "";
+    whosSelectedPokemonId = null;
     saveState();
     renderPlay();
   }
@@ -2116,8 +2159,9 @@
     state.whosThat.completedRoundIds = [...state.whosThat.completedRoundIds, round.id].slice(-300);
     state.whosThat.statistics = QuizmonWhosThatPokemon.recordStatistics(state.whosThat.statistics, round, score);
     addXp(score.xp);
+    const dailyGoalCompletion = completeDailyGoalFromPokeidle(round);
     if (round.mode === "daily" && round.dailyDate) {
-      const result = { date: round.dailyDate, solvedAtHint: score.solvedAtHint, status: round.status, lives: round.lives, points: score.points };
+      const result = { date: round.dailyDate, solvedAtHint: score.solvedAtHint, status: round.status, lives: round.lives, points: score.points, xp:score.xp + dailyGoalCompletion.bonusXp, dailyGoalCompleted:round.status === "won" };
       state.whosThat.daily.history[round.dailyDate] = { result, round: clone(round) };
       state.whosThat.daily.pendingUploads = [...state.whosThat.daily.pendingUploads.filter(item => item.date !== round.dailyDate), result].slice(-30);
       queueMicrotask(syncWhosDailyResults);
@@ -2158,6 +2202,7 @@
       state.whosThat.difficulty = safeDifficulty;
       state.whosThat.round = QuizmonWhosThatPokemon.createRound({ context: WHOS_CONTEXT, difficulty: safeDifficulty });
       whosSuggestionQuery = "";
+      whosSelectedPokemonId = null;
       saveState();
       renderPlay();
       requestAnimationFrame(() => {
@@ -2172,18 +2217,14 @@
   function renderWhosSetup() {
     view.innerHTML = `<section class="whos-page whos-setup-page" aria-labelledby="whosTitle">
       <section class="whos-hero">
-        <div class="whos-hero-orb" aria-hidden="true"><span>?</span><i></i></div>
-        <div class="whos-hero-copy"><div class="whos-mode-meta"><span>${t("whos.modeNumber")}</span><b>${t("whos.available")}</b></div><p class="quiz-kicker">${t("whos.kicker")}</p><h1 id="whosTitle">${t("whos.title")}</h1><p>${t("whos.subtitle")}</p></div>
+        <div class="whos-hero-symbol" aria-hidden="true"><img src="assets/pokeidle-symbol.png" alt=""></div>
+        <div class="whos-hero-copy"><h1 id="whosTitle">${t("whos.title")}</h1><p>${t("whos.subtitle")}</p></div>
       </section>
       ${whosDailyCardMarkup()}
-      <div class="whos-setup-grid">
-        <section class="whos-difficulty-panel" aria-labelledby="whosDifficultyTitle"><header><div><small>${t("whos.modeNumber")}</small><h2 id="whosDifficultyTitle">${t("whos.difficultyTitle")}</h2></div><p>${t("whos.difficultyText")}</p></header>
-          <div class="whos-difficulty-grid">${whosDifficultyCard("easy", "I")}${whosDifficultyCard("medium", "II")}${whosDifficultyCard("hard", "III")}</div>
-          <button type="button" id="startWhosRound" class="primary-button whos-start-button">${t("whos.start")}<span aria-hidden="true">›</span></button>
-        </section>
-        <aside class="whos-rules-card"><span aria-hidden="true">5</span><div><h2>${t("whos.rulesTitle")}</h2><ul><li>${t("whos.ruleLives")}</li><li>${t("whos.ruleHints")}</li><li>${t("whos.ruleBalance")}</li><li>${t("whos.ruleInput")}</li></ul></div></aside>
-      </div>
-      ${whosStatisticsMarkup()}
+      <section class="whos-difficulty-panel" aria-labelledby="whosDifficultyTitle"><header><div><small>${t("whos.modeNumber")}</small><h2 id="whosDifficultyTitle">${t("whos.difficultyTitle")}</h2></div></header>
+        <div class="whos-difficulty-grid">${whosDifficultyCard("easy", "I")}${whosDifficultyCard("medium", "II")}${whosDifficultyCard("hard", "III")}</div>
+        <button type="button" id="startWhosRound" class="primary-button whos-start-button">${t("whos.start")}<span aria-hidden="true">›</span></button>
+      </section>
     </section>`;
     view.querySelectorAll("[data-whos-difficulty]").forEach(button => button.addEventListener("click", () => {
       state.whosThat.difficulty = button.dataset.whosDifficulty;
@@ -2201,16 +2242,69 @@
   }
 
   function whosHintsMarkup(round, target) {
-    return `<ol class="whos-hint-list" aria-label="${escapeHtml(t("whos.hintsLabel"))}">${round.hints.map((descriptor, index) => {
+    const revealedHints = round.hints.slice(0, Math.min(round.revealed, round.hints.length));
+    return `<section class="whos-review-hints" aria-labelledby="whosReviewHintsTitle"><header><div><small>${t("whos.reviewKicker")}</small><h2 id="whosReviewHintsTitle">${t("whos.hintsLabel")}</h2></div><b>${revealedHints.length}/5</b></header><ol>${revealedHints.map((descriptor, index) => `<li class="whos-review-hint" data-whos-difficulty="${escapeHtml(round.difficulty)}"><span>${String(index + 1).padStart(2, "0")}</span><div><small>${t("whos.hintLabel", { number:index + 1 })}</small>${whosHintContentMarkup(descriptor, target)}</div></li>`).join("")}</ol></section>`;
+  }
+
+  function whosProgressMarkup(round) {
+    return `<ol class="whos-progress" aria-label="${escapeHtml(t("whos.hintsLabel"))}">${round.hints.map((_, index) => {
       const number = index + 1;
-      const revealed = number <= round.revealed;
+      const unlocked = number <= round.revealed;
       const current = round.status === "active" && number === round.revealed;
-      return `<li class="whos-hint-card ${revealed ? "revealed" : "locked"} ${current ? "current" : ""}" data-whos-difficulty="${escapeHtml(round.difficulty)}">
-        <span class="whos-hint-number" aria-hidden="true">${String(number).padStart(2, "0")}</span>
-        <div><small>${current ? t("whos.currentHint") : t("whos.hintLabel", { number })}</small>${revealed ? whosHintContentMarkup(descriptor, target) : `<p>${escapeHtml(t("whos.lockedHint"))}</p>`}</div>
-        <i aria-hidden="true">${revealed ? "✓" : "·"}</i>
-      </li>`;
+      const complete = number < round.revealed || round.status !== "active" && unlocked;
+      const stateLabel = current ? t("whos.progress.current") : unlocked ? t("whos.progress.revealed") : t("whos.progress.locked");
+      return `<li class="whos-progress-step ${unlocked ? "unlocked" : "locked"} ${current ? "current" : ""} ${complete ? "complete" : ""}" ${current ? 'aria-current="step"' : ""}><span>${complete ? "✓" : number}</span><small>${escapeHtml(stateLabel)}</small></li>`;
     }).join("")}</ol>`;
+  }
+
+  function whosPotentialScore(round) {
+    return QuizmonWhosThatPokemon.scoreRound({ ...round, status:"won" }).points;
+  }
+
+  function whosCurrentStageMarkup(round, target) {
+    const descriptor = round.hints[Math.max(0, round.revealed - 1)];
+    const media = ["shadow", "pixel", "crop", "cry"].includes(descriptor?.kind);
+    const visualMedia = ["shadow", "pixel", "crop"].includes(descriptor?.kind);
+    const canSkip = round.status === "active" && round.revealed < round.hints.length;
+    const canGiveUp = round.status === "active" && round.revealed >= round.hints.length;
+    return `<section class="whos-current-stage ${media ? "has-media" : "is-text"} ${visualMedia ? "has-visual" : ""}" data-whos-difficulty="${escapeHtml(round.difficulty)}" aria-labelledby="whosCurrentHintTitle">
+      <div class="whos-stage-body">
+        <div class="whos-mystery-symbol" aria-hidden="true"><img src="assets/pokeidle-symbol.png" alt=""></div>
+        <div class="whos-current-copy"><h2 id="whosCurrentHintTitle">${escapeHtml(formatWhosHint(descriptor, target))}</h2>${media ? whosHintContentMarkup(descriptor, target) : ""}</div>
+      </div>
+      <div class="whos-stage-footer"><div class="whos-stage-potential"><small>${t("whos.potential")}</small><strong>${whosPotentialScore(round)}</strong><b>PTS</b></div>${canSkip ? `<button type="button" id="skipWhosHint" class="secondary-button whos-skip-hint"><strong>${t("whos.skipHint")}</strong><b aria-hidden="true">›</b></button>` : canGiveUp ? `<button type="button" id="giveUpWhosRound" class="danger-button whos-give-up"><strong>${t("whos.giveUp")}</strong><b aria-hidden="true">×</b></button>` : ""}</div>
+    </section>`;
+  }
+
+  function whosDiscoveredHintsMarkup(round, target) {
+    const previous = round.hints.slice(0, Math.max(0, round.revealed - 1));
+    return `<section class="whos-discovered" aria-labelledby="whosDiscoveredTitle"><header><div><small>${t("whos.discoveredKicker")}</small><h2 id="whosDiscoveredTitle">${t("whos.discoveredTitle")}</h2></div><b>${previous.length}</b></header>${previous.length ? `<ol>${previous.map((descriptor, index) => `<li data-whos-difficulty="${escapeHtml(round.difficulty)}"><span>${String(index + 1).padStart(2, "0")}</span><div>${whosHintContentMarkup(descriptor, target)}</div><i aria-hidden="true">✓</i></li>`).join("")}</ol>` : `<p class="whos-discovered-empty">${t("whos.discoveredEmpty")}</p>`}</section>`;
+  }
+
+  function whosCompareRelation(guessValue, targetValue, higherKey = "whos.compare.higher", lowerKey = "whos.compare.lower") {
+    if (Number(guessValue) === Number(targetValue)) return { tone:"exact", arrow:"✓", label:t("whos.compare.exact") };
+    if (Number(targetValue) > Number(guessValue)) return { tone:"direction", arrow:"↑", label:t(higherKey) };
+    return { tone:"direction", arrow:"↓", label:t(lowerKey) };
+  }
+
+  function whosComparisonMarkup(round, target) {
+    const lastId = [...round.guesses].reverse().find(id => Number(id) !== Number(round.targetId));
+    const guessed = WHOS_CONTEXT.byId.get(Number(lastId));
+    if (!guessed || round.status !== "active") return "";
+    const generation = whosCompareRelation(guessed.generation, target.generation, "whos.compare.newer", "whos.compare.older");
+    const height = whosCompareRelation(guessed.height, target.height, "whos.compare.taller", "whos.compare.shorter");
+    const weight = whosCompareRelation(guessed.weight, target.weight, "whos.compare.heavier", "whos.compare.lighter");
+    const matchingTypes = guessed.types.filter(type => target.types.includes(type));
+    const exactTypes = matchingTypes.length === target.types.length && guessed.types.length === target.types.length;
+    const typeTone = exactTypes ? "exact" : matchingTypes.length ? "partial" : "miss";
+    const typeLabelText = exactTypes ? t("whos.compare.typesExact") : matchingTypes.length ? tp("whos.compare.typeOne", "whos.compare.typesMany", matchingTypes.length) : t("whos.compare.typesNone");
+    const item = (label, value, relation) => `<article class="whos-compare-item ${relation.tone}"><small>${label}</small><div><strong>${value}</strong><span aria-hidden="true">${relation.arrow}</span></div><p>${escapeHtml(relation.label)}</p></article>`;
+    return `<section class="whos-comparison" aria-labelledby="whosComparisonTitle"><header><div><small>${t("whos.compare.kicker")}</small><h2 id="whosComparisonTitle">${escapeHtml(whosPokemonName(guessed))}</h2></div><span>${t("whos.compare.clue")}</span></header><div class="whos-compare-grid">
+      ${item(t("whos.compare.generation"), `Gen ${guessed.generation}`, generation)}
+      <article class="whos-compare-item ${typeTone}"><small>${t("whos.compare.types")}</small><div class="whos-compare-types">${guessed.types.map(type => `<span>${escapeHtml(typeLabel(type))}</span>`).join("")}</div><p>${escapeHtml(typeLabelText)}</p></article>
+      ${item(t("whos.compare.height"), `${whosNumber(guessed.height / 10)} m`, height)}
+      ${item(t("whos.compare.weight"), `${whosNumber(guessed.weight / 10)} kg`, weight)}
+    </div></section>`;
   }
 
   function whosGuessesMarkup(round) {
@@ -2222,21 +2316,18 @@
     return `<section class="whos-guesses"><h2>${t("whos.guessesTitle")}</h2>${items ? `<ul>${items}</ul>` : `<p>${t("whos.noGuesses")}</p>`}</section>`;
   }
 
-  function whosMobileCurrentHintMarkup(round, target) {
-    const descriptor = round.hints[Math.max(0, round.revealed - 1)];
-    return `<section class="whos-mobile-current-hint" data-whos-difficulty="${escapeHtml(round.difficulty)}"><small>${t("whos.currentHint")}</small>${whosHintContentMarkup(descriptor, target)}</section>`;
-  }
-
   function whosResultMarkup(round, target) {
     const won = round.status === "won";
     const name = whosPokemonName(target);
     const score = QuizmonWhosThatPokemon.scoreRound(round);
     const daily = round.mode === "daily";
+    const dailyEntry = daily ? whosDailyEntry(round.dailyDate) : null;
+    const awardedXp = Math.max(0, Number(dailyEntry?.result?.xp) || score.xp);
     const distribution = daily && state.whosThat.daily.distribution?.date === round.dailyDate ? state.whosThat.daily.distribution : null;
     return `<section class="whos-result ${won ? "won" : "lost"}" aria-labelledby="whosResultTitle">
       <div class="whos-result-art"><img src="${escapeHtml(knowledgeArtwork(target))}" data-image-kind="pokemon" alt="${escapeHtml(name)}"><span>#${String(target.id).padStart(4, "0")}</span></div>
       <div class="whos-result-copy"><p class="quiz-kicker">${t(won ? "whos.wonKicker" : "whos.lostKicker")}</p><h2 id="whosResultTitle">${t(won ? "whos.wonTitle" : "whos.lostTitle")}</h2><p>${t(won ? "whos.wonText" : "whos.lostText", { name, hint: round.revealed, lives: round.lives })}</p><div class="whos-result-identity"><strong>${escapeHtml(name)}</strong><span>${target.types.map(typeLabel).join(" / ")}</span></div>
-        <div class="whos-result-score"><span><small>${t("whos.result.points")}</small><strong>${score.points}</strong></span><span><small>XP</small><strong>+${score.xp}</strong></span><span><small>${t("whos.result.hints")}</small><strong>${round.revealed}/5</strong></span></div>
+        <div class="whos-result-score"><span><small>${t("whos.result.points")}</small><strong>${score.points}</strong></span><span><small>XP</small><strong>+${awardedXp}</strong></span><span><small>${t("whos.result.hints")}</small><strong>${round.revealed}/5</strong></span></div>
         ${daily ? `<div class="whos-global-status"><strong>${t("whos.daily.distributionTitle")}</strong>${distribution ? `<div class="whos-distribution">${[1,2,3,4,5].map(hint => `<span><small>${hint}</small><i style="height:${distribution.percentages[`hint${hint}`]}%"></i><b>${distribution.percentages[`hint${hint}`]}%</b></span>`).join("")}<span><small>×</small><i style="height:${distribution.percentages.lost}%"></i><b>${distribution.percentages.lost}%</b></span></div><p>${distribution.total} ${t("whos.daily.participants")}</p>` : `<p>${t("whos.daily.distributionPending")}</p>`}</div>` : ""}
         <div class="whos-result-actions">${daily ? "" : `<button type="button" id="nextWhosRound" class="primary-button">${t("whos.nextRound")}<span aria-hidden="true">›</span></button>`}<button type="button" id="changeWhosDifficulty" class="secondary-button">${t(daily ? "whos.backToModes" : "whos.changeDifficulty")}</button></div>
       </div>
@@ -2246,19 +2337,37 @@
   function updateWhosSuggestions(input, root) {
     if (!input || !root) return;
     whosSuggestionQuery = input.value;
+    whosSelectedPokemonId = null;
     const query = QuizmonWhosThatPokemon.normalizedName(input.value);
-    if (!query) { root.innerHTML = ""; root.hidden = true; return; }
+    const submit = document.getElementById("whosGuessSubmit");
+    const selection = document.getElementById("whosGuessSelection");
+    const exact = QuizmonWhosThatPokemon.findPokemonByName(input.value, state.language, WHOS_CONTEXT);
+    if (exact) whosSelectedPokemonId = exact.id;
+    if (submit) submit.disabled = !exact;
+    if (selection) {
+      selection.hidden = !exact;
+      selection.innerHTML = exact ? `<span aria-hidden="true">✓</span><strong>${escapeHtml(whosPokemonName(exact))}</strong><small>#${String(exact.id).padStart(4, "0")}</small>` : "";
+    }
+    if (!query || exact) { root.innerHTML = ""; root.hidden = true; input.setAttribute("aria-expanded", "false"); return; }
     const rows = WHOS_CONTEXT.pokemon.map(item => ({ item, name: whosPokemonName(item), normalized: QuizmonWhosThatPokemon.normalizedName(whosPokemonName(item)) }))
       .filter(row => row.normalized.includes(query))
       .sort((left, right) => Number(!left.normalized.startsWith(query)) - Number(!right.normalized.startsWith(query)) || left.name.localeCompare(right.name, state.language))
       .slice(0, 6);
-    root.innerHTML = rows.map(row => `<button type="button" data-whos-suggestion="${row.item.id}"><span>${escapeHtml(row.name)}</span><small>#${String(row.item.id).padStart(4, "0")}</small></button>`).join("");
+    root.innerHTML = rows.map(row => `<button type="button" role="option" data-whos-suggestion="${row.item.id}"><span>${escapeHtml(row.name)}</span><small>#${String(row.item.id).padStart(4, "0")}</small></button>`).join("");
     root.hidden = !rows.length;
+    input.setAttribute("aria-expanded", String(Boolean(rows.length)));
     root.querySelectorAll("[data-whos-suggestion]").forEach(button => button.addEventListener("click", () => {
       const item = WHOS_CONTEXT.byId.get(Number(button.dataset.whosSuggestion));
       input.value = whosPokemonName(item);
       whosSuggestionQuery = input.value;
+      whosSelectedPokemonId = item.id;
       root.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      if (submit) submit.disabled = false;
+      if (selection) {
+        selection.hidden = false;
+        selection.innerHTML = `<span aria-hidden="true">✓</span><strong>${escapeHtml(whosPokemonName(item))}</strong><small>#${String(item.id).padStart(4, "0")}</small>`;
+      }
       input.focus();
     }));
   }
@@ -2270,12 +2379,13 @@
     const suggestions = document.getElementById("whosSuggestions");
     if (!form || !input || !status || !suggestions) return;
     input.value = whosSuggestionQuery;
+    updateWhosSuggestions(input, suggestions);
     input.addEventListener("input", () => { status.textContent = ""; updateWhosSuggestions(input, suggestions); });
     input.addEventListener("focus", () => updateWhosSuggestions(input, suggestions));
-    input.addEventListener("keydown", event => { if (event.key === "Escape") { suggestions.hidden = true; status.textContent = ""; } });
+    input.addEventListener("keydown", event => { if (event.key === "Escape") { suggestions.hidden = true; input.setAttribute("aria-expanded", "false"); status.textContent = ""; } });
     form.addEventListener("submit", event => {
       event.preventDefault();
-      const pokemon = QuizmonWhosThatPokemon.findPokemonByName(input.value, state.language, WHOS_CONTEXT);
+      const pokemon = WHOS_CONTEXT.byId.get(Number(whosSelectedPokemonId)) || QuizmonWhosThatPokemon.findPokemonByName(input.value, state.language, WHOS_CONTEXT);
       if (!pokemon) { status.textContent = t("whos.invalidGuess"); status.className = "whos-input-status error"; haptic("error"); return; }
       const result = QuizmonWhosThatPokemon.submitGuess(round, pokemon.id, WHOS_CONTEXT);
       if (!result.accepted) {
@@ -2287,6 +2397,7 @@
       state.whosThat.round = result.round;
       completeWhosRound(result.round);
       whosSuggestionQuery = "";
+      whosSelectedPokemonId = null;
       saveState();
       haptic(result.correct ? "success" : "error");
       if (result.correct) enqueueToast("✓", t("whos.correctGuess"), "", "success");
@@ -2299,21 +2410,51 @@
     });
   }
 
+  function bindWhosSkipHint(round) {
+    document.getElementById("skipWhosHint")?.addEventListener("click", () => {
+      const result = QuizmonWhosThatPokemon.skipHint(round);
+      if (!result.accepted) return;
+      state.whosThat.round = result.round;
+      saveState();
+      haptic("selection");
+      renderPlay();
+      requestAnimationFrame(() => {
+        const status = document.getElementById("whosInputStatus");
+        if (status) { status.textContent = t("whos.skippedHint"); status.className = "whos-input-status success"; }
+      });
+    });
+  }
+
+  function bindWhosGiveUp(round) {
+    document.getElementById("giveUpWhosRound")?.addEventListener("click", () => {
+      const result = QuizmonWhosThatPokemon.giveUp(round);
+      if (!result.accepted) return;
+      state.whosThat.round = result.round;
+      completeWhosRound(result.round);
+      whosSuggestionQuery = "";
+      whosSelectedPokemonId = null;
+      saveState();
+      haptic("error");
+      renderPlay();
+    });
+  }
+
   function renderWhosRound(round) {
     const target = WHOS_CONTEXT.byId.get(Number(round.targetId));
     const active = round.status === "active";
     view.innerHTML = `<section class="whos-page whos-round-page" aria-labelledby="whosRoundTitle">
-      <header class="whos-round-header"><div><p class="quiz-kicker">${t(round.mode === "daily" ? "whos.daily.kicker" : "whos.roundKicker")}</p><h1 id="whosRoundTitle">${round.mode === "daily" ? t("whos.daily.title") : whosDifficultyName(round.difficulty)}</h1><span>${t("whos.roundProgress", { current: round.revealed, total: round.hints.length })}</span></div>${whosLivesMarkup(round)}</header>
-      ${active ? "" : whosResultMarkup(round, target)}
-      <div class="whos-round-layout"><section class="whos-clues-panel">${whosHintsMarkup(round, target)}</section><aside class="whos-answer-panel">
-        ${active ? `${whosMobileCurrentHintMarkup(round, target)}<form id="whosGuessForm" class="whos-guess-form" novalidate><label for="whosGuessInput">${t("whos.guessLabel")}</label><div class="whos-search-wrap"><div class="whos-search-row"><input id="whosGuessInput" type="search" placeholder="${escapeHtml(t("whos.guessPlaceholder"))}" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="go"><button type="submit" class="primary-button">${t("whos.guessAction")}</button></div><div id="whosSuggestions" class="whos-suggestions" hidden></div></div><p id="whosInputStatus" class="whos-input-status" role="status" aria-live="polite"></p></form>` : ""}
-        ${whosGuessesMarkup(round)}
-      </aside></div>
+      <header class="whos-round-header"><div><p class="quiz-kicker">${t(round.mode === "daily" ? "whos.daily.kicker" : "whos.roundKicker")}</p><h1 id="whosRoundTitle">${round.mode === "daily" ? t("whos.daily.title") : whosDifficultyName(round.difficulty)}</h1></div><div class="whos-round-status">${whosLivesMarkup(round)}${active && round.mode !== "daily" ? `<button type="button" id="leaveWhosRound" class="secondary-button whos-leave-round">${t("whos.leaveRound")}</button>` : ""}</div></header>
+      ${whosProgressMarkup(round)}
+      ${active ? `<div class="whos-game-layout"><main class="whos-game-main">${whosCurrentStageMarkup(round, target)}${whosDiscoveredHintsMarkup(round, target)}</main><aside class="whos-answer-panel">
+        <form id="whosGuessForm" class="whos-guess-form" novalidate><div class="whos-answer-heading"><span aria-hidden="true">?</span><div><small>${t("whos.answerKicker")}</small><label for="whosGuessInput">${t("whos.guessLabel")}</label></div></div><div class="whos-search-wrap"><input id="whosGuessInput" type="search" placeholder="${escapeHtml(t("whos.guessPlaceholder"))}" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="go" role="combobox" aria-autocomplete="list" aria-controls="whosSuggestions" aria-expanded="false"><div id="whosSuggestions" class="whos-suggestions" role="listbox" hidden></div></div><div id="whosGuessSelection" class="whos-guess-selection" hidden></div><button id="whosGuessSubmit" type="submit" class="primary-button whos-guess-submit" disabled><span>${t("whos.guessAction")}</span><kbd>↵</kbd></button><p id="whosInputStatus" class="whos-input-status" role="status" aria-live="polite"></p></form>
+        ${whosComparisonMarkup(round, target)}${whosGuessesMarkup(round)}
+      </aside></div>` : `${whosResultMarkup(round, target)}${whosHintsMarkup(round, target)}`}
     </section>`;
-    if (active) bindWhosGuessForm(round);
+    if (active) { bindWhosGuessForm(round); bindWhosSkipHint(round); bindWhosGiveUp(round); }
     bindWhosMediaHints(view);
+    document.getElementById("leaveWhosRound")?.addEventListener("click", () => { state.whosThat.round = null; whosSuggestionQuery = ""; whosSelectedPokemonId = null; saveState(); renderWhosSetup(); });
     document.getElementById("nextWhosRound")?.addEventListener("click", () => startWhosRound(round.difficulty));
-    document.getElementById("changeWhosDifficulty")?.addEventListener("click", () => { state.whosThat.round = null; saveState(); renderWhosSetup(); });
+    document.getElementById("changeWhosDifficulty")?.addEventListener("click", () => { state.whosThat.round = null; whosSuggestionQuery = ""; whosSelectedPokemonId = null; saveState(); renderWhosSetup(); });
   }
 
   function renderPlay() {
@@ -3921,7 +4062,7 @@
     addXp(baseXp+bonusXp+dailyGoal.bonusXp);
     if(dailyGoal.completedNow){
       setTimeout(()=>haptic("goal"),160);
-      enqueueToast("🔥",t("daily.completedTitle"),tp("daily.goalRewardToastOne","daily.goalRewardToast",dailyGoal.streak,{count:dailyGoal.bonusXp,streak:dailyGoal.streak}),"level");
+      enqueueToast("🔥",t("daily.completedTitle"),dailyGoalRewardToast(dailyGoal.streak,dailyGoal.bonusXp),"level");
     }
     checkAchievements();
     updateHeader();
@@ -7962,7 +8103,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=4.1-sprint3-v1",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=4.1-sprint3-v8",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{

@@ -1,4 +1,4 @@
-/* Phase 4.1 · Who's That Pokémon */
+/* Phase 4.1 · PokéIdle */
 .whos-page { display:grid; gap:18px; }
 .whos-hero {
   min-height:286px; display:grid; grid-template-columns:250px minmax(0,1fr); align-items:center; gap:38px;
@@ -11,18 +11,11 @@
 .whos-hero::before { width:330px; height:330px; right:-160px; bottom:-185px; border:48px solid rgba(255,255,255,.055); }
 .whos-hero::after { width:150px; height:150px; left:-85px; top:-80px; background:rgba(255,255,255,.04); }
 .whos-hero-copy { position:relative; z-index:2; max-width:660px; }
-.whos-mode-meta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:27px; }
-.whos-mode-meta span,.whos-mode-meta b { min-height:28px; display:inline-flex; align-items:center; padding:0 10px; border-radius:999px; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
-.whos-mode-meta span { border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.09); }
-.whos-mode-meta b { color:#12363e; background:#8fdddd; }
 .whos-hero h1 { margin:0; max-width:650px; font-size:clamp(40px,7.2vw,66px); line-height:.96; letter-spacing:-3px; }
 .whos-hero-copy>p:last-child { max-width:640px; margin:18px 0 0; color:rgba(248,252,253,.82); font-size:15px; line-height:1.65; }
-.whos-hero-orb { width:220px; height:220px; display:grid; place-items:center; justify-self:center; position:relative; z-index:1; border-radius:50%; background:linear-gradient(#f2f7f8 0 46%,#293d43 46% 54%,#f2f7f8 54%); box-shadow:0 25px 50px rgba(0,0,0,.25),inset 0 0 0 10px rgba(255,255,255,.15); }
-.whos-hero-orb::before { content:""; width:62px; height:62px; position:absolute; border:10px solid #293d43; border-radius:50%; background:#f2f7f8; box-shadow:0 0 0 8px rgba(255,255,255,.16); }
-.whos-hero-orb span { position:relative; z-index:2; color:#173944; font-size:35px; font-weight:950; }
-.whos-hero-orb i { position:absolute; inset:18px; border:1px solid rgba(19,55,65,.15); border-radius:50%; }
+.whos-hero-symbol { width:220px; height:220px; display:grid; place-items:center; justify-self:center; position:relative; z-index:1; filter:drop-shadow(0 25px 28px rgba(0,0,0,.27)); }
+.whos-hero-symbol img { width:100%; height:100%; display:block; object-fit:contain; }
 
-.whos-setup-grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(280px,.75fr); gap:14px; align-items:stretch; }
 .whos-daily-card { display:grid; grid-template-columns:64px minmax(0,1fr) auto; gap:16px; align-items:center; padding:18px 20px; border:1px solid color-mix(in srgb,var(--primary) 40%,var(--line)); border-radius:22px; background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 12%,var(--surface)),var(--surface)); box-shadow:var(--shadow-sm); }
 .whos-daily-calendar { width:58px; height:58px; display:grid; place-items:center; border-radius:16px; color:white; background:linear-gradient(145deg,var(--primary),var(--primary-2)); font-size:21px; font-weight:950; box-shadow:0 10px 22px color-mix(in srgb,var(--primary) 24%,transparent); }
 .whos-daily-card small,.whos-stats-card header small { color:var(--primary); font-size:8px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
@@ -45,53 +38,150 @@
 .whos-distribution span { height:100%; display:grid; grid-template-rows:14px 1fr 14px; justify-items:center; align-items:end; color:var(--muted); font-size:8px; }
 .whos-distribution i { width:70%; min-height:2px; max-height:78px; border-radius:5px 5px 2px 2px; background:var(--primary); }
 .whos-distribution b { color:var(--text-strong); font-size:8px; }
-.whos-difficulty-panel,.whos-rules-card { border:1px solid var(--line); border-radius:25px; background:var(--surface); box-shadow:var(--shadow-sm); }
+.whos-difficulty-panel { border:1px solid var(--line); border-radius:25px; background:var(--surface); box-shadow:var(--shadow-sm); }
 .whos-difficulty-panel { padding:22px; }
-.whos-difficulty-panel>header { display:grid; grid-template-columns:minmax(0,1fr) minmax(230px,.8fr); gap:22px; align-items:end; margin-bottom:17px; }
+.whos-difficulty-panel>header { margin-bottom:17px; }
 .whos-difficulty-panel>header small { color:var(--primary); font-size:9px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
-.whos-difficulty-panel h2,.whos-rules-card h2 { margin:5px 0 0; color:var(--text-strong); font-size:23px; letter-spacing:-.5px; }
-.whos-difficulty-panel>header>p { margin:0; color:var(--muted); font-size:11px; line-height:1.5; }
+.whos-difficulty-panel h2 { margin:5px 0 0; color:var(--text-strong); font-size:23px; letter-spacing:-.5px; }
 .whos-difficulty-grid { display:grid; gap:9px; }
 .whos-difficulty-card { min-height:80px; display:grid; grid-template-columns:48px minmax(0,1fr) 28px; gap:13px; align-items:center; padding:12px 14px; border:1px solid var(--line); border-radius:18px; color:var(--text); background:var(--surface-soft); text-align:left; cursor:pointer; transition:border-color .18s ease,transform .18s ease,background .18s ease; }
 .whos-difficulty-card>span { width:48px; height:48px; display:grid; place-items:center; border-radius:15px; color:var(--primary); background:color-mix(in srgb,var(--primary) 10%,var(--surface)); font-size:14px; font-weight:950; }
 .whos-difficulty-card strong { display:block; color:var(--text-strong); font-size:15px; }
-.whos-difficulty-card p { margin:5px 0 0; color:var(--muted); font-size:10px; line-height:1.45; }
 .whos-difficulty-card>i { width:24px; height:24px; display:grid; place-items:center; border:1px solid var(--line); border-radius:50%; color:white; font-style:normal; font-size:12px; }
 .whos-difficulty-card.selected { border-color:color-mix(in srgb,var(--primary) 60%,var(--line)); background:color-mix(in srgb,var(--primary) 7%,var(--surface)); box-shadow:0 8px 22px color-mix(in srgb,var(--primary) 10%,transparent); }
 .whos-difficulty-card.selected>i { border-color:var(--primary); background:var(--primary); }
 .whos-start-button { width:100%; min-height:51px; justify-content:center; gap:9px; margin-top:15px; }
-.whos-rules-card { display:grid; grid-template-columns:58px minmax(0,1fr); gap:15px; align-content:start; padding:22px; background:linear-gradient(145deg,color-mix(in srgb,var(--primary) 7%,var(--surface)),var(--surface)); }
-.whos-rules-card>span { width:58px; height:58px; display:grid; place-items:center; border-radius:18px; color:white; background:linear-gradient(145deg,var(--primary),var(--primary-2)); font-size:25px; font-weight:950; box-shadow:0 12px 26px color-mix(in srgb,var(--primary) 25%,transparent); }
-.whos-rules-card ul { display:grid; gap:12px; margin:17px 0 0; padding:0; list-style:none; counter-reset:whos-rules; }
-.whos-rules-card li { position:relative; padding-left:25px; color:var(--muted); font-size:11px; line-height:1.5; counter-increment:whos-rules; }
-.whos-rules-card li::before { content:counter(whos-rules); width:17px; height:17px; display:grid; place-items:center; position:absolute; left:0; top:0; border-radius:6px; color:var(--primary); background:color-mix(in srgb,var(--primary) 10%,var(--surface)); font-size:8px; font-weight:950; }
-
-.whos-round-header { min-height:112px; display:flex; justify-content:space-between; gap:24px; align-items:center; padding:23px 25px; border:1px solid var(--line); border-radius:24px; background:var(--surface); box-shadow:var(--shadow-sm); }
-.whos-round-header h1 { margin:0; color:var(--text-strong); font-size:30px; letter-spacing:-1px; }
-.whos-round-header>div:first-child>span { display:block; margin-top:6px; color:var(--muted); font-size:11px; font-weight:750; }
+.whos-round-header {
+  min-height:132px; display:flex; justify-content:space-between; gap:24px; align-items:center; position:relative; overflow:hidden;
+  padding:25px 28px; border:1px solid rgba(255,255,255,.1); border-radius:27px; color:#f8fcfd;
+  background:radial-gradient(circle at 77% -40%,rgba(104,218,224,.35),transparent 18rem),linear-gradient(130deg,#102b35,#183d49 62%,#255763); box-shadow:0 20px 44px rgba(10,29,35,.22);
+}
+.whos-round-header::after { content:""; width:190px; height:190px; position:absolute; right:-100px; bottom:-125px; border:28px solid rgba(255,255,255,.05); border-radius:50%; pointer-events:none; }
+.whos-round-header .quiz-kicker { color:#89dfe2; }
+.whos-round-header h1 { margin:0; color:#fff; font-size:32px; letter-spacing:-1.1px; }
+.whos-round-status { display:grid; justify-items:end; gap:9px; position:relative; z-index:1; }
+.whos-leave-round { min-height:44px; padding:0 14px; border-color:rgba(255,255,255,.17); color:#f5fbfc; background:rgba(255,255,255,.08); font-size:10px; backdrop-filter:blur(10px); }
 .whos-lives { display:grid; grid-template-columns:repeat(5,30px); gap:4px; align-items:center; text-align:center; }
 .whos-lives>span { width:30px; height:30px; display:grid; place-items:center; border-radius:10px; font-size:20px; transition:filter .2s ease,opacity .2s ease,transform .2s ease; }
 .whos-lives>span svg { width:19px; height:19px; display:block; fill:currentColor; }
-.whos-lives>span.available { color:#c7354d; background:color-mix(in srgb,#d84f60 18%,var(--surface)); filter:drop-shadow(0 4px 7px rgba(216,79,96,.24)); text-shadow:0 1px 0 rgba(255,255,255,.5); }
-.whos-lives>span.lost { color:var(--muted); background:var(--surface-soft); opacity:.28; filter:grayscale(1); transform:scale(.88); }
-.whos-lives small { grid-column:1/-1; margin-top:3px; color:var(--muted); font-size:9px; font-weight:850; }
-.whos-round-layout { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.72fr); gap:14px; align-items:start; }
-.whos-clues-panel,.whos-answer-panel { border:1px solid var(--line); border-radius:24px; background:var(--surface); box-shadow:var(--shadow-sm); }
-.whos-clues-panel { padding:15px; }
-.whos-answer-panel { display:grid; gap:15px; padding:19px; position:sticky; top:79px; }
-.whos-hint-list { display:grid; gap:9px; margin:0; padding:0; list-style:none; }
-.whos-hint-card { min-height:84px; display:grid; grid-template-columns:48px minmax(0,1fr) 24px; gap:13px; align-items:center; padding:13px 14px; border:1px solid var(--line); border-radius:18px; background:var(--surface-soft); }
-.whos-hint-number { width:48px; height:48px; display:grid; place-items:center; border-radius:15px; color:var(--muted); background:var(--surface); font-size:12px; font-weight:950; box-shadow:inset 0 0 0 1px var(--line); }
-.whos-hint-card small { display:block; color:var(--muted); font-size:8px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
-.whos-hint-card p { margin:6px 0 0; color:var(--text); font-size:12px; font-weight:720; line-height:1.5; }
-.whos-hint-card>i { width:22px; height:22px; display:grid; place-items:center; border-radius:50%; color:var(--muted); background:var(--surface); font-style:normal; font-size:10px; }
-.whos-hint-card.revealed { background:var(--surface); }
-.whos-hint-card.revealed .whos-hint-number { color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--surface)); }
-.whos-hint-card.revealed>i { color:white; background:var(--primary); }
-.whos-hint-card.current { border-color:color-mix(in srgb,var(--primary) 62%,var(--line)); background:color-mix(in srgb,var(--primary) 6%,var(--surface)); box-shadow:0 10px 24px color-mix(in srgb,var(--primary) 10%,transparent); }
-.whos-hint-card.current small { color:var(--primary); }
-.whos-hint-card.locked { opacity:.58; }
-.whos-hint-card.locked p { font-weight:600; }
+.whos-lives>span.available { color:#ff536b; background:rgba(255,83,107,.14); filter:drop-shadow(0 5px 8px rgba(255,83,107,.28)); }
+.whos-lives>span.lost { color:rgba(242,251,252,.35); background:rgba(255,255,255,.06); opacity:.42; filter:grayscale(1); transform:scale(.86); }
+.whos-lives small { grid-column:1/-1; margin-top:3px; color:rgba(242,251,252,.67); font-size:9px; font-weight:850; }
+
+.whos-progress { min-height:76px; display:grid; grid-template-columns:repeat(5,1fr); gap:0; margin:0; padding:12px 24px; border:1px solid var(--line); border-radius:22px; background:var(--surface); box-shadow:var(--shadow-sm); list-style:none; }
+.whos-progress-step { min-width:0; display:grid; grid-template-rows:34px auto; place-items:center; position:relative; color:var(--muted); }
+.whos-progress-step::before,.whos-progress-step::after { content:""; height:3px; position:absolute; top:16px; background:var(--surface-soft); }
+.whos-progress-step::before { left:0; right:50%; }
+.whos-progress-step::after { left:50%; right:0; }
+.whos-progress-step:first-child::before,.whos-progress-step:last-child::after { display:none; }
+.whos-progress-step.unlocked::before,.whos-progress-step.complete::after { background:linear-gradient(90deg,var(--primary),var(--primary-2)); }
+.whos-progress-step>span { width:34px; height:34px; display:grid; place-items:center; position:relative; z-index:1; border:2px solid var(--line); border-radius:50%; background:var(--surface-solid); font-size:10px; font-weight:950; }
+.whos-progress-step.unlocked>span { border-color:color-mix(in srgb,var(--primary) 62%,var(--line)); color:var(--primary); }
+.whos-progress-step.current>span { border-color:var(--primary); color:white; background:linear-gradient(145deg,var(--primary),var(--primary-2)); box-shadow:0 0 0 6px color-mix(in srgb,var(--primary) 10%,transparent),0 8px 18px color-mix(in srgb,var(--primary) 24%,transparent); transform:scale(1.08); }
+.whos-progress-step.complete>span { color:white; background:var(--primary); }
+.whos-progress-step small { max-width:86px; overflow:hidden; margin-top:5px; font-size:8px; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
+.whos-progress-step.current small { color:var(--primary); }
+
+.whos-game-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
+.whos-game-main { min-width:0; display:grid; gap:14px; }
+.whos-current-stage { min-height:430px; display:grid; grid-template-rows:1fr auto; gap:22px; position:relative; overflow:hidden; padding:28px; border:1px solid color-mix(in srgb,var(--primary) 38%,var(--line)); border-radius:27px; background:radial-gradient(circle at 50% 19%,color-mix(in srgb,var(--primary) 16%,transparent),transparent 21rem),linear-gradient(145deg,color-mix(in srgb,var(--primary) 8%,var(--surface)),var(--surface) 70%); box-shadow:0 20px 45px color-mix(in srgb,var(--primary) 9%,transparent); }
+.whos-current-stage::after { content:"?"; position:absolute; right:-17px; bottom:-78px; color:color-mix(in srgb,var(--primary) 5%,transparent); font-size:250px; font-weight:950; line-height:1; pointer-events:none; }
+.whos-stage-potential { min-height:42px; display:flex; align-items:baseline; gap:5px; padding:7px 11px; border:1px solid color-mix(in srgb,var(--primary) 28%,var(--line)); border-radius:13px; background:var(--surface); }
+.whos-stage-potential small { margin-right:3px; color:var(--muted); font-size:8px; font-weight:850; text-transform:uppercase; }
+.whos-stage-potential strong { color:var(--text-strong); font-size:19px; }
+.whos-stage-potential b { color:var(--primary); font-size:8px; }
+.whos-stage-body { display:grid; grid-template-columns:minmax(0,1fr); justify-items:center; gap:20px; align-content:center; position:relative; z-index:1; }
+.whos-mystery-symbol { width:178px; height:178px; display:grid; place-items:center; position:relative; border-radius:31px; background:radial-gradient(circle,color-mix(in srgb,var(--primary) 15%,var(--surface)),transparent 72%); filter:drop-shadow(0 18px 22px rgba(14,39,47,.17)); animation:whos-symbol-float 3.6s ease-in-out infinite; }
+.whos-mystery-symbol img { width:100%; height:100%; display:block; object-fit:contain; }
+.whos-current-copy { min-width:0; width:100%; display:grid; justify-items:center; }
+.whos-current-copy h2 { max-width:760px; margin:0; color:var(--text-strong); font-size:clamp(23px,3vw,34px); line-height:1.22; letter-spacing:-.75px; text-align:center; }
+.whos-current-stage.has-visual .whos-mystery-symbol { display:none; }
+.whos-current-stage.has-visual.media-failed .whos-mystery-symbol { display:grid; }
+.whos-current-stage.has-media .whos-stage-body { grid-template-columns:1fr; }
+.whos-current-stage.has-media .whos-current-copy h2 { font-size:18px; }
+.whos-current-stage.has-media .whos-media-hint { width:100%; margin-top:14px; }
+.whos-current-stage.has-media .whos-media-stage { width:100%; height:222px; }
+.whos-stage-footer { display:flex; align-items:center; justify-content:flex-end; gap:12px; position:relative; z-index:1; }
+.whos-skip-hint,.whos-give-up { min-height:50px; flex:0 0 auto; justify-content:space-between; gap:18px; padding:7px 12px 7px 15px; text-align:left; }
+.whos-skip-hint { border-color:color-mix(in srgb,var(--primary) 34%,var(--line)); background:color-mix(in srgb,var(--primary) 7%,var(--surface)); }
+.whos-skip-hint strong { color:var(--text-strong); font-size:10px; }
+.whos-give-up strong { font-size:10px; }
+.whos-skip-hint>b,.whos-give-up>b { width:27px; height:27px; display:grid; place-items:center; border-radius:9px; color:white; font-size:16px; }
+.whos-skip-hint>b { background:var(--primary); }
+.whos-give-up>b { background:var(--danger); }
+
+.whos-discovered,.whos-review-hints,.whos-answer-panel { border:1px solid var(--line); border-radius:24px; background:var(--surface); box-shadow:var(--shadow-sm); }
+.whos-discovered,.whos-review-hints { padding:18px; }
+.whos-discovered>header,.whos-review-hints>header { display:flex; justify-content:space-between; align-items:center; gap:14px; }
+.whos-discovered>header small,.whos-review-hints>header small,.whos-comparison>header small,.whos-answer-heading small { display:block; color:var(--primary); font-size:8px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
+.whos-discovered h2,.whos-review-hints h2,.whos-comparison h2 { margin:3px 0 0; color:var(--text-strong); font-size:16px; }
+.whos-discovered>header>b,.whos-review-hints>header>b { width:29px; height:29px; display:grid; place-items:center; border-radius:10px; color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--surface)); font-size:10px; }
+.whos-discovered ol,.whos-review-hints ol { display:grid; gap:8px; margin:13px 0 0; padding:0; list-style:none; }
+.whos-discovered li,.whos-review-hint { min-height:60px; display:grid; grid-template-columns:38px minmax(0,1fr) 22px; gap:11px; align-items:center; padding:10px 11px; border:1px solid var(--line); border-radius:15px; background:var(--surface-soft); }
+.whos-discovered li>span,.whos-review-hint>span { width:38px; height:38px; display:grid; place-items:center; border-radius:12px; color:var(--primary); background:var(--surface); font-size:9px; font-weight:950; }
+.whos-discovered li p,.whos-review-hint p { margin:0; color:var(--text); font-size:11px; font-weight:720; line-height:1.45; }
+.whos-discovered li>i { width:21px; height:21px; display:grid; place-items:center; border-radius:50%; color:white; background:var(--primary); font-style:normal; font-size:9px; }
+.whos-discovered-empty { margin:13px 0 0; padding:13px; border-radius:14px; color:var(--muted); background:var(--surface-soft); font-size:10px; line-height:1.5; }
+.whos-review-hints { margin-top:0; }
+.whos-review-hint { grid-template-columns:38px minmax(0,1fr); }
+.whos-review-hint small { display:block; margin-bottom:4px; color:var(--primary); font-size:8px; font-weight:900; text-transform:uppercase; }
+
+.whos-answer-panel { display:grid; gap:15px; padding:19px; position:static; }
+.whos-guess-form { display:grid; gap:9px; }
+.whos-answer-heading { display:grid; grid-template-columns:38px minmax(0,1fr); gap:10px; align-items:center; }
+.whos-answer-heading>span { width:38px; height:38px; display:grid; place-items:center; border-radius:12px; color:white; background:linear-gradient(145deg,var(--primary),var(--primary-2)); font-size:16px; font-weight:950; box-shadow:0 8px 18px color-mix(in srgb,var(--primary) 22%,transparent); }
+.whos-answer-heading label,.whos-guesses h2 { display:block; margin-top:3px; color:var(--text-strong); font-size:12px; font-weight:900; }
+.whos-search-wrap { display:grid; gap:7px; }
+.whos-search-wrap>input { width:100%; min-height:50px; padding:0 14px; border:1px solid var(--line); border-radius:14px; color:var(--text-strong); background:var(--surface-soft); font-size:14px; transition:border-color .18s ease,box-shadow .18s ease; }
+.whos-search-wrap>input:focus { border-color:color-mix(in srgb,var(--primary) 62%,var(--line)); box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 10%,transparent); outline:0; }
+.whos-search-wrap>input::placeholder { color:var(--muted); }
+.whos-suggestions { display:grid; position:relative; z-index:2; padding:6px; border:1px solid color-mix(in srgb,var(--primary) 28%,var(--line)); border-radius:15px; background:var(--surface-solid); box-shadow:0 14px 28px rgba(14,34,42,.14); }
+.whos-suggestions[hidden] { display:none; }
+.whos-suggestions button { min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 10px; border:0; border-radius:10px; color:var(--text); background:transparent; text-align:left; cursor:pointer; }
+.whos-suggestions button:hover,.whos-suggestions button:focus-visible { background:var(--surface-soft); }
+.whos-suggestions span { font-size:12px; font-weight:850; }
+.whos-suggestions small { color:var(--muted); font-size:9px; }
+.whos-guess-selection { min-height:38px; display:grid; grid-template-columns:25px minmax(0,1fr) auto; gap:8px; align-items:center; padding:6px 9px; border:1px solid color-mix(in srgb,var(--success) 32%,var(--line)); border-radius:12px; background:var(--success-bg); animation:whos-selection-in .18s ease both; }
+.whos-guess-selection[hidden] { display:none; }
+.whos-guess-selection>span { width:25px; height:25px; display:grid; place-items:center; border-radius:8px; color:white; background:var(--success); font-size:10px; font-weight:950; }
+.whos-guess-selection strong { color:var(--text-strong); font-size:11px; }
+.whos-guess-selection small { color:var(--muted); font-size:8px; font-weight:850; }
+.whos-guess-submit { width:100%; min-height:49px; justify-content:space-between; padding:0 12px 0 16px; }
+.whos-guess-submit kbd { min-width:27px; height:27px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.25); border-radius:8px; color:white; background:rgba(255,255,255,.12); font:800 12px/1 inherit; }
+.whos-guess-submit:disabled { cursor:not-allowed; filter:saturate(.25); opacity:.48; }
+.whos-input-status { min-height:18px; margin:0; color:var(--muted); font-size:10px; line-height:1.4; }
+.whos-input-status.error { color:var(--danger); }
+.whos-input-status.warning { color:var(--warning); }
+.whos-input-status.success { color:var(--success); }
+
+.whos-comparison { padding:14px; border:1px solid color-mix(in srgb,var(--primary) 24%,var(--line)); border-radius:18px; background:color-mix(in srgb,var(--primary) 4%,var(--surface)); animation:whos-comparison-in .28s ease both; }
+.whos-comparison>header { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.whos-comparison>header>span { padding:5px 7px; border-radius:999px; color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--surface)); font-size:8px; font-weight:850; }
+.whos-compare-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:11px; }
+.whos-compare-item { min-width:0; padding:9px; border:1px solid var(--line); border-radius:13px; background:var(--surface); }
+.whos-compare-item>small { color:var(--muted); font-size:7px; font-weight:900; text-transform:uppercase; }
+.whos-compare-item>div:not(.whos-compare-types) { display:flex; justify-content:space-between; gap:5px; align-items:center; margin-top:4px; }
+.whos-compare-item strong { min-width:0; overflow:hidden; color:var(--text-strong); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.whos-compare-item>div>span { width:20px; height:20px; display:grid; place-items:center; flex:0 0 auto; border-radius:7px; color:white; background:var(--primary); font-size:10px; font-weight:950; }
+.whos-compare-item p { margin:5px 0 0; color:var(--muted); font-size:8px; line-height:1.3; }
+.whos-compare-item.exact { border-color:color-mix(in srgb,var(--success) 38%,var(--line)); background:var(--success-bg); }
+.whos-compare-item.exact>div>span { background:var(--success); }
+.whos-compare-item.partial { border-color:color-mix(in srgb,var(--warning) 38%,var(--line)); }
+.whos-compare-item.miss { opacity:.7; }
+.whos-compare-types { display:flex; flex-wrap:wrap; gap:3px; margin-top:5px; }
+.whos-compare-types span { padding:3px 5px; border-radius:6px; color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--surface)); font-size:7px; font-weight:850; }
+.whos-guesses { padding-top:14px; border-top:1px solid var(--line); }
+.whos-guesses h2 { margin:0 0 9px; }
+.whos-guesses>p { margin:0; color:var(--muted); font-size:10px; line-height:1.48; }
+.whos-guesses ul { display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; list-style:none; }
+.whos-guesses li { min-height:32px; display:inline-flex; align-items:center; gap:8px; padding:0 9px 0 11px; border:1px solid var(--line); border-radius:999px; background:var(--surface-soft); font-size:10px; font-weight:800; }
+.whos-guesses li b { color:var(--danger); font-size:13px; }
+.whos-guesses li.correct { border-color:color-mix(in srgb,var(--success) 35%,var(--line)); background:var(--success-bg); }
+.whos-guesses li.correct b { color:var(--success); }
+
+@keyframes whos-symbol-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-7px); } }
+@keyframes whos-selection-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+@keyframes whos-comparison-in { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
 .whos-media-hint { margin-top:8px; }
 .whos-media-stage { width:min(100%,300px); height:178px; display:grid; place-items:center; overflow:hidden; position:relative; border:1px solid var(--line); border-radius:16px; background:radial-gradient(circle,color-mix(in srgb,var(--primary) 12%,var(--surface)),var(--surface-soft) 70%); }
 .whos-media-stage img { width:165px; height:165px; display:block; object-fit:contain; }
@@ -112,31 +202,6 @@
 .whos-cry-hint input { width:82px; accent-color:var(--primary); }
 .whos-media-fallback { flex-basis:100%; margin:8px 0 0!important; padding:10px 11px; border-radius:11px; color:var(--text)!important; background:var(--surface-soft); }
 .whos-media-fallback[hidden],.whos-media-stage[hidden] { display:none; }
-.whos-guess-form { display:grid; gap:8px; }
-.whos-mobile-current-hint { display:none; }
-.whos-guess-form>label,.whos-guesses h2 { color:var(--text-strong); font-size:12px; font-weight:900; }
-.whos-search-wrap { position:relative; }
-.whos-search-row { display:grid; gap:8px; }
-.whos-search-row input { width:100%; min-height:48px; padding:0 14px; border:1px solid var(--line); border-radius:14px; color:var(--text-strong); background:var(--surface-soft); font-size:14px; }
-.whos-search-row input::placeholder { color:var(--muted); }
-.whos-search-row button { min-height:47px; justify-content:center; }
-.whos-suggestions { display:grid; position:absolute; z-index:12; top:54px; left:0; right:0; padding:6px; border:1px solid var(--line); border-radius:15px; background:var(--surface-solid); box-shadow:0 18px 42px rgba(14,34,42,.22); }
-.whos-suggestions[hidden] { display:none; }
-.whos-suggestions button { min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 10px; border:0; border-radius:10px; color:var(--text); background:transparent; text-align:left; cursor:pointer; }
-.whos-suggestions button:hover,.whos-suggestions button:focus-visible { background:var(--surface-soft); }
-.whos-suggestions span { font-size:12px; font-weight:850; }
-.whos-suggestions small { color:var(--muted); font-size:9px; }
-.whos-input-status { min-height:18px; margin:0; color:var(--muted); font-size:10px; line-height:1.4; }
-.whos-input-status.error { color:var(--danger); }
-.whos-input-status.warning { color:var(--warning); }
-.whos-guesses { padding-top:14px; border-top:1px solid var(--line); }
-.whos-guesses h2 { margin:0 0 9px; }
-.whos-guesses>p { margin:0; color:var(--muted); font-size:10px; line-height:1.48; }
-.whos-guesses ul { display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; list-style:none; }
-.whos-guesses li { min-height:32px; display:inline-flex; align-items:center; gap:8px; padding:0 9px 0 11px; border:1px solid var(--line); border-radius:999px; background:var(--surface-soft); font-size:10px; font-weight:800; }
-.whos-guesses li b { color:var(--danger); font-size:13px; }
-.whos-guesses li.correct { border-color:color-mix(in srgb,var(--success) 35%,var(--line)); background:var(--success-bg); }
-.whos-guesses li.correct b { color:var(--success); }
 
 .whos-result { display:grid; grid-template-columns:190px minmax(0,1fr); gap:24px; align-items:center; padding:22px 25px; border:1px solid var(--line); border-radius:25px; background:var(--surface); box-shadow:var(--shadow-sm); overflow:hidden; position:relative; }
 .whos-result::after { content:""; width:220px; height:220px; position:absolute; right:-110px; bottom:-145px; border:32px solid color-mix(in srgb,var(--primary) 7%,transparent); border-radius:50%; pointer-events:none; }
@@ -159,15 +224,7 @@
 }
 @media (max-width:820px) {
   .whos-hero { grid-template-columns:160px minmax(0,1fr); min-height:250px; }
-  .whos-hero-orb { width:150px; height:150px; }
-  .whos-hero-orb::before { width:48px; height:48px; border-width:8px; }
-  .whos-setup-grid,.whos-round-layout { grid-template-columns:1fr; }
-  .whos-rules-card { grid-template-columns:52px minmax(0,1fr); }
-  .whos-answer-panel { position:static; grid-row:1; }
-  .whos-mobile-current-hint { display:block; padding:13px 14px; border:1px solid color-mix(in srgb,var(--primary) 52%,var(--line)); border-radius:16px; background:color-mix(in srgb,var(--primary) 6%,var(--surface)); }
-  .whos-mobile-current-hint small { color:var(--primary); font-size:9px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
-  .whos-mobile-current-hint p { margin:7px 0 0; color:var(--text-strong); font-size:12px; font-weight:800; line-height:1.5; }
-  .whos-clues-panel .whos-hint-card.current { display:none; }
+  .whos-hero-symbol { width:150px; height:150px; }
 }
 @media (max-width:620px) {
   .whos-daily-card { grid-template-columns:52px minmax(0,1fr); padding:15px; }
@@ -175,29 +232,40 @@
   .whos-daily-card button { grid-column:1/-1; width:100%; }
   .whos-stat-grid { grid-template-columns:repeat(2,1fr); }
   .whos-page { gap:11px; }
+  .whos-round-header { align-items:flex-start; }
+  .whos-round-status { justify-items:stretch; }
+  .whos-leave-round { width:100%; white-space:nowrap; }
   .whos-hero { min-height:245px; grid-template-columns:1fr; padding:25px 21px; border-radius:24px; }
-  .whos-hero-orb { width:110px; height:110px; position:absolute; right:17px; top:18px; opacity:.18; }
-  .whos-hero-orb::before { width:38px; height:38px; border-width:7px; }
-  .whos-mode-meta { max-width:70%; margin-bottom:31px; }
+  .whos-hero-symbol { width:110px; height:110px; position:absolute; right:17px; top:18px; opacity:.34; }
   .whos-hero h1 { max-width:450px; font-size:clamp(39px,13vw,55px); letter-spacing:-2.4px; }
   .whos-hero-copy>p:last-child { font-size:13px; line-height:1.55; }
-  .whos-difficulty-panel,.whos-rules-card,.whos-round-header,.whos-clues-panel,.whos-answer-panel,.whos-result { border-radius:20px; }
+  .whos-difficulty-panel,.whos-round-header,.whos-answer-panel,.whos-current-stage,.whos-discovered,.whos-review-hints,.whos-result { border-radius:20px; }
   .whos-difficulty-panel { padding:16px; }
-  .whos-difficulty-panel>header { grid-template-columns:1fr; gap:8px; }
-  .whos-difficulty-panel>header>p { font-size:10px; }
   .whos-difficulty-card { grid-template-columns:43px minmax(0,1fr) 24px; min-height:78px; padding:11px; }
   .whos-difficulty-card>span { width:43px; height:43px; border-radius:13px; }
-  .whos-rules-card { padding:17px; }
   .whos-round-header { min-height:0; align-items:flex-start; padding:18px; }
   .whos-round-header h1 { font-size:25px; }
   .whos-lives { grid-template-columns:repeat(5,24px); gap:2px; }
   .whos-lives>span { width:24px; height:27px; font-size:17px; border-radius:8px; }
   .whos-lives small { font-size:8px; }
-  .whos-clues-panel { padding:9px; }
+  .whos-progress { min-height:64px; padding:9px 13px; border-radius:18px; }
+  .whos-progress-step { grid-template-rows:30px auto; }
+  .whos-progress-step::before,.whos-progress-step::after { top:14px; }
+  .whos-progress-step>span { width:30px; height:30px; }
+  .whos-progress-step small { max-width:58px; font-size:7px; }
+  .whos-current-stage { min-height:365px; gap:18px; padding:18px; }
+  .whos-stage-body { gap:15px; }
+  .whos-mystery-symbol { width:132px; height:132px; border-radius:24px; }
+  .whos-current-copy h2 { font-size:clamp(19px,5.6vw,25px); }
+  .whos-stage-footer { align-items:stretch; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.35fr); }
+  .whos-stage-potential { justify-content:center; }
+  .whos-skip-hint,.whos-give-up { width:100%; }
+  .whos-current-stage.has-media .whos-media-stage { height:190px; }
+  .whos-discovered,.whos-review-hints { padding:14px; }
   .whos-answer-panel { padding:15px; }
-  .whos-hint-card { grid-template-columns:40px minmax(0,1fr) 21px; min-height:78px; gap:10px; padding:11px; border-radius:15px; }
-  .whos-hint-number { width:40px; height:40px; border-radius:12px; font-size:10px; }
-  .whos-hint-card p { font-size:11px; }
+  .whos-discovered li,.whos-review-hint { grid-template-columns:34px minmax(0,1fr) 20px; gap:9px; }
+  .whos-review-hint { grid-template-columns:34px minmax(0,1fr); }
+  .whos-discovered li>span,.whos-review-hint>span { width:34px; height:34px; }
   .whos-media-stage { height:155px; }
   .whos-media-stage img { width:145px; height:145px; }
   .whos-result { grid-template-columns:115px minmax(0,1fr); gap:16px; padding:17px; }
@@ -209,16 +277,23 @@
 }
 @media (max-width:430px) {
   .whos-hero { min-height:270px; }
-  .whos-mode-meta { margin-bottom:35px; }
-  .whos-rules-card { grid-template-columns:1fr; }
-  .whos-rules-card>span { width:49px; height:49px; border-radius:15px; }
   .whos-round-header { display:grid; gap:13px; }
+  .whos-round-status { justify-items:start; }
   .whos-lives { justify-self:start; }
+  .whos-progress { min-height:48px; padding:8px 11px; }
+  .whos-progress-step { grid-template-rows:30px; }
+  .whos-progress-step small { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  .whos-current-stage { min-height:340px; }
+  .whos-mystery-symbol { width:118px; height:118px; }
+  .whos-stage-footer { grid-template-columns:1fr; }
+  .whos-compare-grid { gap:6px; }
+  .whos-compare-item { padding:8px; }
   .whos-result { grid-template-columns:1fr; }
   .whos-result-art { min-height:150px; }
   .whos-result-art img { width:140px; height:140px; }
-  .whos-search-row button,.whos-start-button,.whos-result-actions button { width:100%; }
+  .whos-guess-submit,.whos-skip-hint,.whos-give-up,.whos-start-button,.whos-result-actions button { width:100%; }
 }
 @media (prefers-reduced-motion:reduce) {
   .whos-difficulty-card,.whos-lives>span { transition:none; }
+  .whos-mystery-symbol,.whos-guess-selection,.whos-comparison { animation:none; }
 }

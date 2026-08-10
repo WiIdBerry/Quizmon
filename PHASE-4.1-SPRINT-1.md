@@ -13,7 +13,7 @@ ausdrücklich abgenommenen Datei
 
 ## Umgesetzter Spielmodus
 
-Der bisherige Platzhalter „Spielen“ öffnet jetzt „Who's That Pokémon“.
+Der bisherige Platzhalter „Spielen“ öffnet jetzt den später in „PokéIdle“ umbenannten Spielmodus.
 
 - Auswahl zwischen Einfach, Normal und Schwer
 - zufälliges Ziel aus allen 1.025 lokal vorhandenen Pokémon

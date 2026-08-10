@@ -33,6 +33,13 @@ test("scoring rewards early solutions and statistics count once when called once
   assert.equal(stats.firstHintWins, 1);
 });
 
+test("remaining lives never change points at the same clue", () => {
+  const fullLives = { status: "won", difficulty: "hard", revealed: 3, lives: 5, mode: "free" };
+  const lastLife = { ...fullLives, lives: 1 };
+  assert.equal(engine.scoreRound(fullLives).points, engine.scoreRound(lastLife).points);
+  assert.equal(engine.scoreRound(fullLives).xp, engine.scoreRound(lastLife).xp);
+});
+
 test("daily service validates anonymous result buckets and distributions", () => {
   assert.equal(service.resultBucket({ solvedAtHint: 3 }), "hint3");
   assert.equal(service.resultBucket({ solvedAtHint: null }), "lost");
@@ -45,10 +52,13 @@ test("Sprint 3 UI contains daily, XP, statistics and online-ready integration", 
   const app = read("app.js");
   const html = read("index.html");
   const css = read("styles-play.css");
-  assert.match(app, /4\.1-sprint3-v1/);
+  assert.match(app, /const BUILD_VERSION = "4\.1-sprint3-v8"/);
   assert.match(app, /createDailyRound/);
   assert.match(app, /completeWhosRound/);
   assert.match(app, /addXp\(score\.xp\)/);
+  assert.match(app, /completeDailyGoalFromPokeidle/);
+  assert.match(app, /round\?\.mode !== "daily" \|\| round\.status !== "won"/);
+  assert.match(app, /dailyGoalCompleted:round\.status === "won"/);
   assert.match(app, /pendingUploads/);
   assert.match(html, /daily-service\.js/);
   assert.match(css, /\.whos-daily-card/);

@@ -34,7 +34,7 @@ test("Sprint 2 extends the 25 data clues with four media clue kinds", () => {
   assert.deepEqual(engine.HINT_KINDS.slice(-4), ["shadow", "pixel", "crop", "cry"]);
 });
 
-test("all difficulties build five progressive clues and become conclusive after clue two", () => {
+test("all difficulties build five valid clues and become conclusive after clue two", () => {
   const ids = [1, 25, 94, 132, 150, 152, 251, 252, 386, 387, 493, 494, 649, 650, 721, 722, 809, 810, 905, 906, 1000, 1025];
   const limits = { easy: 12, medium: 28, hard: 60 };
   for (const difficulty of engine.DIFFICULTIES) {
@@ -49,12 +49,29 @@ test("all difficulties build five progressive clues and become conclusive after 
       assert.ok(!["typeOne", "typeCombo", "evolutionNeighbor", "namePattern", "evolutionGap"].includes(selection.hints[0].kind));
       assert.ok(!["typeOne", "typeCombo", "evolutionNeighbor", "namePattern", "evolutionGap"].includes(selection.hints[1].kind));
       const media = selection.hints.filter(hint => ["shadow", "pixel", "crop", "cry"].includes(hint.kind));
-      assert.ok(media.length >= 1 && media.length <= 2, `${difficulty} #${id} media count`);
-      assert.ok(media.every(hint => hint.position >= 4), `${difficulty} #${id} media position`);
+      if (difficulty === "easy") {
+        assert.deepEqual(media.map(hint => hint.kind), ["cry", "shadow", "crop"], `${difficulty} #${id} fixed media sequence`);
+        assert.deepEqual(media.map(hint => hint.position), [1, 4, 5], `${difficulty} #${id} fixed media positions`);
+      } else {
+        assert.ok(media.length >= 1 && media.length <= 2, `${difficulty} #${id} media count`);
+        assert.ok(media.every(hint => hint.position >= 4), `${difficulty} #${id} media position`);
+      }
       assert.ok(media.every(hint => hint.value.pokemonId === id && hint.value.fallback), `${difficulty} #${id} media fallback`);
+      if (difficulty !== "easy" && media.length === 2) assert.ok(engine.mediaRevealRank(media[0].kind) <= engine.mediaRevealRank(media[1].kind), `${difficulty} #${id} progressive media order`);
       if (selection.hints.some(hint => hint.kind === "namePattern")) assert.equal(selection.hints.find(hint => hint.kind === "namePattern").position, 5);
       if (selection.hints.some(hint => hint.kind === "evolutionGap")) assert.equal(selection.hints.find(hint => hint.kind === "evolutionGap").position, 5);
     }
+  }
+});
+
+test("random media pairs in normal and hard never move backwards in reveal strength", () => {
+  assert.ok(engine.mediaRevealRank("crop") < engine.mediaRevealRank("shadow"));
+  assert.ok(engine.mediaRevealRank("crop") < engine.mediaRevealRank("pixel"));
+  for (let seed = 1; seed <= 300; seed += 1) {
+    const difficulty = seed % 2 ? "medium" : "hard";
+    const selection = engine.selectHints(context.byId.get((seed % 1025) + 1), context, difficulty, seeded(seed));
+    const media = selection.hints.filter(hint => ["shadow", "pixel", "crop", "cry"].includes(hint.kind));
+    if (media.length === 2) assert.ok(engine.mediaRevealRank(media[0].kind) <= engine.mediaRevealRank(media[1].kind));
   }
 });
 
@@ -65,8 +82,25 @@ test("media strength becomes less revealing with higher difficulty", () => {
   assert.equal(engine.mediaStrength("pixel", "hard"), "strong");
   assert.equal(engine.mediaStrength("crop", "easy"), "large");
   assert.equal(engine.mediaStrength("crop", "hard"), "small");
-  assert.equal(engine.mediaStrength("cry", "easy"), "long");
+  assert.equal(engine.mediaStrength("cry", "easy"), "full");
   assert.equal(engine.mediaStrength("cry", "hard"), "short");
+});
+
+test("easy mode uses the fixed accessible five-clue sequence for the complete catalogue", () => {
+  const lightFacts = new Set(["generation", "dexRange", "typeCount", "evolutionStage", "familySize", "heightBand", "weightBand"]);
+  const clearFacts = new Set(["typeCombo", "evolutionNeighbor", "singleAbility", "evolutionMethod", "specialGroup", "measurements", "originProfile", "abilityProfile", "statSignature"]);
+  for (const target of context.pokemon) {
+    const selection = engine.selectHints(target, context, "easy", seeded(target.id * 97));
+    assert.deepEqual(selection.hints.map(hint => hint.kind), ["cry", selection.hints[1].kind, selection.hints[2].kind, "shadow", "crop"], `#${target.id} clue sequence`);
+    assert.ok(lightFacts.has(selection.hints[1].kind), `#${target.id} light fact`);
+    assert.ok(clearFacts.has(selection.hints[2].kind), `#${target.id} clear fact`);
+    assert.equal(selection.hints[0].value.strength, "full", `#${target.id} full cry`);
+    assert.equal(selection.hints[3].value.strength, "full", `#${target.id} full shadow`);
+    assert.equal(selection.hints[4].value.strength, "large", `#${target.id} large crop`);
+    assert.ok(selection.hints[4].value.anchor >= 42 && selection.hints[4].value.anchor <= 58, `#${target.id} centred crop`);
+    assert.ok(selection.hints.filter(hint => ["cry", "shadow", "crop"].includes(hint.kind)).every(hint => hint.value.fallback), `#${target.id} media fallbacks`);
+    assert.equal(selection.candidatesAfterSecond, 1, `#${target.id} conclusive after clue two`);
+  }
 });
 
 test("five lives reveal one clue per accepted wrong guess", () => {
@@ -97,6 +131,69 @@ test("five lives reveal one clue per accepted wrong guess", () => {
   assert.equal(correct.correct, true);
   assert.equal(correct.round.status, "won");
   assert.equal(correct.round.lives, 4);
+});
+
+test("clues can be skipped without losing lives and scoring follows the revealed clue", () => {
+  let round = engine.createRound({ context, difficulty: "medium", targetId: 25, random: seeded(225) });
+  const firstHintScore = engine.scoreRound({ ...round, status: "won" }).points;
+
+  const firstSkip = engine.skipHint(round);
+  assert.equal(firstSkip.accepted, true);
+  assert.equal(firstSkip.round.revealed, 2);
+  assert.equal(firstSkip.round.skippedHints, 1);
+  assert.equal(firstSkip.round.lives, 5);
+  assert.ok(engine.scoreRound({ ...firstSkip.round, status: "won" }).points < firstHintScore);
+  round = firstSkip.round;
+
+  for (let hint = 3; hint <= 5; hint += 1) {
+    const skipped = engine.skipHint(round);
+    assert.equal(skipped.accepted, true);
+    assert.equal(skipped.round.revealed, hint);
+    assert.equal(skipped.round.lives, 5);
+    round = skipped.round;
+  }
+
+  const atLastHint = engine.skipHint(round);
+  assert.equal(atLastHint.accepted, false);
+  assert.equal(atLastHint.reason, "lastHint");
+  const won = engine.submitGuess(round, 25, context).round;
+  assert.equal(won.status, "won");
+  assert.equal(won.lives, 5);
+  assert.equal(engine.scoreRound(won).points, engine.scoreRound({ ...won, lives: 1 }).points);
+});
+
+test("giving up is available only after all five clues and survives sanitization", () => {
+  let round = engine.createRound({ context, difficulty: "easy", targetId: 25, random: seeded(325) });
+  const tooEarly = engine.giveUp(round);
+  assert.equal(tooEarly.accepted, false);
+  assert.equal(tooEarly.reason, "hintsRemaining");
+  assert.equal(tooEarly.round.status, "active");
+
+  while (round.revealed < 5) round = engine.skipHint(round).round;
+  const givenUp = engine.giveUp(round, { now: () => new Date("2026-08-10T12:00:00Z") });
+  assert.equal(givenUp.accepted, true);
+  assert.equal(givenUp.round.status, "lost");
+  assert.equal(givenUp.round.forfeited, true);
+  assert.equal(givenUp.round.lives, 5);
+  assert.equal(givenUp.round.completedAt, "2026-08-10T12:00:00.000Z");
+  assert.deepEqual(engine.scoreRound(givenUp.round), { points: 0, xp: 5, solvedAtHint: null });
+
+  const repaired = engine.sanitizeRound(givenUp.round, context);
+  assert.equal(repaired.status, "lost");
+  assert.equal(repaired.forfeited, true);
+  assert.equal(repaired.revealed, 5);
+  assert.equal(repaired.lives, 5);
+  assert.equal(engine.giveUp(repaired).reason, "finished");
+});
+
+test("skipped clue progress survives round sanitization", () => {
+  let round = engine.createRound({ context, difficulty: "easy", targetId: 94, random: seeded(194) });
+  round = engine.skipHint(round).round;
+  round = engine.submitGuess(round, 25, context).round;
+  const repaired = engine.sanitizeRound({ ...round, lives: 0, revealed: 5 }, context);
+  assert.equal(repaired.skippedHints, 1);
+  assert.equal(repaired.revealed, 3);
+  assert.equal(repaired.lives, 4);
 });
 
 test("the fifth accepted wrong guess ends the round without accepting spam", () => {
