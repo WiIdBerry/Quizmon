@@ -1,95 +1,98 @@
-Quizmon Beta 1.3 – Phase 4.1 Sprint 3 v4
-Build: 4.1-sprint3-v4
-Datenschema: 19
+Quizmon Beta 1.3 – Phase 4.1 Sprint 1 v1
+Build: 4.1-sprint1-v1
+Datenschema: 18
 Lernpfadversion: 3
 
-Verbindliche Korrekturgrundlage:
-- Quizmon-Beta-1.3-Phase-4.1-Sprint-3-v3-Windows.zip
+Verbindliche Grundlage:
+- Quizmon-Beta-1.2-Phase-3-Abschluss-Clean-up-v1-Windows.zip
 
 Automatische Modul- und Strukturprüfung:
 - npm run check: bestanden
-- 170 von 170 Tests bestanden
+- 159 von 159 Tests bestanden
 - sämtliche JavaScript-Syntaxprüfungen bestanden
 - CSS-Kaskadenprüfung bestanden
 - Deutsch-/Englisch-Schlüsselparität bestanden
 - Übersetzungs-Platzhalterparität bestanden
 - keine fehlenden lokalen HTML-, CSS-, Script-, Manifest- oder Service-Worker-Dateien
-- Datenschema 19 und Lernpfadversion 3 unverändert
-- Service Worker, App-Build und Paketversion konsistent auf 4.1-sprint3-v4
+- Datenschema 18 mit lokal gespeicherter Who's-That-Runde
+- Lernpfadversion 3 unverändert
 
-Phase-4.1-v4-Balancingprüfungen:
-- alle 1.025 einfachen Runden verwenden exakt Ruf – leichter Fakt – deutlicher Fakt – Schatten – Farbausschnitt
-- der einfache Ruf läuft vollständig und besitzt bei Stummschaltung oder Medienfehler einen eigenen Faktenersatz
-- Hinweis 4 verwendet immer den vollständigen klaren Schatten
-- Hinweis 5 verwendet immer einen großen farbigen Ausschnitt mit zentralem Fokus von 42 bis 58 Prozent
-- alle drei einfachen Medienhinweise besitzen unterschiedliche datenbasierte Ersatzhinweise
-- Normal, Schwer und die tägliche Runde behalten ihre bisherige Auswahl- und Schwierigkeitslogik
-- 1.025 Pokémon × 3 Schwierigkeiten vollständig geprüft
-- insgesamt 3.075 Hinweispakete ohne Fehler erzeugt
-- 559 Pakete mit zwei zufälligen Medienhinweisen in Normal und Schwer ohne rückwärts angeordnete Kombination
-
-Phase-4.1-v3-UX- und Spielflussprüfungen:
-- Suchvorschläge liegen im normalen Seitenfluss und können den Bestätigungsbutton nicht überdecken
-- der Bestätigungsbutton bleibt bei geöffneter Vorschlagsliste sichtbar
-- eine vollständige Auswahl zeigt Name und Pokédex-Nummer und aktiviert die Bestätigung
-- Enter und Mausklick verwenden denselben geprüften Antwortweg
-- aktueller Hinweis wird als zentrale Spielfläche dargestellt
-- fünfstufige Fortschrittsspur ersetzt die großen gesperrten Platzhalterkarten
-- aktuelles Punktepotenzial wird passend zu Schwierigkeit und Hinweis angezeigt
-- ältere Hinweise bleiben in einer kompakten Spur einsehbar
-- Fehlversuche erzeugen Vergleichsinformationen zu Generation, Typen, Größe und Gewicht
-- Richtungsangaben und exakte beziehungsweise teilweise Typübereinstimmungen geprüft
-- mobile Reihenfolge zeigt aktuellen Hinweis, Antwortbereich und danach ältere Hinweise
-
-Phase-4.1-Korrekturprüfungen:
-- öffentlicher Modusname in Deutsch und Englisch einheitlich PokéIdle
-- Startseite, Modusauswahl, freie Runde, Tagesrunde und Statistik verwenden den neuen Namen
-- laufende freie Runde besitzt einen direkten Rückweg zur Schwierigkeitswahl
-- Abbruch verwirft nur die freie Runde und ermöglicht sofort eine neue Schwierigkeit
-- Tagesrunde zeigt keinen Abbruchweg, der die Einmalwertung umgehen könnte
-- zufällige Medienpaare in Normal und Schwer werden weiterhin nach steigender Aussagekraft sortiert
-- die feste einfache Folge verwendet bewusst einen klaren Schatten vor dem großen Farbausschnitt
-- 1.025 Pokémon × 3 Schwierigkeiten vollständig geprüft
-- insgesamt 3.075 Hinweispakete ohne Fehler erzeugt
-- darunter 559 zufällige Medienpaare in Normal und Schwer ohne eine rückwärts angeordnete Kombination
-- jedes Paket enthält genau fünf Hinweise und bleibt nach Hinweis 1 und 2 eindeutig
-- ein gewonnenes Tages-PokéIdle schließt das Tagestraining ab
-- Tagesfortschritt wird auf 10/10 gesetzt und der heutige Kalendertag abgehakt
-- Lernserie, Bestserie, Tageserfolg und 25-XP-Tagesbonus werden höchstens einmal aktualisiert
-- verlorenes Tages-PokéIdle schließt das Tagestraining nicht ab
-- gespeicherte Sprint-3-v1-Spielstände bleiben import- und reparaturfähig
-
-Erhaltene Daten- und Regressionstests:
-- 1.025 Pokémon, 919 Attacken, 313 Fähigkeiten und 2.176 Items geprüft
-- 340 Entwicklungslinien, 9 Regionen und 145 Trainer beziehungsweise Figuren geprüft
+Phase-3-Daten und Fachlogik:
+- 1.025 Pokémon geprüft
+- 919 Attacken geprüft
+- 313 Fähigkeiten geprüft
+- 2.176 Items geprüft
+- 340 Entwicklungslinien geprüft
+- 9 Regionen geprüft
+- 145 Trainer und Figuren geprüft
+- 117 Arenaleiter-, Top-Vier- und Champion-Einträge geprüft
+- 450 vollständige Trainer-Teamplätze geprüft
 - 21 Learnset-Spielgruppen weiterhin strikt getrennt
-- Typenberechnung, Lernintelligenz, Schwierigkeit, Fehleranalyse, Motivation und Fortschritt geprüft
+- Spielauswahl, Lernmethoden, Maschinen und Rückverknüpfungen geprüft
 - Suche, Generationenfilter, Favoriten, Trainingslisten und Lernkarten geprüft
-- fünf Leben, gültige Namenssuche, Doppelratenschutz sowie Gewinn- und Verlustwege geprüft
-- tägliche Runde bleibt je UTC-Datum deterministisch und einmalig gewertet
-- XP-, Punkte-, Statistik-, Offline-Warteschlangen- und Online-Schnittstellenlogik geprüft
-- Import-Guard, Zustandsreparatur, Bildfallbacks und PWA-App-Shell geprüft
+- Typenberechnung, Lernintelligenz, Schwierigkeit, Fehleranalyse, Motivation und Fortschritt geprüft
+
+Neue Phase-4.1-Sprint-1-Prüfungen:
+- genau 25 datenbasierte Hinweisarten geprüft
+- 1.025 Pokémon × 3 Schwierigkeiten vollständig geprüft
+- insgesamt 3.075 Hinweispakete ohne Fehler erzeugt
+- jedes Paket enthält genau fünf unterschiedliche Hinweisfamilien
+- Hinweis 1 bleibt je Schwierigkeit innerhalb der festgelegten Kandidatengrenze
+- Hinweis 1 und 2 lassen in jedem Paket exakt ein Pokémon übrig
+- visuelle und akustische Hinweisarten sind in Sprint 1 nicht enthalten
+- fünf Leben und fünf schrittweise freigeschaltete Hinweise geprüft
+- ungültige, leere und doppelte Antworten kosten kein Leben
+- fünfter gültiger Fehlversuch beendet die Runde
+- richtige Antwort beendet die Runde sofort
+- deutsch- und englischsprachige Namenssuche geprüft
+- laufende Runden werden repariert und sicher fortgesetzt
+- Desktop- und iPhone-Layout für Auswahl, Runde und Auflösung geprüft
+
+Erhaltene Clean-up- und Regressionstests:
+- Browser-History-Integration und Zustands-Snapshots statisch geprüft
+- nur eine Service-Worker-Registrierung vorhanden
+- Service-Worker-Build, Beta-1.3-Anzeige und Paketversion konsistent
+- Learnset-Metadaten für alle 1.025 Pokémon und 919 Attacken gegen den vollständigen Datensatz verglichen
+- vollständige Learnsets werden nicht mehr im allgemeinen HTML-Startpfad ausgeführt
+- vollständige Learnsets bleiben im Offline-App-Shell-Cache
+- Import-Guard für aktuelle und ältere unterstützte Zustände geprüft
+- ungültige, leere, nicht unterstützte und beschädigte Imports werden abgewiesen
+- Phase-3-Zustandsreparatur für Favoriten, Trainingslisten und Lernkarten geprüft
+- kritische persönliche, Lern- und Motivationsdaten für Rundreisen abgebildet
+- getrennte Pokémon-, Item- und allgemeine Bildfallbacks geprüft
+- relevante Phase-3-Touchflächen auf mindestens 44 Pixel abgesichert
+- progressive Gruppen der Wissenswelt geprüft
+- keine veralteten sichtbaren Hinweise auf spätere Lexikon-Sprints
+- Fortschrittsbezeichnung konsistent
+- GitHub-Veröffentlichung hängt vom vollständigen Verify-Job ab
+
+Performanceprüfung in der Entwicklungsumgebung:
+- vollständiger Learnset-Datensatz: 8.425.835 Bytes
+- kompakte Learnset-Metadaten: 70.730 Bytes
+- isolierte Node-Auswertung der Metadaten: etwa 5,5 ms
+- isolierte Node-Auswertung des vollständigen Datensatzes: etwa 406 ms
+- vollständiger Datensatz wird erst bei tatsächlichem Learnset-Bedarf ausgewertet
+- alle lokalen Kernwissensdaten bleiben offline verfügbar
 
 Browserprüfung:
-- isolierter Chromium-Lauf bestanden
-- Desktop 1.440 × 1.000 und Smartphone 390 × 844 geprüft
-- PokéIdle-Name auf der Modusauswahl sichtbar
-- freie Runde gestartet, verlassen und mit anderer Schwierigkeit neu gestartet
-- fünf Leben, Hinweise, Namenssuche, Medienhinweis, Lösung und Rundenauswertung geprüft
-- Tages-PokéIdle gewonnen und Einmalwertung kontrolliert
-- Hauptmenü danach als Tagesziel abgeschlossen und heutiger Tag abgehakt
-- kein horizontaler Überlauf
-- relevante Touchziele mindestens 44 Pixel
-- keine Laufzeit-Ausnahmen und keine sichtbaren internen Übersetzungsschlüssel
+- ein dependency-freier Chrome-Smoke-Test wurde erstellt
+- geprüft werden Desktop 1.440 × 1.000 und Smartphone 390 × 844
+- geprüft werden Startseite, Wissenswelt, Pokémon-Katalog, Detailnavigation, Browser-Zurück, Suche, Überbreite, Übersetzungsschlüssel und Touchziele
+- zusätzlich vollständig geprüft: Modusauswahl, Rundenstart, Fehlversuch, Lebensabzug, Hinweisfreigabe, richtige Lösung und nächste Runde
+- lokaler Desktop-/Smartphone-Browserdurchlauf bestanden
+- im GitHub-Workflow wird Chrome eingerichtet und der Smoke-Test ist eine verpflichtende Veröffentlichungssperre
 
-ZIP-Prüfung:
-- ZIP-Integrität ohne Fehler
-- frisch entpackter Build bytegleich zur geprüften Arbeitsfassung
-- 170/170 Tests aus der frischen Entpackung bestanden
-- Desktop-/iPhone-Browserlauf aus der frischen Entpackung bestanden
+PWA und Offline:
+- nur eine zentrale Service-Worker-Registrierung
+- neuer Cache-Build 4.1-sprint1-v1
+- Who's-That-Logik und Spieloberfläche im Offline-App-Shell-Cache
+- alte Quizmon-Caches werden weiterhin entfernt
+- große Kernassets erhalten einen erweiterten Installationszeitraum
+- optionale Bilder bleiben im kontrollierten Laufzeitcache
+- lokale Platzhalter für Pokémon, Items und allgemeine Bilder vorhanden
 
-Auf echter Hardware weiterhin manuell zu prüfen:
-- physisches iPhone und Safari
+In dieser Entwicklungsumgebung nicht vollständig ersetzbar:
+- physischer iPhone- und Safari-Test
 - installierte PWA auf einem echten Gerät
 - reales GitHub-Pages-Service-Worker-Update
 - echter Import des persönlichen Nutzerexports

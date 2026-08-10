@@ -30,7 +30,7 @@ Quizmon liefert Namen, Beziehungen und Kerndaten lokal aus. Pokémon-Artworks un
 Item-Sprites werden bei Bedarf geladen, begrenzt gecacht und bei fehlender
 Verbindung durch lokale Platzhalter ersetzt.
 
-## PokéIdle
+## Who's That Pokémon
 
 Die datenbasierten Hinweise aus Phase 4.1 Sprint 1 werden ausschließlich aus den
 bereits lokal geprüften Pokémon-, Typen-, Fähigkeiten- und Entwicklungsdaten

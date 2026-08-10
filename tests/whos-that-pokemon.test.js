@@ -34,7 +34,7 @@ test("Sprint 2 extends the 25 data clues with four media clue kinds", () => {
   assert.deepEqual(engine.HINT_KINDS.slice(-4), ["shadow", "pixel", "crop", "cry"]);
 });
 
-test("all difficulties build five valid clues and become conclusive after clue two", () => {
+test("all difficulties build five progressive clues and become conclusive after clue two", () => {
   const ids = [1, 25, 94, 132, 150, 152, 251, 252, 386, 387, 493, 494, 649, 650, 721, 722, 809, 810, 905, 906, 1000, 1025];
   const limits = { easy: 12, medium: 28, hard: 60 };
   for (const difficulty of engine.DIFFICULTIES) {
@@ -49,29 +49,12 @@ test("all difficulties build five valid clues and become conclusive after clue t
       assert.ok(!["typeOne", "typeCombo", "evolutionNeighbor", "namePattern", "evolutionGap"].includes(selection.hints[0].kind));
       assert.ok(!["typeOne", "typeCombo", "evolutionNeighbor", "namePattern", "evolutionGap"].includes(selection.hints[1].kind));
       const media = selection.hints.filter(hint => ["shadow", "pixel", "crop", "cry"].includes(hint.kind));
-      if (difficulty === "easy") {
-        assert.deepEqual(media.map(hint => hint.kind), ["cry", "shadow", "crop"], `${difficulty} #${id} fixed media sequence`);
-        assert.deepEqual(media.map(hint => hint.position), [1, 4, 5], `${difficulty} #${id} fixed media positions`);
-      } else {
-        assert.ok(media.length >= 1 && media.length <= 2, `${difficulty} #${id} media count`);
-        assert.ok(media.every(hint => hint.position >= 4), `${difficulty} #${id} media position`);
-      }
+      assert.ok(media.length >= 1 && media.length <= 2, `${difficulty} #${id} media count`);
+      assert.ok(media.every(hint => hint.position >= 4), `${difficulty} #${id} media position`);
       assert.ok(media.every(hint => hint.value.pokemonId === id && hint.value.fallback), `${difficulty} #${id} media fallback`);
-      if (difficulty !== "easy" && media.length === 2) assert.ok(engine.mediaRevealRank(media[0].kind) <= engine.mediaRevealRank(media[1].kind), `${difficulty} #${id} progressive media order`);
       if (selection.hints.some(hint => hint.kind === "namePattern")) assert.equal(selection.hints.find(hint => hint.kind === "namePattern").position, 5);
       if (selection.hints.some(hint => hint.kind === "evolutionGap")) assert.equal(selection.hints.find(hint => hint.kind === "evolutionGap").position, 5);
     }
-  }
-});
-
-test("random media pairs in normal and hard never move backwards in reveal strength", () => {
-  assert.ok(engine.mediaRevealRank("crop") < engine.mediaRevealRank("shadow"));
-  assert.ok(engine.mediaRevealRank("crop") < engine.mediaRevealRank("pixel"));
-  for (let seed = 1; seed <= 300; seed += 1) {
-    const difficulty = seed % 2 ? "medium" : "hard";
-    const selection = engine.selectHints(context.byId.get((seed % 1025) + 1), context, difficulty, seeded(seed));
-    const media = selection.hints.filter(hint => ["shadow", "pixel", "crop", "cry"].includes(hint.kind));
-    if (media.length === 2) assert.ok(engine.mediaRevealRank(media[0].kind) <= engine.mediaRevealRank(media[1].kind));
   }
 });
 
@@ -82,25 +65,8 @@ test("media strength becomes less revealing with higher difficulty", () => {
   assert.equal(engine.mediaStrength("pixel", "hard"), "strong");
   assert.equal(engine.mediaStrength("crop", "easy"), "large");
   assert.equal(engine.mediaStrength("crop", "hard"), "small");
-  assert.equal(engine.mediaStrength("cry", "easy"), "full");
+  assert.equal(engine.mediaStrength("cry", "easy"), "long");
   assert.equal(engine.mediaStrength("cry", "hard"), "short");
-});
-
-test("easy mode uses the fixed accessible five-clue sequence for the complete catalogue", () => {
-  const lightFacts = new Set(["generation", "dexRange", "typeCount", "evolutionStage", "familySize", "heightBand", "weightBand"]);
-  const clearFacts = new Set(["typeCombo", "evolutionNeighbor", "singleAbility", "evolutionMethod", "specialGroup", "measurements", "originProfile", "abilityProfile", "statSignature"]);
-  for (const target of context.pokemon) {
-    const selection = engine.selectHints(target, context, "easy", seeded(target.id * 97));
-    assert.deepEqual(selection.hints.map(hint => hint.kind), ["cry", selection.hints[1].kind, selection.hints[2].kind, "shadow", "crop"], `#${target.id} clue sequence`);
-    assert.ok(lightFacts.has(selection.hints[1].kind), `#${target.id} light fact`);
-    assert.ok(clearFacts.has(selection.hints[2].kind), `#${target.id} clear fact`);
-    assert.equal(selection.hints[0].value.strength, "full", `#${target.id} full cry`);
-    assert.equal(selection.hints[3].value.strength, "full", `#${target.id} full shadow`);
-    assert.equal(selection.hints[4].value.strength, "large", `#${target.id} large crop`);
-    assert.ok(selection.hints[4].value.anchor >= 42 && selection.hints[4].value.anchor <= 58, `#${target.id} centred crop`);
-    assert.ok(selection.hints.filter(hint => ["cry", "shadow", "crop"].includes(hint.kind)).every(hint => hint.value.fallback), `#${target.id} media fallbacks`);
-    assert.equal(selection.candidatesAfterSecond, 1, `#${target.id} conclusive after clue two`);
-  }
 });
 
 test("five lives reveal one clue per accepted wrong guess", () => {

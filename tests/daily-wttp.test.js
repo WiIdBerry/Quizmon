@@ -45,13 +45,10 @@ test("Sprint 3 UI contains daily, XP, statistics and online-ready integration", 
   const app = read("app.js");
   const html = read("index.html");
   const css = read("styles-play.css");
-  assert.match(app, /const BUILD_VERSION = "4\.1-sprint3-v4"/);
+  assert.match(app, /4\.1-sprint3-v1/);
   assert.match(app, /createDailyRound/);
   assert.match(app, /completeWhosRound/);
   assert.match(app, /addXp\(score\.xp\)/);
-  assert.match(app, /completeDailyGoalFromPokeidle/);
-  assert.match(app, /round\?\.mode !== "daily" \|\| round\.status !== "won"/);
-  assert.match(app, /dailyGoalCompleted:round\.status === "won"/);
   assert.match(app, /pendingUploads/);
   assert.match(html, /daily-service\.js/);
   assert.match(css, /\.whos-daily-card/);

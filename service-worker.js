@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "quizmon-beta-1-3";
-const BUILD = "4.1-sprint3-v4";
+const BUILD = "4.1-sprint3-v1";
 const SHELL_CACHE = `${CACHE_PREFIX}-${BUILD}-shell`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}-${BUILD}-runtime`;
 const CURRENT_CACHES = new Set([SHELL_CACHE, RUNTIME_CACHE]);

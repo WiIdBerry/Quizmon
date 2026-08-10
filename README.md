@@ -1,40 +1,29 @@
 # Quizmon Beta 1.3
 
-## Phase 4.1 – PokéIdle · Sprint 3 Korrektur v4
+## Phase 4.1 – Who's That Pokémon · Sprint 2
 
-Diese Korrektur baut ausschließlich auf der getesteten Sprint-3-Korrektur
-`Quizmon-Beta-1.3-Phase-4.1-Sprint-3-v3-Windows.zip` auf.
+Diese Version baut ausschließlich auf der ausdrücklich abgenommenen Datei
+`Quizmon-Beta-1.2-Phase-3-Abschluss-Clean-up-v1-Windows.zip` auf.
 
 ### Versionsstand
 
 - Öffentliche Version: `Beta 1.3`
-- Build: `4.1-sprint3-v4`
-- Datenschema: `19`
+- Build: `4.1-sprint2-v1`
+- Datenschema: `18`
 - Lernpfadversion: `3` (unverändert)
-- Service Worker: `4.1-sprint3-v4`
+- Service Worker: `4.1-sprint2-v1`
 
-Der Bereich „Spielen“ enthält mit „PokéIdle“ seinen ersten vollständig
-spielbaren Modus. Er umfasst drei Schwierigkeiten, fünf Leben, fünf
-datenbasierte beziehungsweise mediale Hinweise, eine lokale Pokémon-Namenssuche,
-eine gemeinsame Tagesrunde, XP, Statistiken sowie Gewinn- und Verlustauflösung.
+Der Bereich „Spielen“ enthält mit „Who's That Pokémon“ seinen ersten vollständig
+spielbaren Modus. Sprint 1 umfasst drei Schwierigkeiten, fünf Leben, fünf
+datenbasierte Hinweise, eine lokale Pokémon-Namenssuche, Gewinn- und
+Verlustauflösung sowie die sichere Fortsetzung laufender Runden.
 
-Korrektur v2 benennt den Modus vollständig in PokéIdle um, ergänzt während einer
-freien Runde den direkten Rückweg zur Schwierigkeitswahl, ordnet doppelte
-Medienhinweise strikt nach steigender Aussagekraft und wertet einen gewonnenen
-Tages-PokéIdle zugleich als abgeschlossenes Tagestraining im Hauptmenü.
+Hinweis 1 ist charakteristisch genug für eine mögliche frühe Lösung. Die
+Kombination aus Hinweis 1 und 2 wird gegen den vollständigen Katalog geprüft und
+ist eindeutig. Visuelle Hinweise und Pokémon-Rufe folgen planmäßig erst in
+Sprint 2; Tagesrunde, XP und Modusstatistiken folgen in Sprint 3.
 
-Korrektur v3 behebt die von Suchvorschlägen verdeckte Bestätigungsaktion und
-überarbeitet die Runde grundlegend: zentraler Hinweisbereich, kompakte
-Fortschrittsspur, sichtbares Punktepotenzial, klarer Auswahlzustand und eine
-strategische Vergleichsspur nach jedem Fehlversuch.
-
-Korrektur v4 stimmt die Schwierigkeit „Einfach“ neu ab. Jede einfache Runde
-verwendet nun dieselbe verständliche Steigerung: vollständiger Ruf, leichter
-Faktenhinweis, deutlicher Faktenhinweis, klarer Schatten und großer farbiger
-Bildausschnitt. Medienfehler oder stumme Nutzung werden weiterhin durch
-eigenständige Faktenhinweise abgefangen. Normal und Schwer bleiben unverändert.
-
-Die vollständige Änderungsbeschreibung steht in `PHASE-4.1-SPRINT-3.md`.
+Die vollständige Änderungsbeschreibung steht in `PHASE-4.1-SPRINT-1.md`.
 
 ## Lokale Prüfung
 
@@ -44,10 +33,10 @@ npm run test:browser
 ```
 
 `npm run check` prüft Syntax, Daten, Übersetzungen, Speicherung, Import,
-Lernsysteme, Wissensplattform, PokéIdle-Logik und PWA-Struktur.
+Lernsysteme, Wissensplattform, Who's-That-Logik und PWA-Struktur.
 
 `npm run test:browser` prüft die zentralen Desktop- und Smartphone-Abläufe,
-einschließlich einer vollständigen PokéIdle-Runde. Im GitHub-Workflow wird
+einschließlich einer vollständigen Who's-That-Runde. Im GitHub-Workflow wird
 Chrome eingerichtet und der Browsertest als Veröffentlichungssperre ausgeführt.
 
 ## Start

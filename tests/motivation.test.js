@@ -24,25 +24,6 @@ test("daily goal never exceeds its target", () => {
   assert.equal(motivation.dailyGoal(4, 10).remaining, 6);
 });
 
-test("a successful daily PokéIdle completes today's training goal exactly once", () => {
-  const first = motivation.completeDailyGoal({
-    date:"2026-08-05", completed:false, streak:2, bestStreak:4, lastCompletedDate:"2026-08-04",
-    goalProgress:3, goalCompleted:false, goalRewardClaimed:false, history:{}
-  }, { today:"2026-08-05", yesterday:"2026-08-04", result:{ source:"pokeidle", solvedAtHint:3 } });
-  assert.equal(first.completedNow, true);
-  assert.equal(first.bonusXp, 25);
-  assert.equal(first.state.completed, true);
-  assert.equal(first.state.goalProgress, 10);
-  assert.equal(first.state.goalCompleted, true);
-  assert.equal(first.state.streak, 3);
-  assert.deepEqual(first.state.history["2026-08-05"], { progress:10, completed:true });
-
-  const repeated = motivation.completeDailyGoal(first.state, { today:"2026-08-05", yesterday:"2026-08-04" });
-  assert.equal(repeated.completedNow, false);
-  assert.equal(repeated.bonusXp, 0);
-  assert.equal(repeated.state.streak, 3);
-});
-
 test("level progress and plural categories are stable", () => {
   const levels = [{ level:1, xp:0 }, { level:2, xp:100 }, { level:3, xp:250 }];
   assert.equal(motivation.levelInfo(levels, 50).progress, 50);
