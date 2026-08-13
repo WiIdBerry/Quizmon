@@ -1,35 +1,35 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
   /* Quizmon Beta 1.0 — Sprint 1: visual foundations */
-  --bg: #f4f6f8;
-  --bg-2: #eef2f5;
-  --surface: rgba(255,255,255,.90);
-  --surface-solid: #ffffff;
-  --surface-soft: #f2f5f7;
-  --surface-strong: #e7ecef;
-  --text: #172027;
-  --text-strong: #0d151b;
-  --muted: #66737d;
-  --line: rgba(31,45,54,.12);
+  --bg: #10171b;
+  --bg-2: #162126;
+  --surface: rgba(25,36,42,.90);
+  --surface-solid: #19242a;
+  --surface-soft: #223138;
+  --surface-strong: #2b3d45;
+  --text: #edf4f6;
+  --text-strong: #ffffff;
+  --muted: #a8b7bd;
+  --line: rgba(224,239,244,.12);
 
   /* Functional interaction color. Pokémon identity comes from type colors. */
-  --primary: #315f72;
-  --primary-2: #4f8794;
-  --primary-deep: #1f4352;
-  --focus: #2d7e96;
+  --primary: #78aebb;
+  --primary-2: #55909e;
+  --primary-deep: #9bc8d2;
+  --focus: #8ac4d2;
 
-  --success: #238457;
-  --success-bg: #e9f7f0;
-  --danger: #c44554;
-  --danger-bg: #fff0f2;
-  --warning: #a76512;
-  --warning-bg: #fff6e7;
+  --success: #72d29e;
+  --success-bg: #153829;
+  --danger: #ff8c98;
+  --danger-bg: #451f27;
+  --warning: #f5bf69;
+  --warning-bg: #47351c;
 
-  --shadow-xs: 0 1px 2px rgba(24,36,44,.04);
-  --shadow-sm: 0 7px 20px rgba(24,36,44,.07);
-  --shadow: 0 16px 38px rgba(24,36,44,.10);
-  --shadow-lg: 0 26px 64px rgba(24,36,44,.16);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.18);
+  --shadow-sm: 0 7px 20px rgba(0,0,0,.20);
+  --shadow: 0 16px 38px rgba(0,0,0,.28);
+  --shadow-lg: 0 26px 64px rgba(0,0,0,.40);
 
   --radius-xs: 10px;
   --radius-sm: 14px;
@@ -1156,5 +1156,4 @@ html[data-animations="on"] .ambient-two { animation: ambient-float-two 19s ease-
     animation: none !important;
   }
 }
-
 

@@ -1,0 +1,12 @@
+Quizmon campaign Pokémon artwork
+
+Source package: pokeapi-sprites 2.0.4
+Source collection: sprites/pokemon/other/dream-world
+Repository: PokeAPI/sprites
+
+Included IDs: 1, 4, 7, 10, 11, 13, 14, 16, 19, 21, 25, 56, 74, 95
+
+The source package states that image contents are copyright The Pokémon Company.
+Pokémon and related marks belong to their respective rights holders. Quizmon is
+an independent learning project and is not affiliated with Nintendo, Game Freak
+or The Pokémon Company.

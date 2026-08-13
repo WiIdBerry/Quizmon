@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { read } = require("./helpers.js");
 
-test("Phase 4.1 play mode remains integrated in the Sprint 3 build", () => {
+test("Phase 4.1 play mode remains integrated in the Phase 4.3 build", () => {
   const app = read("app.js");
   const html = read("index.html");
   const sw = read("service-worker.js");
@@ -11,16 +11,33 @@ test("Phase 4.1 play mode remains integrated in the Sprint 3 build", () => {
   assert.match(html, /whos-that-pokemon\.js/);
   assert.ok(html.indexOf("whos-that-pokemon.js") < html.indexOf("app.js"));
   assert.match(app, /const PUBLIC_VERSION = "Beta 1\.3"/);
-  assert.match(app, /const BUILD_VERSION = "4\.1-sprint3-v8"/);
-  assert.match(app, /const DATA_SCHEMA = 20/);
+  assert.match(app, /const BUILD_VERSION = "4\.3-sprint3-v6"/);
+  assert.match(app, /const DATA_SCHEMA = 22/);
   assert.match(app, /state\.route === "play"\) renderPlay\(\)/);
+  assert.match(app, /state\.route === "pokeidle"\) renderPokeidle\(\)/);
   assert.match(app, /function renderWhosSetup/);
   assert.match(app, /function renderWhosRound/);
   assert.match(sw, /whos-that-pokemon\.js/);
   assert.match(sw, /styles-play\.css/);
 });
 
-test("the setup overlay uses the approved symbol and contains only the retained controls", () => {
+test("Play presents PokéIdle and Campaign as two equal mode cards", () => {
+  const app = read("app.js");
+  const ui = read("play-mode-ui.js");
+  const css = read("styles-play.css");
+  const play = app.slice(app.indexOf("function renderPlay"), app.indexOf("function renderCampaign"));
+  assert.match(play, /QuizmonPlayModeUI\.markup/);
+  assert.match(play, /getElementById\("openPokeidle"\)/);
+  assert.match(play, /getElementById\("openCampaign"\)/);
+  assert.match(ui, /class="play-mode-grid"/);
+  assert.equal((ui.match(/class="play-mode-card/g) || []).length, 2);
+  assert.match(ui, /assets\/pokeidle-symbol\.png/);
+  assert.match(ui, /assets\/campaign-kanto-chapter-1-background\.png/);
+  assert.match(css, /\.play-mode-grid \{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/s);
+  assert.match(css, /@media \(max-width:620px\)[\s\S]*\.play-mode-grid \{ grid-template-columns:1fr/);
+});
+
+test("the PokéIdle setup uses the approved symbol and contains only its retained controls", () => {
   const app = read("app.js");
   const css = read("styles-play.css");
   const setup = app.slice(app.indexOf("function renderWhosSetup"), app.indexOf("function whosLivesMarkup"));
@@ -28,6 +45,7 @@ test("the setup overlay uses the approved symbol and contains only the retained 
   assert.match(setup, /whosDailyCardMarkup/);
   assert.match(setup, /whosDifficultyCard\("easy"/);
   assert.match(setup, /id="startWhosRound"/);
+  assert.doesNotMatch(setup, /campaign-entry-card|id="openCampaign"/);
   assert.doesNotMatch(setup, /whos-mode-meta|whos\.kicker|whos\.difficultyText|whos-rules-card|whosStatisticsMarkup/);
   assert.doesNotMatch(setup, /difficulty\.[^`]+Desc/);
   assert.match(css, /\.whos-hero-symbol/);

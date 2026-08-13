@@ -5,6 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
   const DEFAULT_TIMEOUT_MS = 6500;
+  const LOCAL_OFFICIAL_ARTWORK_IDS = new Set([1,4,7,10,11,13,14,16,19,21,25,56,74,95]);
 
   async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const controller = new AbortController();
@@ -26,6 +27,8 @@
     return response.json();
   }
   function artworkUrl(id) {
+    const numericId = Number(id);
+    if (LOCAL_OFFICIAL_ARTWORK_IDS.has(numericId)) return `assets/pokemon-artwork/${numericId}.png`;
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
   }
   return Object.freeze({ DEFAULT_TIMEOUT_MS, fetchWithTimeout, fetchJson, artworkUrl });

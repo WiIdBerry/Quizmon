@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 96 96" color="#ffffff" role="img" aria-labelledby="title">
+  <title id="title">Quizmon Kampfsymbol</title>
+
+  <!-- Hinteres Schwert -->
+  <g transform="rotate(36 48 37)" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <path
+      d="M48 6 55.2 51.5c.5 2.5-.3 4.8-2.2 6.4l-2.5 2.2h-5l-2.5-2.2c-1.9-1.6-2.7-3.9-2.2-6.4Z"
+      fill="currentColor"
+      fill-opacity=".18"
+      stroke-width="4.8"
+    />
+    <path d="M48 17v34" fill="none" stroke-width="3" opacity=".52"/>
+    <path
+      d="M36.5 58.5c3.2 3.1 7 4.7 11.5 4.7s8.3-1.6 11.5-4.7"
+      fill="none"
+      stroke-width="5.2"
+    />
+    <path d="M44 64h8v16.5h-8Z" fill="currentColor" fill-opacity=".22" stroke-width="4.8"/>
+    <path d="m44.3 69.5 7.4 3.6m-7.4 2 7 3.4" fill="none" stroke-width="2.4" opacity=".58"/>
+    <path d="M42 83.5h12l-2.2 6h-7.6Z" fill="currentColor" fill-opacity=".42" stroke-width="4.8"/>
+  </g>
+
+  <!-- Vorderes Schwert -->
+  <g transform="rotate(-36 48 37)" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <path
+      d="M48 6 55.2 51.5c.5 2.5-.3 4.8-2.2 6.4l-2.5 2.2h-5l-2.5-2.2c-1.9-1.6-2.7-3.9-2.2-6.4Z"
+      fill="currentColor"
+      fill-opacity=".18"
+      stroke-width="4.8"
+    />
+    <path d="M48 17v34" fill="none" stroke-width="3" opacity=".52"/>
+    <path
+      d="M36.5 58.5c3.2 3.1 7 4.7 11.5 4.7s8.3-1.6 11.5-4.7"
+      fill="none"
+      stroke-width="5.2"
+    />
+    <path d="M44 64h8v16.5h-8Z" fill="currentColor" fill-opacity=".22" stroke-width="4.8"/>
+    <path d="m44.3 69.5 7.4 3.6m-7.4 2 7 3.4" fill="none" stroke-width="2.4" opacity=".58"/>
+    <path d="M42 83.5h12l-2.2 6h-7.6Z" fill="currentColor" fill-opacity=".42" stroke-width="4.8"/>
+  </g>
+</svg>

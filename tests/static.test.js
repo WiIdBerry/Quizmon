@@ -16,7 +16,7 @@ test("all local script, stylesheet and manifest references exist", () => {
 test("CSS imports preserve the intended app-wide cascade", () => {
   const imports = [...read("styles.css").matchAll(/@import url\("(.+?)"\)/g)].map(match => match[1]);
   assert.deepEqual(imports, [
-    "./styles-base.css", "./styles-home.css", "./styles-play.css", "./styles-training.css", "./styles-learning.css",
+    "./styles-base.css", "./styles-home.css", "./styles-play.css", "./styles-campaign.css", "./styles-training.css", "./styles-learning.css",
     "./styles-knowledge.css", "./styles-progress.css", "./styles-profile.css", "./styles-motion.css", "./styles-feedback.css",
     "./styles-motivation.css", "./styles-intelligence.css"
   ]);
@@ -198,12 +198,12 @@ test("current build and the single service-worker registration are consistent", 
   const pkg = JSON.parse(read("package.json"));
   const combined = `${html}
 ${app}`;
-  assert.match(app, /const BUILD_VERSION = "4\.1-sprint3-v8"/);
-  assert.match(app, /service-worker\.js\?build=4\.1-sprint3-v8/);
+  assert.match(app, /const BUILD_VERSION = "4\.3-sprint3-v6"/);
+  assert.match(app, /service-worker\.js\?build=4\.3-sprint3-v6/);
   assert.doesNotMatch(html, /navigator\.serviceWorker\.register/);
   assert.equal((combined.match(/navigator\.serviceWorker\.register/g) || []).length, 1);
-  assert.match(sw, /const BUILD = "4\.1-sprint3-v8"/);
-  assert.equal(pkg.version, "1.3.0-4.1-sprint3.8");
+  assert.match(sw, /const BUILD = "4\.3-sprint3-v6"/);
+  assert.equal(pkg.version, "1.3.0-4.3-sprint3.6");
   assert.match(app, /"3\.5-sprint2-v2"/);
 });
 

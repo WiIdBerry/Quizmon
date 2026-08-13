@@ -1,64 +1,128 @@
 # Quizmon Beta 1.3
 
-## Phase 4.1 – PokéIdle · Sprint 3 Korrektur v8
+## Phase 4.3 – Spielbare Kanto-Missionen · Sprint 3 v6
 
-Diese Korrektur baut ausschließlich auf der getesteten Sprint-3-Korrektur
-`Quizmon-Beta-1.3-Phase-4.1-Sprint-3-v7-Windows.zip` auf.
+Diese Version baut ausschließlich auf dem zuletzt abgenommenen Stand
+`Quizmon-Beta-1.3-Phase-4.3-Sprint-1-v7-Windows.zip` auf.
 
 ### Versionsstand
 
 - Öffentliche Version: `Beta 1.3`
-- Build: `4.1-sprint3-v8`
-- Datenschema: `20`
+- Build: `4.3-sprint3-v6`
+- Datenschema: `22`
 - Lernpfadversion: `3` (unverändert)
-- Service Worker: `4.1-sprint3-v8`
+- Service Worker: `4.3-sprint3-v6`
 
-Der Bereich „Spielen“ enthält mit „PokéIdle“ seinen ersten vollständig
-spielbaren Modus. Er umfasst drei Schwierigkeiten, fünf Leben, fünf
-datenbasierte beziehungsweise mediale Hinweise, eine lokale Pokémon-Namenssuche,
-eine gemeinsame Tagesrunde, XP, Statistiken sowie Gewinn- und Verlustauflösung.
+### Neu in v6
 
-Korrektur v2 benennt den Modus vollständig in PokéIdle um, ergänzt während einer
-freien Runde den direkten Rückweg zur Schwierigkeitswahl, ordnet doppelte
-Medienhinweise strikt nach steigender Aussagekraft und wertet einen gewonnenen
-Tages-PokéIdle zugleich als abgeschlossenes Tagestraining im Hauptmenü.
+- `Spielen` ist jetzt eine eigenständige Modusauswahl mit genau zwei gleichwertigen Karten
+- PokéIdle und Kampagne besitzen jeweils eine große Bildfläche, eine kurze Erklärung und einen direkten Einstieg
+- der frühere kleine Kampagnen-Banner über PokéIdle wurde vollständig entfernt
+- PokéIdle besitzt eine eigene Unterroute; die Zurück-Navigation führt wieder zur Modusauswahl
+- Kampagnenfortschritt erscheint kompakt direkt auf der Kampagnenkarte
+- auf iPhone-Größe werden beide Moduskarten untereinander als große Touch-Ziele dargestellt
+- der Spielen-Eintrag im Hauptmenü nennt jetzt PokéIdle und Kampagne gemeinsam
 
-Korrektur v3 behebt die von Suchvorschlägen verdeckte Bestätigungsaktion und
-überarbeitet die Runde grundlegend: zentraler Hinweisbereich, kompakte
-Fortschrittsspur, sichtbares Punktepotenzial, klarer Auswahlzustand und eine
-strategische Vergleichsspur nach jedem Fehlversuch.
+### Neu in Sprint 3
 
-Korrektur v4 stimmt die Schwierigkeit „Einfach“ neu ab. Jede einfache Runde
-verwendet nun dieselbe verständliche Steigerung: vollständiger Ruf, leichter
-Faktenhinweis, deutlicher Faktenhinweis, klarer Schatten und großer farbiger
-Bildausschnitt. Medienfehler oder stumme Nutzung werden weiterhin durch
-eigenständige Faktenhinweise abgefangen. Normal und Schwer bleiben unverändert.
+- neun Kartenknoten sind als ortsgebundene Missionen spielbar
+- acht reguläre Knoten besitzen 10 feste Fragen; Rockos Arena enthält 15 Fragen
+- die Zahl der Antworten wächst entlang der Lernkurve von zwei auf bis zu vier, bei Rocko bis auf fünf
+- Frageauswahl und Reihenfolge bleiben bei Wiederholungen gleich; nur die Antwortpositionen wechseln
+- jede Antwort erhält sofort eine Richtig-/Falsch-Auswertung mit Erklärung
+- falsche Inhalte wechseln nach dem ersten Durchlauf in eine verpflichtende Fehler-Meistern-Runde
+- Wiederholungsfragen sind neu formuliert; nach wiederholten Fehlern hilft eine fokussierte Zwei-Antworten-Auswahl
+- erst wenn alle Fehler gemeistert sind, wird die Mission grün und der nächste Pflichtknoten freigeschaltet
+- der Wert des ersten Durchlaufs bleibt für spätere Leistungs- und Sternelogik getrennt erhalten
+- Route 22 und der zweite Rivalenkampf bleiben vollständig optional
+- vollständige Missionswiederholungen bleiben jederzeit möglich
+- laufende Versuche besitzen einen abgesicherten Abbruchdialog
+- die Kapiteltruhe bleibt sichtbar, ist aber bis Sprint 4 nicht einlösbar
+- Fragen und Antwortoptionen werden strikt auf den jeweiligen Ort begrenzt
+- vollständige deutsche und englische Missionsoberfläche
+- Offline-Cache für das neue Missionsmodul
+- pädagogische Lernreihenfolge statt zufälliger Detail- und Statistikfragen
+- Alabastia ausschließlich mit Namen und Typen der drei Starter
+- Typeneffektivität beginnt erst beim ersten Rivalenkampf
+- örtliche Entwicklungen beginnen erst im Vertania-Wald
+- feste Lernreihenfolge steuert Wiederholung, Einführung und Anwendung je Ort
+- keine Basiswert-, Größen-, Gewichts-, Pokédexnummern- oder Levelabfragen
+- echte Pokémon-Abbildungen in Aufgaben und passenden Antwortmöglichkeiten
+- farbige Typ-Chips aus dem bestehenden Lernen- und Training-Design
+- eigene Farbwelt für Forschungs-, Trainer-, Begegnungs-, Route- und Arenenmissionen
+- exakt dieselben offiziellen Pokémon-Artworks wie in der Wissenswelt
+- lokale, offline verfügbare PNG-Abbildungen aller 14 Pokémon des ersten Kapitels
+- Typen und Pokémon-Eigenschaften werden nur dann visualisiert, wenn sie die Lösung nicht verraten
 
-Korrektur v5 ergänzt das freiwillige Überspringen eines Hinweises. Dadurch wird
-der nächste Hinweis ohne Lebensverlust freigeschaltet; nur ein falscher gültiger
-Pokémon-Tipp kostet weiterhin ein Leben. Das Punktepotenzial richtet sich
-innerhalb der gewählten Schwierigkeit nach dem höchsten freigeschalteten Hinweis
-und sinkt sichtbar, bevor der Spieler das Überspringen bestätigt.
+Die technische Grundlage steht in `PHASE-4.3-SPRINT-3-V1.md`.
+Die verbindliche Fragenstruktur von v2 steht in
+`PHASE-4.3-SPRINT-3-V2.md`.
+Die visuelle Missionsüberarbeitung von v3 steht in
+`PHASE-4.3-SPRINT-3-V3.md`.
+Die vereinheitlichten Artworks und festen Fragensätze von v4 stehen in
+`PHASE-4.3-SPRINT-3-V4.md`.
+Die gestaffelte Lernkurve und Fehler-Meistern-Runde von v5 stehen in
+`PHASE-4.3-SPRINT-3-V5.md`.
+Die gleichwertige Spielen-Modusauswahl von v6 steht in
+`PHASE-4.3-SPRINT-3-V6.md`.
 
-Korrektur v6 reduziert die PokéIdle-Einstiegsseite auf die vereinbarten
-Bedienelemente. Zusatzkennzeichnungen, Erklärtexte, Regelkarte und die dortige
-Statistikkarte wurden aus dem Overlay entfernt. Das bisherige Pokéball-Zeichen
-wurde durch das freigestellte, neutrale PokéIdle-Symbol ersetzt. Spielstände,
-Statistikerfassung und sämtliche Rundenregeln bleiben unverändert.
+### Bereits enthaltenes Kampagnen-Grundsystem
 
-Korrektur v7 reduziert nun auch die laufende Runde. Die markierten Zusatztexte
-wurden entfernt, der alte Pokéball im Hinweisbereich durch das freigestellte
-PokéIdle-Symbol ersetzt und der Spielablauf vollständig einspaltig angeordnet:
-gesuchtes Pokémon, Hinweise und anschließend das Eingabefeld. Bei einem nicht
-ladbaren Bildhinweis dient das PokéIdle-Symbol zugleich als Offline-Ersatz.
+- ausschließliches dunkles Design in der gesamten App; die Designumschaltung ist entfernt
+- neuer Kampagneneinstieg unter `Spielen`
+- eigener Kampagnenbereich mit vertikalem Kanto-Pfad von oben nach unten
+- zehn sichtbare Storyknoten von Alabastia bis zur Kapitelbelohnung nach Rocko
+- acht Pflichtmissionen auf dem Hauptweg sowie Route 22 und der zweite Kampf
+  gegen Blau als eigener optionaler Seitenzweig
+- klar getrennte Zustände für aktuell, verfügbar, abgeschlossen und gesperrt
+- besondere Gestaltung für Rivalen, Belohnungen, optionale Aufgaben und Kapitelabschlüsse
+- vierstufiges Pop-up-Tutorial mit Professor Berry direkt über der Karte
+- Professor Berry erscheint ausschließlich im Kampagnen-Tutorial
+- Tutorialfortschritt und Kampagnen-Grundzustand werden gespeichert sowie exportiert/importiert
+- Desktop-Detailbereich und mobile Missionsvorschau
+- deutsche und englische Kampagnentexte
+- Offline-Cache für Kampagnenmodul, Gestaltung und Professor-Berry-Asset
+- Kampagnenkarte und Professor-Berry-Tutorial vollständig aus `app.js` in
+  `campaign-ui.js` ausgelagert
+- automatischer Architekturwächter verhindert neues Wachstum von `app.js`
+- Tutorial-Schritt 1 bleibt ohne losgelösten Hervorhebungsrahmen
+- Tutorial-Schritt 2 bis 4 markieren exakt den sichtbaren runden Knoten
+- Zielmarkierung wird beim Scrollen, Drehen und Ändern der Fenstergröße nachgeführt
+- Professor-Berry-Fenster sitzt auf Desktop deutlich höher über dem unteren Rand
+- Browserprüfung findet zusätzlich Playwright-Chromium sowie Chrome und Edge unter Windows
+- manuelles Scrollen ist während des Tutorials per Mausrad, Touch und Tastatur gesperrt
+- die Karte wird vor Tutorialbeginn einmal passend ausgerichtet und bleibt danach über alle Schritte fest stehen
+- ein einziges dauerhaftes Berry-Fenster aktualisiert nur Text, Fortschritt und Zielmarkierung
+- die Zielmarkierung bewegt sich flüssig und ausschließlich nach unten: aktuell, besonders, gesperrt
+- stabile Dialoghöhe auf Desktop und iPhone verhindert sichtbares Springen bei unterschiedlich langen Texten
+- fünf einheitliche, transparente Kampagnensymbole für Route, Stadt, Kampf,
+  Belohnung und Arena
+- feste inhaltliche Symbolzuordnung je Kartenknoten statt wechselnder
+  Lernmechanik-Piktogramme
+- graue gesperrte Knoten mit Schloss, leuchtend blaue aktuelle Knoten und
+  grüne abgeschlossene Knoten mit Haken
+- das eigentliche Orts- oder Ereignissymbol bleibt auch nach dem Abschluss
+  vollständig sichtbar
+- hochwertige, durchgehende Kanto-Landschaft mit Küstenstadt, Wiesenroute,
+  Vertania City, Wald, Felsgebiet und Marmoria-Arena
+- Landschaft, interaktiver Leuchtpfad und Statusknoten bleiben als getrennte
+  Ebenen responsiv und funktional
 
-Korrektur v8 zeigt nach dem vollständigen Freischalten aller fünf Hinweise die
-Aktion „Aufgeben“. Sie beendet die Runde korrekt als verloren und bleibt auch
-nach einem Neustart abgeschlossen. Pokémon-Rufe verwenden nun MP3 als bevorzugte
-iOS-kompatible Quelle und OGG als zweite Quelle; der Wiedergabestart ist zudem
-gegen den auf iOS üblichen noch ungeladenen Audiozustand abgesichert.
+Eine dauerhafte Starterwahl bleibt bewusst außerhalb von Quizmon. Die
+Kapitelbelohnung und weitere Belohnungsvergabe folgen in Sprint 4.
 
-Die vollständige Änderungsbeschreibung steht in `PHASE-4.1-SPRINT-3.md`.
+Die vollständige Funktionsbeschreibung steht in `PHASE-4.3-SPRINT-1.md`.
+Die Architekturkorrektur von v2 ist zusätzlich in
+`PHASE-4.3-SPRINT-1-V2.md` dokumentiert.
+Die Tutorial- und Browserkorrekturen von v3 stehen in
+`PHASE-4.3-SPRINT-1-V3.md`.
+Die Scroll-Sperre von v4 steht in `PHASE-4.3-SPRINT-1-V4.md`.
+Der flüssige, feste Schrittwechsel von v5 steht in
+`PHASE-4.3-SPRINT-1-V5.md`.
+Das neue Kartenknoten- und Symbolsystem von v6 steht in
+`PHASE-4.3-SPRINT-1-V6.md`.
+Die neue Landschaftskarte und die verbindliche Storyreihenfolge von v7 stehen in
+`PHASE-4.3-SPRINT-1-V7.md`.
 
 ## Lokale Prüfung
 
@@ -68,12 +132,16 @@ npm run test:browser
 ```
 
 `npm run check` prüft Syntax, Daten, Übersetzungen, Speicherung, Import,
-Lernsysteme, Wissensplattform, PokéIdle-Logik und PWA-Struktur.
+Kampagnenstruktur, Darkmode, Professor-Berry-Verwendung, Lernsysteme,
+Wissensplattform, PokéIdle, Speedrun und PWA-Struktur.
 
-`npm run test:browser` prüft die zentralen Desktop- und Smartphone-Abläufe,
-einschließlich einer vollständigen PokéIdle-Runde. Im GitHub-Workflow wird
-Chrome eingerichtet und der Browsertest als Veröffentlichungssperre ausgeführt.
+`npm run test:browser` enthält vollständige Desktop- und iPhone-Abläufe für
+Kampagne, Tutorial, Pfad, Touchgrößen und Überlauf. Der Test findet installierte
+Chrome-, Edge-, Chromium- und Playwright-Browser automatisch. Ist keiner
+vorhanden, kann er einmalig mit `npm run setup:browser` installiert werden. Die
+enthaltene GitHub-Workflow-Prüfung installiert Chrome weiterhin automatisch.
 
 ## Start
 
-`index.html` im Browser öffnen oder die Dateien über GitHub Pages beziehungsweise einen lokalen Webserver bereitstellen.
+`index.html` im Browser öffnen oder die Dateien über GitHub Pages beziehungsweise
+einen lokalen Webserver bereitstellen.

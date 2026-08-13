@@ -2,9 +2,9 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "4.1-sprint3-v8";
+  const BUILD_VERSION = "4.3-sprint3-v6";
   const PUBLIC_VERSION = "Beta 1.3";
-  const DATA_SCHEMA = 20;
+  const DATA_SCHEMA = 22;
   const LEARNING_EVENT_LIMIT = 800;
   const ERROR_EVENT_LIMIT = 600;
   const HISTORY_LIMIT = 30;
@@ -16,7 +16,7 @@
   const LEARNING_EVENT_MODES = Object.freeze([...PLAYABLE_MODES, "weak", "daily", "review", "problem", "path"]);
   const ADAPTIVE_SESSION_MODES = Object.freeze(["weak", "problem"]);
   const SUPPORTED_CURRENT_VERSIONS = Object.freeze([
-    "4.1-sprint3-v8", "4.1-sprint3-v7", "4.1-sprint3-v6", "4.1-sprint3-v5", "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
+    "4.3-sprint3-v6", "4.3-sprint3-v5", "4.3-sprint3-v4", "4.3-sprint3-v3", "4.3-sprint3-v2", "4.3-sprint3-v1", "4.3-sprint1-v7", "4.3-sprint1-v6", "4.3-sprint1-v5", "4.3-sprint1-v4", "4.3-sprint1-v3", "4.3-sprint1-v2", "4.3-sprint1-v1", "4.2-sprint1-v1", "4.1-sprint3-v8", "4.1-sprint3-v7", "4.1-sprint3-v6", "4.1-sprint3-v5", "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
     "4.1-sprint1-v1", "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
     "2.5-sprint3-v1", "2.5-sprint2-v1", "2.5-sprint1-v1", "2.4-sprint2-v1", "2.4-sprint1-v1",
     "2.3-sprint2-v3", "2.3-sprint2-v2", "2.3-sprint2-v1", "2.3-sprint1-v1",
@@ -82,7 +82,7 @@
     diagnostics: { errors: [], repairs: [], lastBackup: null, maintenance: { lastRun: null, lastSaveBytes: 0, lastCompaction: null, quotaRecoveries: 0 } },
     route: "home",
     language: defaultLanguage,
-    theme: "system",
+    theme: "dark",
     animations: true,
     haptics: true,
     onboardingComplete: false,
@@ -111,11 +111,13 @@
     lastMode: null,
     lastConfig: null,
     config: {
-      effectiveness: { length: 10, kind: "mixed", difficulty: "medium" },
-      multiplier: { length: 10, defense: "mixed", difficulty: "medium" },
-      impact: { length: 10, defense: "mixed", difficulty: "medium" },
-      pokemon: { length: 10, generation: "all", display: "both", difficulty: "medium" }
+      effectiveness: { length: 10, kind: "mixed", difficulty: "medium", speedrun: 0 },
+      multiplier: { length: 10, defense: "mixed", difficulty: "medium", speedrun: 0 },
+      impact: { length: 10, defense: "mixed", difficulty: "medium", speedrun: 0 },
+      pokemon: { length: 10, generation: "all", display: "both", difficulty: "medium", speedrun: 0 }
     },
+    speedrun: { statistics: QuizmonSpeedrun.blankStatistics() },
+    campaign: QuizmonCampaign.blankProgress(),
     stats: {
       total: 0,
       correct: 0,
@@ -159,8 +161,11 @@
 
   let state = loadState();
   const requestedRoute = new URLSearchParams(location.search).get("route");
-  if (["home", "play", "train", "learn", "knowledge", "stats", "settings", "support", "profile"].includes(requestedRoute)) state.route = requestedRoute;
+  if (["home", "play", "pokeidle", "campaign", "train", "learn", "knowledge", "stats", "settings", "support", "profile"].includes(requestedRoute)) state.route = requestedRoute;
   let session = null;
+  let speedrunClockId = null;
+  let speedrunAdvanceId = null;
+  let speedrunCountdownIds = [];
   let learnType = null;
   let knowledgeView = "home";
   let knowledgePokemonId = null;
@@ -227,6 +232,10 @@
   const HAPTIC_PATTERNS = Object.freeze({
     selection: 5, move: 8, success: [12,28,18], error: [26,32,26],
     combo: [8,18,10,18,24], goal: [12,22,12,22,32], level: [14,34,14,34,34], unlock: [10,24,10]
+  });
+  const campaignUI = QuizmonCampaignUI.createController({
+    campaign: QuizmonCampaign, missions: QuizmonCampaignMissions, view, modalRoot, getState: () => state,
+    getMissionContext:()=>({pokemonById:QuizmonKnowledgeData.BY_ID,itemById:QuizmonKnowledgeContent.ITEM_BY_ID,typeChart:TYPE_CHART}), renderTypeChip:typeChip, pokemonArtwork:id=>artworkUrl(id), itemArtwork:knowledgeItemArtwork, t, escapeHtml, saveState, haptic, motionEnabled, setModalMarkup, closeModal, showConfirmDialog
   });
 
   function clone(value) { return QuizmonCore.clone(value); }
@@ -354,6 +363,8 @@
     output.whosThat.daily = { ...clone(base.whosThat.daily), ...(output.whosThat.daily || {}) };
     output.whosThat.daily.history = output.whosThat.daily.history && typeof output.whosThat.daily.history === "object" ? output.whosThat.daily.history : {};
     output.whosThat.daily.pendingUploads = Array.isArray(output.whosThat.daily.pendingUploads) ? output.whosThat.daily.pendingUploads.slice(-30) : [];
+    output.speedrun = { ...clone(base.speedrun), ...((saved || {}).speedrun || {}) };
+    output.speedrun.statistics = QuizmonSpeedrun.sanitizeStatistics(output.speedrun.statistics);
     output.profile = { ...clone(base.profile), ...((saved || {}).profile || {}) };
     output.profile.unlocked = {
       avatars: unique([...(base.profile.unlocked?.avatars || []), ...(((saved || {}).profile?.unlocked?.avatars) || [])]),
@@ -551,6 +562,9 @@
     repaired.whosThat.difficulty = QuizmonWhosThatPokemon.DIFFICULTIES.includes(repaired.whosThat.difficulty) ? repaired.whosThat.difficulty : "medium";
     repaired.whosThat.round = QuizmonWhosThatPokemon.sanitizeRound(repaired.whosThat.round, WHOS_CONTEXT);
     repaired.whosThat.statistics = QuizmonWhosThatPokemon.sanitizeStatistics(repaired.whosThat.statistics);
+    repaired.speedrun = repaired.speedrun && typeof repaired.speedrun === "object" ? repaired.speedrun : clone(defaults.speedrun);
+    repaired.speedrun.statistics = QuizmonSpeedrun.sanitizeStatistics(repaired.speedrun.statistics);
+    repaired.campaign = QuizmonCampaign.sanitizeProgress(repaired.campaign);
 
     const oldLevel = getLevelInfo(repaired.stats.xp).current.level;
     const oldMastered = TYPES.filter(type => repaired.stats.types[type].total >= 5 && percent(repaired.stats.types[type].correct, repaired.stats.types[type].total) >= 80).length;
@@ -572,7 +586,7 @@
       if (profileSource[field] && repaired.profile[field] !== profileSource[field]) fixes.push(`profile.${field}`);
     });
     if (!validRoute(repaired.route)) { repaired.route = "home"; fixes.push("route"); }
-    repaired.theme = ["system","light","dark"].includes(repaired.theme) ? repaired.theme : "system";
+    repaired.theme = "dark";
     repaired.animations = repaired.animations !== false;
     repaired.haptics = repaired.haptics !== false;
     repaired.onboardingComplete = Boolean(repaired.onboardingComplete);
@@ -599,6 +613,7 @@
     Object.entries(repaired.config).forEach(([mode, config]) => {
       config.length = allowedLengths.includes(config.length) ? config.length : 10;
       config.difficulty = allowedDifficulties.includes(config.difficulty) ? config.difficulty : "medium";
+      config.speedrun = QuizmonSpeedrun.normalizeDuration(config.speedrun);
       if (mode === "effectiveness") config.kind = ["mixed","effective","resisted"].includes(config.kind) ? config.kind : "mixed";
       if (["multiplier","impact"].includes(mode)) config.defense = ["mixed","single","dual"].includes(config.defense) ? config.defense : "mixed";
       if (mode === "pokemon") {
@@ -1240,14 +1255,14 @@
   }
 
   function actualTheme() {
-    return state.theme === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : state.theme;
+    return "dark";
   }
   function applyPreferences() {
     document.documentElement.dataset.theme = actualTheme();
     document.documentElement.dataset.animations = state.animations ? "on" : "off";
     document.documentElement.lang = state.language;
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-      meta.setAttribute("content", actualTheme() === "dark" ? "#10171b" : "#f4f6f8");
+      meta.setAttribute("content", "#071426");
       meta.removeAttribute("media");
     });
     document.querySelectorAll("[data-nav-label]").forEach(item => item.textContent = t(`nav.${item.dataset.navLabel}`));
@@ -1492,6 +1507,8 @@
 
   function routeRank(route) {
     if (route === "home") return 0;
+    if (route === "play") return 4;
+    if (route === "campaign") return 5;
     if (route === "train") return 10;
     if (route.startsWith("setup-")) return 11;
     if (route === "session") return 12;
@@ -1756,8 +1773,9 @@
     return browserHistoryIndex > 0 && Boolean(history.state?.quizmon);
   }
 
-  function setRoute(route, options = {}) {
-    const fromRoute = state.route;
+  function setRoute(route, options = {}) { const fromRoute = state.route;
+    if(fromRoute==="campaign"&&route!=="campaign"&&!options.campaignExit&&campaignUI.isMissionActive()){campaignUI.requestExit(()=>setRoute(route,{...options,campaignExit:true}));return;}
+    if (fromRoute === "session" && route !== "session") clearSpeedrunRuntime();
     const changed = fromRoute !== route;
     if (!options.fromHistory && (changed || options.forceHistory)) replaceBrowserHistorySnapshot();
     prepareRouteMotion(fromRoute, route, options.direction);
@@ -1786,7 +1804,7 @@
     const goal = dailyGoalInfo();
     levelNumber.textContent = `Lv. ${level.current.level}`;
     headerStreak.textContent = `🔥 ${goal.streak}`;
-    if(brandVersion)brandVersion.textContent=["knowledge","learn-detail"].includes(state.route)?`${PUBLIC_VERSION} · ${t("nav.knowledge")}`:PUBLIC_VERSION;
+    if(brandVersion)brandVersion.textContent=["knowledge","learn-detail"].includes(state.route)?`${PUBLIC_VERSION} · ${t("nav.knowledge")}`:state.route==="campaign"?`${PUBLIC_VERSION} · ${t("campaign.title")}`:state.route==="pokeidle"?`${PUBLIC_VERSION} · ${t("whos.title")}`:PUBLIC_VERSION;
     headerStreak.setAttribute("title", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
     headerStreak.setAttribute("aria-label", tp("daily.streakLabelOne", "daily.streakLabel", goal.streak));
   }
@@ -1795,6 +1813,7 @@
     const inner = isInnerRoute(state.route);
     let active = state.route;
     if (state.route.startsWith("setup-") || ["session", "summary"].includes(state.route)) active = "train";
+    if (["pokeidle", "campaign"].includes(state.route)) active = "play";
     if (state.route === "profile") active = "home";
 
     navButtons.forEach(button => {
@@ -1822,6 +1841,8 @@
   function updateDocumentTitle() {
     let label = t("nav.home");
     if (state.route === "play") label = t("nav.play");
+    else if (state.route === "pokeidle") label = t("whos.title");
+    else if (state.route === "campaign") label = t("campaign.title");
     else if (state.route === "train" || state.route.startsWith("setup-") || ["session", "summary"].includes(state.route)) label = t("nav.train");
     else if (state.route === "learn") label = t("nav.learn");
     else if (["knowledge", "learn-detail"].includes(state.route)) label = t("nav.knowledge");
@@ -1839,6 +1860,8 @@
     }
     if (state.route === "summary") return t("a11y.summaryOpened");
     if (state.route === "profile") return t("profile.title");
+    if (state.route === "pokeidle") return t("whos.title");
+    if (state.route === "campaign") return t("campaign.title");
     if (state.route === "learn-detail") return t("nav.knowledge");
     if (state.route.startsWith("setup-")) return t("nav.train");
     return t(`nav.${state.route}`);
@@ -1869,6 +1892,8 @@
 
       if (state.route === "home") renderHome();
       else if (state.route === "play") renderPlay();
+      else if (state.route === "pokeidle") renderPokeidle();
+      else if (state.route === "campaign") renderCampaign();
       else if (state.route === "train") renderTrain();
       else if (state.route === "learn") renderLearn();
       else if (state.route === "knowledge") renderKnowledgePage();
@@ -2143,14 +2168,14 @@
     const finished = whosDailyEntry(dateKey);
     if (finished) {
       const saved = QuizmonWhosThatPokemon.sanitizeRound(finished.round, WHOS_CONTEXT);
-      if (saved) { state.whosThat.round = saved; saveState(); renderPlay(); }
+      if (saved) { state.whosThat.round = saved; saveState(); renderPokeidle(); }
       return;
     }
     state.whosThat.round = QuizmonWhosThatPokemon.createDailyRound({ context: WHOS_CONTEXT, date: `${dateKey}T12:00:00.000Z` });
     whosSuggestionQuery = "";
     whosSelectedPokemonId = null;
     saveState();
-    renderPlay();
+    renderPokeidle();
   }
 
   function completeWhosRound(round) {
@@ -2204,7 +2229,7 @@
       whosSuggestionQuery = "";
       whosSelectedPokemonId = null;
       saveState();
-      renderPlay();
+      renderPokeidle();
       requestAnimationFrame(() => {
         if (window.matchMedia("(min-width: 720px)").matches) document.getElementById("whosGuessInput")?.focus({ preventScroll: true });
       });
@@ -2401,7 +2426,7 @@
       saveState();
       haptic(result.correct ? "success" : "error");
       if (result.correct) enqueueToast("✓", t("whos.correctGuess"), "", "success");
-      renderPlay();
+      renderPokeidle();
       if (result.round.status === "active") requestAnimationFrame(() => {
         const nextStatus = document.getElementById("whosInputStatus");
         if (nextStatus) { nextStatus.textContent = t("whos.wrongGuess"); nextStatus.className = "whos-input-status warning"; }
@@ -2417,7 +2442,7 @@
       state.whosThat.round = result.round;
       saveState();
       haptic("selection");
-      renderPlay();
+      renderPokeidle();
       requestAnimationFrame(() => {
         const status = document.getElementById("whosInputStatus");
         if (status) { status.textContent = t("whos.skippedHint"); status.className = "whos-input-status success"; }
@@ -2435,7 +2460,7 @@
       whosSelectedPokemonId = null;
       saveState();
       haptic("error");
-      renderPlay();
+      renderPokeidle();
     });
   }
 
@@ -2457,14 +2482,20 @@
     document.getElementById("changeWhosDifficulty")?.addEventListener("click", () => { state.whosThat.round = null; whosSuggestionQuery = ""; whosSelectedPokemonId = null; saveState(); renderWhosSetup(); });
   }
 
-  function renderPlay() {
+  function renderPokeidle() {
     const round = QuizmonWhosThatPokemon.sanitizeRound(state.whosThat.round, WHOS_CONTEXT);
     if (state.whosThat.round && !round) { state.whosThat.round = null; saveState(); }
     else if (round) state.whosThat.round = round;
     if (round) renderWhosRound(round);
     else renderWhosSetup();
   }
-
+  function renderPlay() {
+    const progress = QuizmonCampaign.chapterProgress(state.campaign);
+    view.innerHTML = QuizmonPlayModeUI.markup({ t, progress });
+    document.getElementById("openPokeidle")?.addEventListener("click", () => setRoute("pokeidle"));
+    document.getElementById("openCampaign")?.addEventListener("click", () => setRoute("campaign"));
+  }
+  function renderCampaign() { campaignUI.render(); }
 
   function renderFutureArea(kind) {
     const isPlay=kind==="play";
@@ -3035,8 +3066,9 @@
   }
 
   function configSummary(mode, config = state.config[mode] || {}) {
+    const speedrunDuration = QuizmonSpeedrun.normalizeDuration(config.speedrun);
     const length = config.length === "infinite" ? t("setup.endless") : tp("train.questionCountOne", "train.questionCount", config.length || 10);
-    const parts = [length, difficultyLabel(config.difficulty)];
+    const parts = [speedrunDuration ? t("speedrun.summaryLabel", { seconds:speedrunDuration }) : length, difficultyLabel(config.difficulty)];
     if (mode === "effectiveness") parts.push(t(`setup.${config.kind || "mixed"}`));
     if (["multiplier", "impact"].includes(mode)) parts.push(t(`setup.${config.defense || "mixed"}`));
     if (mode === "pokemon") parts.push(config.generation === "all" ? t("common.all") : `Gen ${config.generation}`);
@@ -3086,6 +3118,10 @@
 
   function renderSetup(mode) {
     const config = state.config[mode];
+    const speedrunDuration = QuizmonSpeedrun.normalizeDuration(config.speedrun);
+    const normalStep = speedrunDuration ? "" : "02";
+    const difficultyStep = speedrunDuration ? "02" : "03";
+    const detailStep = speedrunDuration ? "03" : "04";
     const modeDescription = t(`mode.${mode}Desc`);
     const visual = modeVisual(mode);
     view.innerHTML = `
@@ -3109,11 +3145,12 @@
             <p>${t("setup.subtitle")}</p>
           </div>
           <div class="setup-settings-list">
-            ${segmentedSetting("length", t("setup.length"), [[10,"10"],[20,"20"],["infinite",t("setup.endless")]], String(config.length), "01")}
-            ${segmentedSetting("difficulty", t("setup.difficulty"), [["easy",t("setup.easy")],["medium",t("setup.medium")],["hard",t("setup.hard")]], config.difficulty, "02")}
-            ${mode === "effectiveness" ? segmentedSetting("kind", t("setup.kind"), [["mixed",t("setup.mixed")],["effective",t("setup.effective")],["resisted",t("setup.resisted")]], config.kind, "03") : ""}
-            ${["multiplier","impact"].includes(mode) ? segmentedSetting("defense", t("setup.defense"), [["mixed",t("setup.mixed")],["single",t("setup.single")],["dual",t("setup.dual")]], config.defense, "03") : ""}
-            ${mode === "pokemon" ? pokemonSetupSettings(config) : ""}
+            ${speedrunSetting(mode, config, "01")}
+            ${speedrunDuration ? "" : segmentedSetting("length", t("setup.length"), [[10,"10"],[20,"20"],["infinite",t("setup.endless")]], String(config.length), normalStep)}
+            ${segmentedSetting("difficulty", t("setup.difficulty"), [["easy",t("setup.easy")],["medium",t("setup.medium")],["hard",t("setup.hard")]], config.difficulty, difficultyStep)}
+            ${mode === "effectiveness" ? segmentedSetting("kind", t("setup.kind"), [["mixed",t("setup.mixed")],["effective",t("setup.effective")],["resisted",t("setup.resisted")]], config.kind, detailStep) : ""}
+            ${["multiplier","impact"].includes(mode) ? segmentedSetting("defense", t("setup.defense"), [["mixed",t("setup.mixed")],["single",t("setup.single")],["dual",t("setup.dual")]], config.defense, detailStep) : ""}
+            ${mode === "pokemon" ? pokemonSetupSettings(config, Number(detailStep)) : ""}
           </div>
           <div class="setup-launch-bar">
             <div><small>${t("setup.selected")}</small><strong>${escapeHtml(configSummary(mode, config))}</strong></div>
@@ -3127,6 +3164,7 @@
         const key = button.dataset.configKey;
         let value = button.dataset.configValue;
         if (key === "length") value = value === "infinite" ? "infinite" : Number(value);
+        if (key === "speedrun") value = QuizmonSpeedrun.normalizeDuration(value);
         config[key] = value;
         saveState();
         renderSetup(mode);
@@ -3139,14 +3177,29 @@
     return `<div class="setup-setting-card"><div class="setup-setting-title">${step ? `<span>${step}</span>` : ""}<h3>${escapeHtml(title)}</h3></div><div class="tabs segmented-control" role="group" aria-label="${escapeHtml(title)}" style="--tab-count:${options.length}">${options.map(([value,label]) => `<button class="tab-button ${String(value) === String(selected) ? "active" : ""}" aria-pressed="${String(value) === String(selected)}" data-config-key="${key}" data-config-value="${value}">${escapeHtml(label)}</button>`).join("")}</div></div>`;
   }
 
-  function pokemonSetupSettings(config) {
+  function speedrunSetting(mode, config, step = "") {
+    const duration = QuizmonSpeedrun.normalizeDuration(config.speedrun);
+    const best = duration ? QuizmonSpeedrun.bestFor(state.speedrun.statistics, mode, duration) : null;
+    const record = best?.runs
+      ? `<p class="speedrun-setup-record"><span aria-hidden="true">★</span>${t("speedrun.bestSetup", { correct:best.bestCorrect, accuracy:best.bestAccuracy })}</p>`
+      : `<p class="speedrun-setup-record muted"><span aria-hidden="true">◷</span>${t(duration ? "speedrun.noRecord" : "speedrun.optionalHint")}</p>`;
+    return `<div class="setup-setting-card speedrun-setting-card ${duration ? "is-active" : ""}">
+      <div class="setup-setting-title">${step ? `<span>${step}</span>` : ""}<h3>${t("speedrun.title")}</h3><em>${t("speedrun.optional")}</em></div>
+      <div class="tabs segmented-control" role="group" aria-label="${escapeHtml(t("speedrun.title"))}" style="--tab-count:4">
+        ${[[0,t("speedrun.off")],[30,"30 s"],[60,"60 s"],[90,"90 s"]].map(([value,label])=>`<button class="tab-button ${Number(value)===duration?"active":""}" aria-pressed="${Number(value)===duration}" data-config-key="speedrun" data-config-value="${value}">${escapeHtml(label)}</button>`).join("")}
+      </div>${record}
+    </div>`;
+  }
+
+  function pokemonSetupSettings(config, startStep = 3) {
     const generationOptions = [["all",t("common.all")], ...Object.keys(GENERATION_RANGES).map(g => [g,`Gen ${g}`])];
-    return `${segmentedSetting("display",t("setup.display"),[["both",t("setup.both")],["image",t("setup.image")],["name",t("setup.name")]],config.display,"03")}
-      <div class="setup-setting-card"><div class="setup-setting-title"><span>04</span><h3>${t("setup.generation")}</h3></div><div class="tabs segmented-control generation-control" role="group" aria-label="${t("setup.generation")}">${generationOptions.map(([value,label]) => `<button class="tab-button ${String(value)===String(config.generation)?"active":""}" aria-pressed="${String(value)===String(config.generation)}" data-config-key="generation" data-config-value="${value}">${label}</button>`).join("")}</div></div>`;
+    return `${segmentedSetting("display",t("setup.display"),[["both",t("setup.both")],["image",t("setup.image")],["name",t("setup.name")]],config.display,String(startStep).padStart(2,"0"))}
+      <div class="setup-setting-card"><div class="setup-setting-title"><span>${String(startStep+1).padStart(2,"0")}</span><h3>${t("setup.generation")}</h3></div><div class="tabs segmented-control generation-control" role="group" aria-label="${t("setup.generation")}">${generationOptions.map(([value,label]) => `<button class="tab-button ${String(value)===String(config.generation)?"active":""}" aria-pressed="${String(value)===String(config.generation)}" data-config-key="generation" data-config-value="${value}">${label}</button>`).join("")}</div></div>`;
   }
 
   function newSession(mode, config = {}, sequence = null) {
-    const lengthValue = config.length === "infinite" ? Infinity : Number(config.length || sequence?.length || 10);
+    const speedrunDuration = QuizmonSpeedrun.normalizeDuration(config.speedrun);
+    const lengthValue = speedrunDuration || config.length === "infinite" ? Infinity : Number(config.length || sequence?.length || 10);
     return {
       id: typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `session-${Date.now()}-${Math.random().toString(36).slice(2,10)}`,
       mode, config: clone(config), length: sequence ? sequence.length : lengthValue, sequence: sequence ? clone(sequence) : null,
@@ -3155,6 +3208,7 @@
       answered: false, ended: false, currentSpec: null, usedSignatures: [], usedPokemonIds: [],
       xpEarned: 0, levelUps: [], newUnlocks: [], rewardCelebrated: false,
       combo: 0, bestCombo: 0, lastReward: null, previousComparable: null, questionStartedAt: null,
+      speedrun: speedrunDuration ? { duration:speedrunDuration, status:"countdown", deadlineAt:null, startedAt:null, finishedAt:null, recordBefore:QuizmonSpeedrun.bestFor(state.speedrun.statistics,mode,speedrunDuration), record:null, newBest:false } : null,
       smartPlan: null, learningBefore: null, learningProgress: null, problemPlan: null, problemBefore: null, problemProgress: null,
       pathModuleId: null, pathModuleBefore: null, pathProgress: null, pathReview: null, pathExamId: null,
       adaptiveFlow: mode === "weak" ? { offset:0, lastChecked:0, adjustments:[], initialDifficultyCounts:{ easy:0, medium:0, hard:0 } } : null,
@@ -3171,7 +3225,129 @@
     state.route = "session";
     saveState();
     updateNavigation();
-    renderQuestion();
+    if (session.speedrun) prepareSpeedrunSession();
+    else renderQuestion();
+  }
+
+  function isSpeedrunSession() {
+    return Boolean(session?.speedrun && QuizmonSpeedrun.normalizeDuration(session.speedrun.duration));
+  }
+
+  function clearSpeedrunRuntime() {
+    if (speedrunClockId) clearInterval(speedrunClockId);
+    if (speedrunAdvanceId) clearTimeout(speedrunAdvanceId);
+    speedrunCountdownIds.forEach(clearTimeout);
+    speedrunClockId = null;
+    speedrunAdvanceId = null;
+    speedrunCountdownIds = [];
+  }
+
+  function speedrunHasExpired(now = Date.now()) {
+    return isSpeedrunSession() && session.speedrun.status === "running" && QuizmonSpeedrun.remainingMs(session.speedrun.deadlineAt, now) <= 0;
+  }
+
+  function speedrunTimerMarkup() {
+    const seconds = QuizmonSpeedrun.remainingSeconds(session.speedrun.deadlineAt);
+    return `<div id="speedrunClock" class="speedrun-clock ${seconds <= 10 ? "is-urgent" : ""}" role="timer" aria-live="off" aria-label="${escapeHtml(t("speedrun.remaining", { seconds }))}"><small>${t("speedrun.time")}</small><strong>${seconds}</strong><span>s</span></div>`;
+  }
+
+  function updateSpeedrunClock() {
+    if (!isSpeedrunSession() || session.speedrun.status !== "running") return;
+    const milliseconds = QuizmonSpeedrun.remainingMs(session.speedrun.deadlineAt);
+    const seconds = Math.ceil(milliseconds / 1000);
+    const clock = document.getElementById("speedrunClock");
+    if (clock) {
+      const strong = clock.querySelector("strong");
+      if (strong) strong.textContent = String(seconds);
+      clock.classList.toggle("is-urgent", seconds <= 10);
+      clock.setAttribute("aria-label", t("speedrun.remaining", { seconds }));
+    }
+    if (milliseconds <= 0) expireSpeedrun();
+  }
+
+  function startSpeedrunClock() {
+    if (!isSpeedrunSession() || session.speedrun.status !== "running") return;
+    if (speedrunClockId) clearInterval(speedrunClockId);
+    updateSpeedrunClock();
+    speedrunClockId = setInterval(updateSpeedrunClock, 100);
+  }
+
+  async function prepareSpeedrunSession() {
+    if (!isSpeedrunSession()) { renderQuestion(); return; }
+    clearSpeedrunRuntime();
+    if (session.mode === "pokemon" && !session.sequence) {
+      renderSessionLoading();
+      session.prefetchedSpec = await generateFreshSpec();
+      if (!session || state.route !== "session" || !isSpeedrunSession()) return;
+    }
+    renderSpeedrunCountdown();
+  }
+
+  function renderSpeedrunCountdown() {
+    if (!isSpeedrunSession()) return;
+    clearSpeedrunRuntime();
+    const duration = session.speedrun.duration;
+    view.innerHTML = `<section class="panel speedrun-countdown-panel">
+      <div class="speedrun-countdown-identity"><span aria-hidden="true">${iconSvg("time")}</span><small>${t("speedrun.title")}</small><strong>${escapeHtml(modeName(session.mode))} · ${duration} s</strong></div>
+      <div class="speedrun-countdown-value" id="speedrunCountdown" role="status" aria-live="assertive">3</div>
+      <p>${t("speedrun.countdownHint")}</p>
+    </section>`;
+    const countdown = document.getElementById("speedrunCountdown");
+    const setValue = value => {
+      if (!countdown || !session || session.speedrun?.status !== "countdown" || state.route !== "session") return;
+      countdown.textContent = value;
+      countdown.classList.remove("pulse");
+      void countdown.offsetWidth;
+      countdown.classList.add("pulse");
+      haptic(value === t("speedrun.go") ? "success" : "selection");
+    };
+    [[700,"2"],[1400,"1"],[2100,t("speedrun.go")]].forEach(([delay,value]) => speedrunCountdownIds.push(setTimeout(()=>setValue(value), delay)));
+    speedrunCountdownIds.push(setTimeout(() => {
+      if (!session || session.speedrun?.status !== "countdown" || state.route !== "session") return;
+      const now = Date.now();
+      session.startedAt = now;
+      session.speedrun.startedAt = now;
+      session.speedrun.deadlineAt = now + duration * 1000;
+      session.speedrun.status = "running";
+      speedrunCountdownIds = [];
+      startSpeedrunClock();
+      renderQuestion();
+    }, 2650));
+  }
+
+  function canSubmitCurrentAnswer() {
+    if (!session || session.answered) return false;
+    if (speedrunHasExpired()) { expireSpeedrun(); return false; }
+    return true;
+  }
+
+  function showSpeedrunFeedback(correct) {
+    const box = document.getElementById("feedback");
+    if (box) {
+      box.className = `feedback visible speedrun-answer-flash ${correct ? "success" : "error"}`;
+      box.setAttribute("role", "status");
+      box.innerHTML = `<span aria-hidden="true">${correct ? "✓" : "×"}</span><strong>${t(correct ? "speedrun.correct" : "speedrun.wrong")}</strong>`;
+    }
+    document.querySelector(".session-actions")?.classList.add("after-feedback", "speedrun-waiting");
+    haptic(correct ? "success" : "error");
+    if (speedrunAdvanceId) clearTimeout(speedrunAdvanceId);
+    speedrunAdvanceId = setTimeout(() => {
+      speedrunAdvanceId = null;
+      if (speedrunHasExpired()) { expireSpeedrun(); return; }
+      if (!isSpeedrunSession() || session.speedrun.status !== "running") return;
+      session.index += 1;
+      prepareRouteMotion("session", "session", "forward");
+      renderQuestion();
+    }, 430);
+  }
+
+  function expireSpeedrun() {
+    if (!isSpeedrunSession() || ["finished","finishing"].includes(session.speedrun.status)) return;
+    session.speedrun.status = "finishing";
+    session.speedrun.finishedAt = Date.now();
+    session.duration = session.speedrun.duration;
+    clearSpeedrunRuntime();
+    finishSession();
   }
 
   function startDailySession() {
@@ -3328,6 +3504,14 @@
   }
 
   async function generatePokemonSpec(config = {}, excludedIds = []) {
+    if (QuizmonSpeedrun.normalizeDuration(config.speedrun)) {
+      const excluded = new Set(excludedIds.map(Number));
+      const generation = config.generation === "all" ? null : Number(config.generation);
+      const matching = QuizmonKnowledgeData.POKEMON.filter(item => (!generation || Number(item.generation) === generation) && !excluded.has(Number(item.id)));
+      const fallback = QuizmonKnowledgeData.POKEMON.filter(item => !generation || Number(item.generation) === generation);
+      const item = randomItem(matching.length ? matching : fallback);
+      if (item) return { kind:"pokemon", pokemon:{ id:item.id, name:knowledgePokemonName(item), types:[...item.types], image:knowledgeArtwork(item) }, display:config.display || "both", focusTypes:[...item.types] };
+    }
     const pokemon = await loadRandomPokemon(config.generation, excludedIds);
     return { kind:"pokemon", pokemon, display:config.display || "both", focusTypes:[...pokemon.types] };
   }
@@ -3356,12 +3540,17 @@
 
   async function renderQuestion() {
     if (!session) { setRoute("home"); return; }
+    if (isSpeedrunSession() && session.speedrun.status === "countdown") { renderSpeedrunCountdown(); return; }
+    if (speedrunHasExpired()) { expireSpeedrun(); return; }
+    if (isSpeedrunSession() && session.speedrun.status !== "running") return;
     if (session.index >= session.length || (session.sequence && session.index >= session.sequence.length)) { finishSession(); return; }
     session.answered = false;
     session.lastReward = null;
     session.lastAdaptiveUpdate = null;
     if (!session.sequence && session.mode === "pokemon") renderSessionLoading();
-    let spec = session.sequence ? clone(session.sequence[session.index]) : await generateFreshSpec();
+    let spec = session.prefetchedSpec ? clone(session.prefetchedSpec) : session.sequence ? clone(session.sequence[session.index]) : await generateFreshSpec();
+    session.prefetchedSpec = null;
+    if (speedrunHasExpired()) { expireSpeedrun(); return; }
     if (!session || state.route !== "session" || !spec) return;
     const signature = questionSignature(spec);
     session.usedSignatures.push(signature);
@@ -3376,9 +3565,19 @@
     else if (spec.kind === "multiplier") renderMultiplierQuestion(spec);
     else if (spec.kind === "impact") renderImpactQuestion(spec);
     else renderPokemonQuestion(spec);
+    if (isSpeedrunSession()) startSpeedrunClock();
   }
 
   function sessionHeader() {
+    if (isSpeedrunSession()) {
+      const visual = modeVisual(session.mode);
+      const wrong = Math.max(0, session.answers.length - session.correct);
+      return `<header class="session-command-bar speedrun-command-bar">
+        <div class="session-mode-identity"><span>${visual.icon}</span><div><small>${t("speedrun.active")}</small><strong>${escapeHtml(modeName(session.mode))}</strong></div></div>
+        ${speedrunTimerMarkup()}
+        <div class="speedrun-live-results"><span><small>${t("speedrun.correct")}</small><strong id="sessionCorrectLive">${session.correct}</strong></span><span><small>${t("speedrun.wrong")}</small><strong id="sessionWrongLive">${wrong}</strong></span></div>
+      </header>`;
+    }
     const finite = Number.isFinite(session.length);
     const progress = finite ? Math.min(100,Math.round((session.index/session.length)*100)) : 100;
     const label = finite ? t("session.question",{current:session.index+1,total:session.length}) : t("session.questionEndless",{current:session.index+1});
@@ -3397,7 +3596,7 @@
   }
 
   function sessionFooter() {
-    return `<div id="feedback" class="feedback"></div><div class="actions session-actions"><button id="primaryAction" class="primary-button">${t("common.check")}</button><button id="finishSession" class="secondary-button">${t("common.finish")}</button></div>`;
+    return `<div id="feedback" class="feedback"></div><div class="actions session-actions ${isSpeedrunSession() ? "speedrun-actions" : ""}"><button id="primaryAction" class="primary-button">${t("common.check")}</button>${isSpeedrunSession() ? "" : `<button id="finishSession" class="secondary-button">${t("common.finish")}</button>`}</div>`;
   }
 
   function hintHtml(key,title,text) {
@@ -3431,7 +3630,7 @@
   }
 
   function checkEffectiveness(spec) {
-    if(session.answered)return;
+    if(!canSubmitCurrentAnswer())return;
     if(!spec.selected.size){showFeedback("neutral",t("session.chooseFirst"));return;}
     session.answered=true;
     const selected=[...spec.selected];
@@ -3439,6 +3638,7 @@
     const errorTypes=QuizmonQuiz.selectionDifference(selected,spec.correctTargets);
     document.querySelectorAll("[data-answer]").forEach(button=>{const type=button.dataset.answer;button.classList.add("is-locked");button.disabled=true;button.setAttribute("aria-disabled","true");if(spec.correctTargets.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
     recordQuestion(correct,unique([spec.attackingType,...errorTypes]),selected);
+    if(isSpeedrunSession()){showSpeedrunFeedback(correct);return;}
     const subtitle = correct ? t("session.answerConfirmed") : t("explanation.effectivenessReview");
     const reviewTarget = errorTypes[0] || spec.correctTargets[0];
     const learningExtras = correct ? "" : `${explanationLearningHintHtml(spec)}${feedbackReferenceActions({ types:[spec.attackingType,reviewTarget], attacker:spec.attackingType, defenders:[reviewTarget] })}`;
@@ -3606,7 +3806,7 @@
   }
 
   function checkMultiplier(spec) {
-    if(session.answered)return;
+    if(!canSubmitCurrentAnswer())return;
     const missing=TYPES.filter(type=>spec.assignments[type]===null);
     if(missing.length){showFeedback("neutral",t("session.missingTypes",{count:missing.length}));return;}
     session.answered=true;
@@ -3615,6 +3815,7 @@
     document.querySelectorAll(".bucket .type-chip").forEach(chip=>{const type=chip.dataset.type;chip.classList.add("is-locked");chip.disabled=true;chip.setAttribute("aria-disabled","true");chip.classList.add(spec.assignments[type]===effectiveness(type,spec.defendingTypes)?"is-correct":"is-wrong");});
     document.querySelectorAll(".multiplier-panel [data-bucket]").forEach(bucket=>{bucket.classList.add("is-locked");bucket.disabled=true;bucket.setAttribute("aria-disabled","true");});
     recordQuestion(correct,spec.defendingTypes,clone(spec.assignments));
+    if(isSpeedrunSession()){showSpeedrunFeedback(correct);return;}
     const shown=wrong.slice(0,5);
     const correctionCards=shown.map((type,index)=>multiplierCorrection(type,spec.defendingTypes,spec.assignments[type],index)).join("");
     if(correct){
@@ -3658,7 +3859,7 @@
   }
 
   function checkImpact(spec) {
-    if(session.answered)return;
+    if(!canSubmitCurrentAnswer())return;
     if(spec.selectedMultiplier===null){showFeedback("neutral",t("session.chooseMultiplier"));return;}
     session.answered=true;
     const correct=spec.selectedMultiplier===spec.correctMultiplier;
@@ -3669,6 +3870,7 @@
       else if(value===spec.selectedMultiplier)button.classList.add("incorrect");
     });
     recordQuestion(correct,unique([spec.attackingType,...spec.defendingTypes]),spec.selectedMultiplier);
+    if(isSpeedrunSession()){showSpeedrunFeedback(correct);return;}
     const subtitle=correct?t("session.answerConfirmed"):t("session.correctResultShown");
     const learningExtras = correct ? "" : `${explanationLearningHintHtml(spec)}${feedbackReferenceActions({ types:[spec.attackingType,...spec.defendingTypes], attacker:spec.attackingType, defenders:spec.defendingTypes })}`;
     const breakdown=matchupBreakdown(spec.attackingType,spec.defendingTypes,{explain:!correct});
@@ -3706,13 +3908,14 @@
   }
 
   function checkPokemon(spec) {
-    if(session.answered)return;
+    if(!canSubmitCurrentAnswer())return;
     if(!spec.selected.size){showFeedback("neutral",t("session.chooseFirst"));return;}
     session.answered=true;
     const expected=spec.pokemon.types; const selected=[...spec.selected];
     const correct=QuizmonQuiz.isExactSelection(selected,expected);
     document.querySelectorAll("[data-pokemon-type]").forEach(button=>{const type=button.dataset.pokemonType;button.classList.add("is-locked");button.disabled=true;button.setAttribute("aria-disabled","true");if(expected.includes(type))button.classList.add("correct");else if(spec.selected.has(type))button.classList.add("incorrect");});
     recordQuestion(correct,expected,selected);
+    if(isSpeedrunSession()){showSpeedrunFeedback(correct);return;}
     const subtitle=correct?t("session.pokemonConfirmed",{pokemon:spec.pokemon.name}):t("session.pokemonCorrection",{pokemon:spec.pokemon.name});
     const explanation = correct ? "" : `${pokemonTypeExplanationHtml(spec,selected)}${explanationLearningHintHtml(spec)}${feedbackReferenceActions({ types:expected })}`;
     showFeedback(correct?"success":"error",`${feedbackHeading(correct,subtitle)}<div class="feedback-pokemon-types"><span>${t("session.correctTypesLabel")}</span><div>${expected.map(type=>typeChip(type,"small")).join(" ")}</div></div>${explanation}`);
@@ -3773,7 +3976,12 @@
   function updateSessionLiveReward() {
     if (!session) return;
     const correctNode = document.getElementById("sessionCorrectLive");
-    if (correctNode) correctNode.textContent = `✓ ${session.correct}`;
+    if (correctNode) correctNode.textContent = isSpeedrunSession() ? String(session.correct) : `✓ ${session.correct}`;
+    if (isSpeedrunSession()) {
+      const wrongNode = document.getElementById("sessionWrongLive");
+      if (wrongNode) wrongNode.textContent = String(Math.max(0, session.answers.length - session.correct));
+      return;
+    }
     const comboNode = document.getElementById("sessionComboLive");
     if (!comboNode) return;
     const combo = Math.max(0, Number(session.combo || 0));
@@ -4017,17 +4225,17 @@
   }
 
   function recordQuestion(correct,relatedTypes,userAnswer) {
-    const specForReview=serializeCurrentQuestion(); const isReview=session.mode==="review";
-    const modeStats=state.stats.modes[session.mode]||blankModeStats(); state.stats.modes[session.mode]=modeStats; modeStats.total+=1;if(correct)modeStats.correct+=1;
+    const specForReview=serializeCurrentQuestion(); const isReview=session.mode==="review"; const isSpeedrun=isSpeedrunSession();
+    if(!isSpeedrun){const modeStats=state.stats.modes[session.mode]||blankModeStats();state.stats.modes[session.mode]=modeStats;modeStats.total+=1;if(correct)modeStats.correct+=1;}
     const previousCombo=Math.max(0,Number(session.combo||0));
-    if(!isReview){
+    if(!isReview&&!isSpeedrun){
       state.stats.total+=1;
       if(correct){state.stats.correct+=1;state.stats.streak+=1;state.stats.bestStreak=Math.max(state.stats.bestStreak,state.stats.streak);}else state.stats.streak=0;
       unique(relatedTypes).forEach(type=>{const stats=state.stats.types[type];if(!stats)return;stats.total+=1;if(correct)stats.correct+=1;stats.lastSeen=new Date().toISOString();stats.recent.push(Boolean(correct));stats.recent=stats.recent.slice(-10);if(!correct)session.wrongTypes[type]=(session.wrongTypes[type]||0)+1;});
     }
-    const errorEvent=recordErrorAnalysisEvent(correct,userAnswer,specForReview);
-    updateMistakeBook(correct,specForReview,userAnswer,errorEvent);
-    const learningEvent=recordLearningEvent(correct,userAnswer,specForReview);
+    const errorEvent=isSpeedrun?null:recordErrorAnalysisEvent(correct,userAnswer,specForReview);
+    if(!isSpeedrun||!correct)updateMistakeBook(correct,specForReview,userAnswer,errorEvent);
+    const learningEvent=isSpeedrun?null:recordLearningEvent(correct,userAnswer,specForReview);
     const focusKey=session.currentSpec?._smartFocusKey||null;
     const focusObservation=focusKey?learningEvent?.observations?.find(item=>item.key===focusKey):null;
     session.answers.push({
@@ -4039,15 +4247,15 @@
       smartSource:session.currentSpec?._smartSource||null,
       difficulty:session.currentSpec?._smartDifficulty||session.config?.difficulty||null,
       baseDifficulty:session.currentSpec?._smartBaseDifficulty||session.currentSpec?._smartDifficulty||null,
-      duration:Number(learningEvent?.duration||0),
+      duration:Number(learningEvent?.duration||(session.questionStartedAt?Date.now()-session.questionStartedAt:0)),
       sessionAdjustment:session.currentSpec?._smartSessionAdjustment||null,
       pathExamArea:session.currentSpec?._pathExamArea||null,
       pathSourceModule:session.currentSpec?._pathSourceModule||null
     });
-    session.lastAdaptiveUpdate=maybeAdjustSmartTrainingDuringSession();
+    session.lastAdaptiveUpdate=isSpeedrun?null:maybeAdjustSmartTrainingDuringSession();
     if(correct){
       session.correct+=1;
-      session.combo=previousCombo+1;
+      session.combo=isSpeedrun?0:previousCombo+1;
       session.bestCombo=Math.max(Number(session.bestCombo||0),session.combo);
       if(isReview) session.reviewPending = session.reviewPending.filter(signature => signature !== questionSignature(specForReview));
     }else{
@@ -4056,8 +4264,8 @@
       if(isReview&&session.sequence){session.sequence.push(clone(specForReview));session.length+=1;}
     }
     const baseXp=correct?(isReview?5:10):0;
-    const bonusXp=correct?comboBonusFor(session.combo,isReview):0;
-    const dailyGoal=recordDailyGoalProgress();
+    const bonusXp=correct&&!isSpeedrun?comboBonusFor(session.combo,isReview):0;
+    const dailyGoal=isSpeedrun&&!correct?{...dailyGoalInfo(),completedNow:false,bonusXp:0,show:false}:recordDailyGoalProgress();
     session.lastReward={correct,baseXp,bonusXp,combo:session.combo,previousCombo,isReview,dailyGoal};
     addXp(baseXp+bonusXp+dailyGoal.bonusXp);
     if(dailyGoal.completedNow){
@@ -4143,10 +4351,22 @@
     if(!session){setRoute("home");return;}
     if(session.ended){setRoute("summary");return;}
     session.ended=true;
-    const duration=Math.max(1,Math.round((Date.now()-session.startedAt)/1000));
+    const isSpeedrun=isSpeedrunSession();
+    const duration=isSpeedrun?session.speedrun.duration:Math.max(1,Math.round((Date.now()-session.startedAt)/1000));
     session.duration=duration;
     const total=session.answers.length;
     const rate=percent(session.correct,total);
+    if(isSpeedrun){
+      clearSpeedrunRuntime();
+      const result=QuizmonSpeedrun.recordRun(state.speedrun.statistics,{id:session.id,date:new Date().toISOString(),mode:session.mode,duration,answers:total,correct:session.correct});
+      state.speedrun.statistics=result.statistics;
+      session.speedrun.status="finished";
+      session.speedrun.finishedAt=session.speedrun.finishedAt||Date.now();
+      session.speedrun.record=result.record;
+      session.speedrun.previous=result.previous;
+      session.speedrun.newBest=result.newBest;
+      saveState();setRoute("summary",{direction:"forward"});return;
+    }
     const isReview=session.mode==="review";
     if(!isReview&&total){
       const previous=state.stats.history.find(item=>item&&item.mode===session.mode&&Number(item.answers)>0&&(session.mode!=="path"||item.pathModuleId===session.pathModuleId)&&String(item.trainingListId||"")===String(session.trainingList?.id||""));
@@ -4309,6 +4529,7 @@
 
   function renderSummary() {
     if(!session){setRoute("home");return;}
+    if(isSpeedrunSession()){renderSpeedrunSummary();return;}
     const { total,rate,xpEarned,canReview,reviewComplete,verdict,visual,duration,levelInfo,unlockedItems,unlockCount,didLevelUp,nextReward,momentum,comparison,dailyGoal,wrongFocus }=buildSummaryContext();
 
     view.innerHTML=`<section class="summary-shell cleanup-summary">
@@ -4361,6 +4582,40 @@
     document.getElementById("openUnlockedRewards")?.addEventListener("click",openProfileCustomizer);
     document.getElementById("continueMomentum")?.addEventListener("click",()=>startMomentumSession(canReview));
     document.getElementById("goHome").addEventListener("click",()=>{session=null;setRoute("home");});
+  }
+
+  function renderSpeedrunSummary() {
+    const total=session.answers.length;
+    const correct=session.correct;
+    const wrong=Math.max(0,total-correct);
+    const accuracy=percent(correct,total);
+    const duration=session.speedrun.duration;
+    const record=session.speedrun.record||QuizmonSpeedrun.bestFor(state.speedrun.statistics,session.mode,duration);
+    const xpEarned=Math.max(0,state.stats.xp-session.startXp);
+    const visual=modeVisual(session.mode);
+    view.innerHTML=`<section class="speedrun-summary-shell">
+      <section class="speedrun-summary-hero ${session.speedrun.newBest?"is-record":""}">
+        <div class="summary-mode-pill"><span>${visual.icon}</span><strong>${escapeHtml(modeName(session.mode))} · ${duration} s</strong></div>
+        <div class="speedrun-summary-title"><span aria-hidden="true">${session.speedrun.newBest?"★":"◷"}</span><div><p class="quiz-kicker">${t("speedrun.finished")}</p><h1>${t(session.speedrun.newBest?"speedrun.newRecord":"speedrun.timeUp")}</h1><p>${t("speedrun.summaryText",{seconds:duration})}</p></div></div>
+        <p class="speedrun-xp-note">+${xpEarned} XP · ${t("speedrun.correctDailyHint")}</p>
+      </section>
+      <section class="speedrun-result-grid" aria-label="${escapeHtml(t("speedrun.results"))}">
+        <article><small>${t("speedrun.answered")}</small><strong>${total}</strong></article>
+        <article class="correct"><small>${t("speedrun.correct")}</small><strong>${correct}</strong></article>
+        <article class="wrong"><small>${t("speedrun.wrong")}</small><strong>${wrong}</strong></article>
+        <article><small>${t("speedrun.accuracy")}</small><strong>${accuracy}%</strong></article>
+      </section>
+      <section class="speedrun-record-card"><span aria-hidden="true">★</span><div><small>${t("speedrun.personalBest")}</small><strong>${t("speedrun.bestResult",{correct:record.bestCorrect,accuracy:record.bestAccuracy})}</strong><p>${t("speedrun.recordScope",{mode:modeName(session.mode),seconds:duration})}</p></div></section>
+      <section class="speedrun-summary-actions">
+        <button type="button" id="repeatSpeedrun" class="primary-button">${t("speedrun.again")}</button>
+        <button type="button" id="changeSpeedrunTime" class="secondary-button">${t("speedrun.otherTime")}</button>
+        <button type="button" id="backToTraining" class="ghost-button">${t("speedrun.backToTraining")}</button>
+      </section>
+    </section>`;
+    document.getElementById("repeatSpeedrun")?.addEventListener("click",()=>startSession(session.mode));
+    document.getElementById("changeSpeedrunTime")?.addEventListener("click",()=>{const mode=session.mode;session=null;setRoute(`setup-${mode}`);});
+    document.getElementById("backToTraining")?.addEventListener("click",()=>{session=null;setRoute("train");});
+    if(session.speedrun.newBest&&!session.rewardCelebrated){session.rewardCelebrated=true;haptic("level");}
   }
 
   function renderKnowledgePage() {
@@ -7334,6 +7589,7 @@
         ${progressKpi(iconSvg("sessions"),t("stats.sessions"),state.stats.sessions,t("stats.completedSessions"))}
       </section>
       ${learningProfileEntryMarkup()}
+      ${speedrunProgressMarkup()}
       <section class="progress-overview-grid">
         <div class="progress-overview-main">
           <div class="section-title"><h2>${t("stats.modePerformance")}</h2><p>${t("stats.modePerformanceHint")}</p></div>
@@ -7355,6 +7611,12 @@
   }
 
   function progressKpi(icon,label,value,hint){return `<article class="progress-kpi-card"><span class="progress-kpi-icon">${icon}</span><div><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong><p>${escapeHtml(hint)}</p></div></article>`;}
+
+  function speedrunProgressMarkup(){
+    const entries=QuizmonSpeedrun.MODES.flatMap(mode=>QuizmonSpeedrun.DURATIONS.map(duration=>({mode,duration,record:QuizmonSpeedrun.bestFor(state.speedrun.statistics,mode,duration)}))).filter(item=>item.record.runs>0);
+    if(!entries.length)return "";
+    return `<section class="speedrun-progress-section"><div class="section-title"><h2>${t("stats.speedrunTitle")}</h2><p>${t("stats.speedrunHint")}</p></div><div class="speedrun-progress-grid">${entries.map(({mode,duration,record})=>`<article><span>${modeVisual(mode).icon}</span><div><small>${escapeHtml(modeName(mode))} · ${duration} s</small><strong>${record.bestCorrect}</strong><p>${record.bestAccuracy}% · ${tp("speedrun.runOne","speedrun.runMany",record.runs,{count:record.runs})}</p></div></article>`).join("")}</div></section>`;
+  }
 
   function modePerformanceCard(mode){
     const s=state.stats.modes[mode]||blankModeStats();
@@ -7759,19 +8021,17 @@
   }
 
   function renderSettings() {
-    const dark=actualTheme()==="dark";
     const languageLabel=state.language==="de"?"Deutsch":"English";
-    const themeLabel=dark?t("settings.dark"):t("settings.light");
     view.innerHTML=`<section class="settings-page">
-      <section class="settings-hero"><div><p class="quiz-kicker">${t("settings.centerKicker")}</p><h1>${t("settings.centerTitle")}</h1><p>${t("settings.centerSubtitle")}</p></div><div class="settings-current-overview"><div class="settings-current-heading"><small>${t("settings.currentTitle")}</small><p>${t("settings.currentHint")}</p></div><div class="settings-status-grid"><span><small>${t("settings.language")}</small><strong>${languageLabel}</strong></span><span><small>${t("settings.theme")}</small><strong>${themeLabel}</strong></span><span><small>${t("settings.animations")}</small><strong>${state.animations?t("settings.on"):t("settings.off")}</strong></span></div></div></section>
+      <section class="settings-hero"><div><p class="quiz-kicker">${t("settings.centerKicker")}</p><h1>${t("settings.centerTitle")}</h1><p>${t("settings.centerSubtitle")}</p></div><div class="settings-current-overview"><div class="settings-current-heading"><small>${t("settings.currentTitle")}</small><p>${t("settings.currentHint")}</p></div><div class="settings-status-grid"><span><small>${t("settings.language")}</small><strong>${languageLabel}</strong></span><span><small>${t("settings.animations")}</small><strong>${state.animations?t("settings.on"):t("settings.off")}</strong></span></div></div></section>
       <section class="settings-group"><div class="settings-group-heading"><span>◐</span><div><h2>${t("settings.experience")}</h2><p>${t("settings.experienceHint")}</p></div></div><div class="settings-list modern-settings-list">
         ${settingSelectRow("languageSelect","文",t("settings.language"),t("settings.languageDesc"),`<option value="de" ${state.language==="de"?"selected":""}>Deutsch</option><option value="en" ${state.language==="en"?"selected":""}>English</option>`)}
-        ${settingToggleRow("themeToggle","◐",t("settings.theme"),t("settings.themeDesc"),dark)}
         ${settingToggleRow("animationToggle","↝",t("settings.animations"),t("settings.animationsDesc"),state.animations)}
         ${settingToggleRow("hapticToggle","≈",t("settings.haptics"),t("settings.hapticsDesc"),state.haptics)}
       </div></section>
       <section class="settings-group"><div class="settings-group-heading"><span>?</span><div><h2>${t("settings.guidance")}</h2><p>${t("settings.guidanceHint")}</p></div></div><div class="settings-list modern-settings-list">
         ${settingActionRow("restartTutorial","◎",t("settings.tutorial"),t("settings.tutorialDesc"),t("common.start"))}
+        ${settingActionRow("restartCampaignTutorial","⌁",t("campaign.settingsTutorial"),t("campaign.settingsTutorialDesc"),t("common.start"))}
       </div></section>
       <section class="settings-group"><div class="settings-group-heading"><span>⇄</span><div><h2>${t("settings.dataSupport")}</h2><p>${t("settings.dataSupportHint")}</p></div></div><div class="settings-list modern-settings-list">
         ${settingActionRow("exportProgress","↓",t("settings.export"),t("settings.exportDesc"),t("settings.exportAction"))}
@@ -7785,10 +8045,10 @@
       </div></section>
     </section>`;
     document.getElementById("languageSelect").addEventListener("change",event=>{state.language=event.target.value;saveState();applyPreferences();renderSettings();});
-    document.getElementById("themeToggle").addEventListener("click",()=>{state.theme=dark?"light":"dark";saveState();applyPreferences();renderSettings();});
     document.getElementById("animationToggle").addEventListener("click",()=>{state.animations=!state.animations;saveState();applyPreferences();renderSettings();});
     document.getElementById("hapticToggle").addEventListener("click",()=>{state.haptics=!state.haptics;saveState();renderSettings();});
     document.getElementById("restartTutorial").addEventListener("click",()=>{state.onboardingComplete=false;saveState();openOnboarding(0);});
+    document.getElementById("restartCampaignTutorial").addEventListener("click",()=>{state.campaign.tutorialComplete=false;state.campaign.tutorialStep=0;saveState();setRoute("campaign");});
     document.getElementById("exportProgress").addEventListener("click",exportProgress);
     document.getElementById("importProgress").addEventListener("click",()=>document.getElementById("importFile").click());
     document.getElementById("importFile").addEventListener("change",importProgress);
@@ -7983,10 +8243,11 @@
 
   async function installApp(){if(isStandalone()){enqueueToast("✓",t("home.install"),t("install.alreadyInstalled"));return;}if(!deferredInstallPrompt){showInstallGuide();return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;renderHome();}
 
-  backButton.addEventListener("click",()=>{
-    if(state.route==="learn"&&state.learnTab==="cards"&&flashcardSession){finishFlashcardSession();return;}
+  backButton.addEventListener("click",()=>{if(state.route==="learn"&&state.learnTab==="cards"&&flashcardSession){finishFlashcardSession();return;}
     if(state.route==="session"){requestExitSession("train");return;}
+    if(state.route==="campaign"&&campaignUI.isMissionActive()){campaignUI.requestExit();return;}
     if(canUseBrowserBack()){history.back();return;}
+    if(["pokeidle","campaign"].includes(state.route)){setRoute("play");return;}
     if(state.route==="profile"){setRoute("home");return;}
     if(state.route==="learn-detail"){if(knowledgeSearchOpenedResult){returnToKnowledgeSearchResults();return;}setRoute("knowledge");return;}
     if(state.route.startsWith("setup-")){setRoute("train");return;}
@@ -8048,8 +8309,6 @@
     event.preventDefault();
     backButton.click();
   });
-
-
   window.addEventListener("popstate", event => {
     const target = event.state?.quizmon;
     if (!target?.snapshot) return;
@@ -8068,12 +8327,13 @@
       });
       return;
     }
+    if(state.route==="campaign"&&campaignUI.isMissionActive()&&target.snapshot.route!=="campaign"){pushBrowserHistorySnapshot();campaignUI.requestExit(()=>restoreRouteSnapshot(target.snapshot,{replace:true}));return;}
     restoreRouteSnapshot(target.snapshot);
   });
 
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{if(state.theme==="system")applyPreferences();});
   reducedMotionQuery.addEventListener?.("change",()=>{applyPreferences();scheduleViewMotion();});
   window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;if(state.route==="home")renderHome();});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&isSpeedrunSession()&&session.speedrun.status==="running")updateSpeedrunClock();});
 
   document.addEventListener("error", event => {
     const image = event.target;
@@ -8103,7 +8363,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=4.1-sprint3-v8",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=4.3-sprint3-v6",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{

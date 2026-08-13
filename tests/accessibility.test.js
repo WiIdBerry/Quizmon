@@ -38,9 +38,11 @@ test("locked training answers leave the keyboard order", () => {
   assert.doesNotMatch(app, /button\.setAttribute\("aria-live","polite"\)/);
 });
 
-test("manual themes update every browser theme-color declaration", () => {
+test("permanent dark mode keeps the browser chrome color in sync", () => {
   assert.match(app, /querySelectorAll\('meta\[name="theme-color"\]'\)/);
+  assert.match(app, /meta\.setAttribute\("content", "#071426"\)/);
   assert.match(app, /meta\.removeAttribute\("media"\)/);
+  assert.doesNotMatch(app, /id="themeToggle"/);
 });
 
 

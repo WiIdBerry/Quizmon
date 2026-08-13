@@ -1,0 +1,78 @@
+Quizmon Beta 1.3 – Phase 4.3 Kampagnensystem · Sprint 3 v4
+Testnachweis vom 13.08.2026
+
+Build: 4.3-sprint3-v4
+Datenschema: 22
+
+Automatischer Gesamtcheck
+-------------------------
+Befehl: npm run check
+Ergebnis: BESTANDEN
+Node-Tests: 222 bestanden, 0 fehlgeschlagen, 0 übersprungen
+
+Geprüft wurden insbesondere:
+- neun spielbare Missionen und eine für Sprint 4 reservierte Kapiteltruhe
+- genau 10 feste Fragen und 8 benötigte Treffer an jedem spielbaren Knoten
+- identische Fragensätze und Lernreihenfolge bei jedem Wiederholungsversuch
+- neu gemischte Antwortpositionen gegen reines Auswendigklicken
+- unmittelbares Richtig-/Falsch-Feedback mit Erklärung
+- eindeutige, ausreichend große und zweisprachige Fragenpools
+- strenge Ortsfilter für alle Pokémon- und Item-Fragen sowie Antwortoptionen
+- Alabastia ausschließlich mit Bisasam, Glumanda und Schiggy
+- Alabastia ausschließlich mit positiver Namens- und Typzuordnung
+- keine Typeneffektivität oder Attacken im ersten Gebiet
+- Typeneffektivität beginnt erst beim ersten Rivalenkampf
+- Entwicklungen beginnen erst im Vertania-Wald
+- keine Basiswert-, Größen-, Gewichts-, Pokédexnummern- oder Levelabfragen
+- feste Lernreihenfolge mit gezielter Einführung, Wiederholung und Anwendung
+- jede Schwächenantwort wird gegen die gespeicherte Typentabelle validiert
+- Route 1 ausschließlich mit Taubsi und Rattfratz
+- korrekte FR/LG-Inhalte für Route 22, Route 2, Vertania-Wald und Rocko
+- Vertania City als frühe Item- und Heilungsmission
+- grüne Abschlüsse und blaue Freischaltung des nächsten Pflichtknotens
+- Route 22 und zweiter Rivalenkampf als nicht blockierender Seitenzweig
+- Wiederholung, Fehlversuch und abgesicherter Abbruch laufender Missionen
+- Reparatur importierter Kampagnenstände anhand gültiger Voraussetzungen
+- Service-Worker-Cache und Importkompatibilität mit Sprint 1 v1 bis v7
+- bestehende Tutorial-, Karten-, Wissens-, PokéIdle- und Speedrun-Funktionen
+- dieselbe zentrale Bildfunktion für Kampagne und Wissenswelt
+- identische offizielle PokeAPI-Artworks in beiden Bereichen
+- lokale PNG-Abbildungen aller 14 Pokémon des ersten Kapitels
+- farbige Typ-Chips aus dem bestehenden Quizmon-Typsystem
+- eigene Farbwelten für Forschungs-, Trainer-, Begegnungs-, Route- und Arenenmissionen
+- keine verräterischen Typ-Chips an Pokémon-Antworten, deren Typ selbst gefragt ist
+- Offline-Cache aller neuen Kampagnenabbildungen
+
+Architekturstand
+----------------
+app.js Sprint 3 v4: 618.958 Byte, 8.388 Zeilen
+campaign.js: 7.544 Byte, 148 Zeilen
+campaign-missions.js: 30.848 Byte, 486 Zeilen
+campaign-ui.js: 38.010 Byte, 629 Zeilen
+network.js: 1.725 Byte, 35 Zeilen
+
+Browser-Smoke-Test
+------------------
+Befehl: npm run test:browser
+Ergebnis: BESTANDEN
+Browser: Chromium 149
+Desktop: 1.440 × 1.000 Pixel
+iPhone: 390 × 844 Pixel
+
+Der echte Browserlauf spielte Alabastia mit zehn Fragen vollständig durch,
+prüfte eine absichtlich falsche Antwort samt Erklärung, bestand mit 9/10,
+kontrollierte den grünen Abschluss und die Freischaltung des ersten
+Rivalenkampfs. Zusätzlich wurden iPhone-Missionslayout, Touchziele,
+Abbruchdialog, horizontale Überbreite, Tutorial, Karte, Navigation sowie die
+bestehenden PokéIdle-, Speedrun- und Wissensabläufe geprüft. Während des Laufs
+traten keine Browserausnahmen auf. Desktop- und iPhone-Screenshots wurden
+zusätzlich visuell geprüft. Der Browser bestätigte außerdem geladene
+offizielle Pokémon-Abbildungen mit echter Bildbreite, farbige Typ-Chips ohne
+Wortumbruch und die violette Trainer-Farbwelt auf iPhone-Größe. Der feste
+Alabastia-Fragensatz wurde vollständig in seiner vorgesehenen Reihenfolge
+gespielt.
+
+Sprintstatus
+------------
+Technisch bereit zur Nutzerprüfung. Sprint bleibt bis zur ausdrücklichen
+Abnahme offen.

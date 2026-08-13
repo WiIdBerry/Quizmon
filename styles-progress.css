@@ -46,6 +46,7 @@
 .mode-performance-top b { color:var(--text-strong); font-size:15px; }
 .mode-performance-card .progress-track { margin-top:12px; }
 .mode-performance-card p { margin:7px 0 0; color:var(--muted); font-size:10px; }
+.speedrun-progress-section{margin-top:18px}.speedrun-progress-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.speedrun-progress-grid article{min-width:0;padding:13px;display:grid;grid-template-columns:39px minmax(0,1fr);gap:10px;align-items:center;border:1px solid color-mix(in srgb,var(--primary) 22%,var(--line));border-radius:17px;background:linear-gradient(145deg,color-mix(in srgb,var(--primary) 5%,var(--surface-solid)),var(--surface-soft));box-shadow:var(--shadow-xs)}.speedrun-progress-grid article>span{width:39px;height:39px;display:grid;place-items:center;border-radius:12px;color:var(--primary);background:var(--surface-solid)}.speedrun-progress-grid svg{width:20px;height:20px}.speedrun-progress-grid small,.speedrun-progress-grid strong,.speedrun-progress-grid p{display:block}.speedrun-progress-grid small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:9px;font-weight:850}.speedrun-progress-grid strong{margin-top:2px;color:var(--text-strong);font-size:23px;line-height:1}.speedrun-progress-grid p{margin:3px 0 0;color:var(--muted);font-size:9px}
 .progress-overview-side { min-width:0; }
 .progress-recommendation { width:100%; min-height:118px; align-items:flex-start; padding:17px; }
 .progress-recommendation small { display:block; margin-bottom:3px; color:var(--primary); font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
@@ -83,6 +84,7 @@
 .modern-type-stat-body p { margin:2px 0 0; color:var(--muted); font-size:10px; }
 .modern-type-stat-card .type-library-progress { margin-top:10px; }
 @media (hover:hover) { .modern-type-stat-card:hover { transform:translateY(-2px); border-color:color-mix(in srgb,var(--type-color) 48%,var(--line)); box-shadow:var(--shadow); } }
+@media(max-width:620px){.speedrun-progress-grid{grid-template-columns:1fr}}
 .mistake-book-hero, .achievement-summary-card { display:grid; gap:16px; align-items:center; padding:20px; border:1px solid var(--line); border-radius:23px; background:linear-gradient(135deg,color-mix(in srgb,var(--surface-solid) 92%,var(--primary) 8%),var(--surface-soft)); box-shadow:var(--shadow-sm); }
 .mistake-book-hero h2, .achievement-summary-card h2 { margin:0; color:var(--text-strong); font-size:clamp(22px,4vw,31px); letter-spacing:-.035em; }
 .mistake-book-hero p, .achievement-summary-card p { margin:7px 0 0; color:var(--muted); line-height:1.45; }
@@ -237,5 +239,4 @@
   .modern-setting-row > .switch, .modern-setting-row > .select-control, .modern-setting-row > .secondary-button, .modern-setting-row > .danger-button { grid-column:2; justify-self:stretch; width:100%; min-width:0; }
   .modern-setting-row > .switch { width:52px; justify-self:end; }
 }
-
 

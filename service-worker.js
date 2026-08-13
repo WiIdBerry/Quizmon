@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "quizmon-beta-1-3";
-const BUILD = "4.1-sprint3-v8";
+const BUILD = "4.3-sprint3-v6";
 const SHELL_CACHE = `${CACHE_PREFIX}-${BUILD}-shell`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}-${BUILD}-runtime`;
 const CURRENT_CACHES = new Set([SHELL_CACHE, RUNTIME_CACHE]);
@@ -14,6 +14,7 @@ const SHELL = Object.freeze([
   "./styles-base.css",
   "./styles-home.css",
   "./styles-play.css",
+  "./styles-campaign.css",
   "./styles-training.css",
   "./styles-learning.css",
   "./styles-knowledge.css",
@@ -36,6 +37,11 @@ const SHELL = Object.freeze([
   "./router.js",
   "./network.js",
   "./motivation.js",
+  "./speedrun.js",
+  "./campaign.js",
+  "./campaign-missions.js",
+  "./campaign-ui.js",
+  "./play-mode-ui.js",
   "./difficulty-engine.js",
   "./learning-engine.js",
   "./error-analysis.js",
@@ -65,7 +71,28 @@ const SHELL = Object.freeze([
   "./assets/pokemon-placeholder.svg",
   "./assets/item-placeholder.svg",
   "./assets/generic-placeholder.svg",
-  "./assets/pokeidle-symbol.png"
+  "./assets/pokeidle-symbol.png",
+  "./assets/professor-berry.png",
+  "./assets/campaign-kanto-chapter-1-background.png",
+  "./assets/campaign-icons/route.svg",
+  "./assets/campaign-icons/city.svg",
+  "./assets/campaign-icons/battle.svg",
+  "./assets/campaign-icons/reward.svg",
+  "./assets/campaign-icons/arena.svg",
+  "./assets/pokemon-artwork/1.png",
+  "./assets/pokemon-artwork/4.png",
+  "./assets/pokemon-artwork/7.png",
+  "./assets/pokemon-artwork/10.png",
+  "./assets/pokemon-artwork/11.png",
+  "./assets/pokemon-artwork/13.png",
+  "./assets/pokemon-artwork/14.png",
+  "./assets/pokemon-artwork/16.png",
+  "./assets/pokemon-artwork/19.png",
+  "./assets/pokemon-artwork/21.png",
+  "./assets/pokemon-artwork/25.png",
+  "./assets/pokemon-artwork/56.png",
+  "./assets/pokemon-artwork/74.png",
+  "./assets/pokemon-artwork/95.png"
 ]);
 
 const SCOPE_URL = new URL(self.registration.scope);

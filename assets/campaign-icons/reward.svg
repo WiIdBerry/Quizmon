@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 96 96" color="#ffffff" role="img" aria-labelledby="title desc">
+  <title id="title">Quizmon Schatztruhensymbol</title>
+  <desc id="desc">Kompakte Schatztruhe mit gewölbtem Deckel, Metallbändern und zentralem Schloss.</desc>
+
+  <defs>
+    <clipPath id="chest-lid">
+      <path d="M15 44v-9c0-14.4 11.6-26 26-26h14c14.4 0 26 11.6 26 26v9Z"/>
+    </clipPath>
+    <mask id="keyhole-cutout">
+      <rect width="96" height="96" fill="#fff"/>
+      <circle cx="48" cy="56.5" r="3.1" fill="#000"/>
+      <path d="M46.4 58.6h3.2v6.2a1.6 1.6 0 0 1-3.2 0Z" fill="#000"/>
+    </mask>
+  </defs>
+
+  <g mask="url(#keyhole-cutout)" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Truhenkorpus -->
+    <path
+      d="M13 49h70v28c0 4.4-3.6 8-8 8H21c-4.4 0-8-3.6-8-8Z"
+      fill="currentColor"
+      fill-opacity=".18"
+      stroke-width="5.5"
+    />
+
+    <!-- Gewölbter Deckel -->
+    <path
+      d="M15 44v-9c0-14.4 11.6-26 26-26h14c14.4 0 26 11.6 26 26v9Z"
+      fill="currentColor"
+      fill-opacity=".18"
+      stroke-width="5.5"
+    />
+
+    <!-- Dezente Holzfelder des Deckels -->
+    <g clip-path="url(#chest-lid)" fill="none" opacity=".48">
+      <path d="M17 29h62" stroke-width="3.2"/>
+      <path d="M30 12v32M66 12v32" stroke-width="4.2"/>
+    </g>
+
+    <!-- Metallband an der Öffnung -->
+    <path
+      d="M10 43h76v11H10Z"
+      fill="currentColor"
+      fill-opacity=".28"
+      stroke-width="5.5"
+    />
+
+    <!-- Holzfelder und seitliche Metallbänder -->
+    <path d="M15 65h66" fill="none" stroke-width="3.2" opacity=".46"/>
+    <path d="M22 55v20M74 55v20" fill="none" stroke-width="6" opacity=".64"/>
+
+    <!-- Verstärkter Sockel -->
+    <path
+      d="M13 74h70v4c0 3.9-3.1 7-7 7H20c-3.9 0-7-3.1-7-7Z"
+      fill="currentColor"
+      fill-opacity=".42"
+      stroke-width="4.6"
+    />
+
+    <!-- Schlossplatte -->
+    <path
+      d="M41 49v-2.5a7 7 0 0 1 14 0V68l-7 8-7-8Z"
+      fill="currentColor"
+      fill-opacity=".62"
+      stroke-width="5"
+    />
+
+    <!-- Kleine Lichtkante -->
+    <path d="M21 23.5c4.5-6 10.5-8.8 18-8.8" fill="none" stroke-width="3.6" opacity=".5"/>
+  </g>
+</svg>

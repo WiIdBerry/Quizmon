@@ -30,6 +30,12 @@ Quizmon liefert Namen, Beziehungen und Kerndaten lokal aus. Pokémon-Artworks un
 Item-Sprites werden bei Bedarf geladen, begrenzt gecacht und bei fehlender
 Verbindung durch lokale Platzhalter ersetzt.
 
+Für die 14 Pokémon des ersten Kampagnenkapitels sind dieselben offiziellen
+PokeAPI-Artworks lokal enthalten, die auch die Wissenswelt verwendet. Beide
+Bereiche beziehen ihre Bildadresse über dieselbe Quizmon-Funktion. Dadurch
+unterscheiden sich Kampagne und Wissenswelt weder in Motiv noch Stil; zugleich
+bleiben diese ersten Kapitelbilder offline verfügbar.
+
 ## PokéIdle
 
 Die datenbasierten Hinweise aus Phase 4.1 Sprint 1 werden ausschließlich aus den
