@@ -1,19 +1,80 @@
 # Quizmon Beta 1.3
 
-## Phase 4.3 – Spielbare Kanto-Missionen · Sprint 3 v6
+## Phase 4.3 – Abschluss und Qualität · Sprint 5 v1
 
 Diese Version baut ausschließlich auf dem zuletzt abgenommenen Stand
-`Quizmon-Beta-1.3-Phase-4.3-Sprint-1-v7-Windows.zip` auf.
+`Quizmon-Beta-1.3-Phase-4.3-Sprint-4-v4-Windows.zip` auf.
 
 ### Versionsstand
 
 - Öffentliche Version: `Beta 1.3`
-- Build: `4.3-sprint3-v6`
-- Datenschema: `22`
+- Build: `4.3-sprint5-v1`
+- Datenschema: `23`
 - Lernpfadversion: `3` (unverändert)
-- Service Worker: `4.3-sprint3-v6`
+- Service Worker: `4.3-sprint5-v1`
 
-### Neu in v6
+### Neu in Sprint 5 v1
+
+- gestaffelte Missions-, Fragen-, Fehlerfeedback-, Freischaltungs- und Belohnungsanimationen
+- vollständige Bewegungsreduktion über Systemeinstellung und Quizmon-Schalter
+- gezieltes iPhone-Profil ohne teure Kartenfilter, Blur und dauerhafte Schattenanimationen
+- semantische Fortschrittsanzeigen, Fokusführung, Pfeiltasten-Navigation und Hochkontrastmodus
+- zuverlässige Rückkehr zur gespeicherten Kartenposition und zum richtigen Knoten
+- robustere Wiederherstellung beschädigter Zahlen, Sterne, Zeitstempel und Fortschrittsketten
+- beschädigte aktuelle Speicherstände blockieren die Suche nach älteren kompatiblen Ständen nicht mehr
+- zusätzliche End-to-End-Logiktests für alle Missionstypen, beide Kampagnenpfade, Wiederholungen,
+  einmalige Belohnungen, Speicherung, Altstand-Migrationen und Sonderfälle
+
+Die Abschlussprüfung und der manuelle iPhone-Prüfplan stehen in
+`PHASE-4.3-SPRINT-5-V1.md` und `IPHONE-MANUAL-CHECKLIST-SPRINT-5.md`.
+
+### Basis aus Sprint 4 v4
+
+### Neu in Sprint 4 v4
+
+- Größe der Kartensterne bleibt unverändert bei 30 Pixel
+- Abstand zwischen Sternreihe und Knotenkreis vollständig entfernt
+- Sternreihe berührt jetzt direkt den oberen Rand normaler und aktueller Knoten
+
+Die Positionskorrektur steht in `PHASE-4.3-SPRINT-4-V4.md`.
+
+### Neu in Sprint 4 v3
+
+- Kartensterne von 20 auf 30 Pixel vergrößert
+- Sternreihe verbreitert und weiter nach oben versetzt
+- Schatten und gelbes Leuchten für die größere Darstellung verstärkt
+- Sterne bleiben vollständig oberhalb des jeweiligen Knotens
+
+Die Größenkorrektur steht in `PHASE-4.3-SPRINT-4-V3.md`.
+
+### Neu in Sprint 4 v2
+
+- die kleinen beschreibenden Untertitel wurden vollständig von den Kartenknoten entfernt
+- unter jedem Knoten bleibt nur der eindeutige Orts- oder Missionsname stehen
+- die drei Bewertungssterne stehen jetzt direkt oberhalb des zugehörigen Knotens
+- Kartensterne sind deutlich größer, kontrastreicher und unabhängig vom Knotentitel positioniert
+- die optionale Kennzeichnung von Route 22 sitzt seitlich und kollidiert nicht mit den Sternen
+
+Die visuelle Korrektur steht in `PHASE-4.3-SPRINT-4-V2.md`.
+
+### Neu in Sprint 4 v1
+
+- jede abgeschlossene Mission erhält abhängig vom ersten Durchlauf ein bis drei Sterne
+- Bestwert, beste Sterne, letzter Wert, Versuche und Abschlusszeitpunkte bleiben gespeichert
+- der nächste Pflichtknoten wird erst durch ein echtes Missionsergebnis freigeschaltet
+- Erstabschluss, neue Sternstufen, Wiederholung und Bestwertverbesserung besitzen getrennte XP-Regeln
+- Erstabschluss- und Sternbelohnungen werden durch eine eindeutige Belohnungsliste nur einmal vergeben
+- Wiederholungen bleiben möglich und geben eine kleinere, missionsabhängige Trainingsbelohnung
+- die Missionsauswertung zeigt Sterne, XP-Aufteilung, Bestwert und den neu freigeschalteten Knoten
+- die Rückkehr führt automatisch zum gerade freigeschalteten beziehungsweise wiederholten Kartenknoten
+- der Felsorden und 250 XP können nach Rocko genau einmal eingesammelt werden
+- die Kapitelbelohnung schließt Kapitel 1 ab und schaltet den nächsten Kanto-Abschnitt als Vorschau frei
+- alte Sprint-3-Speicherstände werden auf das neue Belohnungssystem migriert; verdiente einmalige XP werden einmal nachgetragen
+- vollständige deutsche und englische Oberfläche für Sterne, Ergebnisse, Belohnungen und Kapitelabschluss
+
+Die technische Umsetzung steht in `PHASE-4.3-SPRINT-4-V1.md`.
+
+### Bereits enthalten aus Sprint 3 v6
 
 - `Spielen` ist jetzt eine eigenständige Modusauswahl mit genau zwei gleichwertigen Karten
 - PokéIdle und Kampagne besitzen jeweils eine große Bildfläche, eine kurze Erklärung und einen direkten Einstieg
@@ -37,7 +98,7 @@ Diese Version baut ausschließlich auf dem zuletzt abgenommenen Stand
 - Route 22 und der zweite Rivalenkampf bleiben vollständig optional
 - vollständige Missionswiederholungen bleiben jederzeit möglich
 - laufende Versuche besitzen einen abgesicherten Abbruchdialog
-- die Kapiteltruhe bleibt sichtbar, ist aber bis Sprint 4 nicht einlösbar
+- die Kapiteltruhe bleibt bis zum Abschluss von Rockos Arena gesperrt
 - Fragen und Antwortoptionen werden strikt auf den jeweiligen Ort begrenzt
 - vollständige deutsche und englische Missionsoberfläche
 - Offline-Cache für das neue Missionsmodul
@@ -108,8 +169,7 @@ Die gleichwertige Spielen-Modusauswahl von v6 steht in
 - Landschaft, interaktiver Leuchtpfad und Statusknoten bleiben als getrennte
   Ebenen responsiv und funktional
 
-Eine dauerhafte Starterwahl bleibt bewusst außerhalb von Quizmon. Die
-Kapitelbelohnung und weitere Belohnungsvergabe folgen in Sprint 4.
+Eine dauerhafte Starterwahl bleibt bewusst außerhalb von Quizmon.
 
 Die vollständige Funktionsbeschreibung steht in `PHASE-4.3-SPRINT-1.md`.
 Die Architekturkorrektur von v2 ist zusätzlich in

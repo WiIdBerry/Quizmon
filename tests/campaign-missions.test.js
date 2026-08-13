@@ -209,18 +209,24 @@ test("mistake reviews are rephrased and become guided binary questions after rep
 
 test("required progress unlocks in order while Route 22 and the second rival remain optional", () => {
   let progress = campaign.blankProgress();
+  const complete = nodeId => {
+    progress = campaign.recordMissionResult(progress, nodeId, { firstRunCorrect:campaign.MISSION_GOALS[nodeId], completedAt:"2026-08-13T12:00:00.000Z" });
+    progress = campaign.completeNode(progress, nodeId);
+  };
   assert.equal(progress.currentNodeId, "pallet-town");
   assert.equal(campaign.canStartNode(progress, "route-one"), false);
-  for (const nodeId of ["pallet-town","rival-one","route-one","viridian-city"]) progress = campaign.completeNode(progress, nodeId);
+  assert.equal(campaign.recordMissionResult(progress, "route-one", { firstRunCorrect:10 }).missionResults["route-one"], undefined, "locked missions reject forged results");
+  assert.deepEqual(campaign.completeNode(progress, "pallet-town").completedNodeIds, [], "a node needs a saved mission result");
+  for (const nodeId of ["pallet-town","rival-one","route-one","viridian-city"]) complete(nodeId);
   assert.equal(progress.currentNodeId, "route-two");
   assert.equal(campaign.nodeStatus(progress, "route-twenty-two"), "available");
   assert.equal(campaign.nodeStatus(progress, "rival-two"), "locked");
-  progress = campaign.completeNode(progress, "route-twenty-two");
+  complete("route-twenty-two");
   assert.equal(progress.currentNodeId, "route-two");
   assert.equal(campaign.nodeStatus(progress, "rival-two"), "available");
-  progress = campaign.completeNode(progress, "rival-two");
+  complete("rival-two");
   assert.equal(progress.currentNodeId, "route-two");
-  for (const nodeId of ["route-two","viridian-forest","pewter-gym"]) progress = campaign.completeNode(progress, nodeId);
+  for (const nodeId of ["route-two","viridian-forest","pewter-gym"]) complete(nodeId);
   assert.equal(progress.currentNodeId, "chapter-reward");
   assert.equal(campaign.canStartNode(progress, "chapter-reward"), false);
   assert.deepEqual(campaign.chapterProgress(progress), { completed:7, total:8, percent:88 });

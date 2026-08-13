@@ -198,12 +198,12 @@ test("current build and the single service-worker registration are consistent", 
   const pkg = JSON.parse(read("package.json"));
   const combined = `${html}
 ${app}`;
-  assert.match(app, /const BUILD_VERSION = "4\.3-sprint3-v6"/);
-  assert.match(app, /service-worker\.js\?build=4\.3-sprint3-v6/);
+  assert.match(app, /const BUILD_VERSION = "4\.3-sprint5-v1"/);
+  assert.match(app, /service-worker\.js\?build=4\.3-sprint5-v1/);
   assert.doesNotMatch(html, /navigator\.serviceWorker\.register/);
   assert.equal((combined.match(/navigator\.serviceWorker\.register/g) || []).length, 1);
-  assert.match(sw, /const BUILD = "4\.3-sprint3-v6"/);
-  assert.equal(pkg.version, "1.3.0-4.3-sprint3.6");
+  assert.match(sw, /const BUILD = "4\.3-sprint5-v1"/);
+  assert.equal(pkg.version, "1.3.0-4.3-sprint5.1");
   assert.match(app, /"3\.5-sprint2-v2"/);
 });
 

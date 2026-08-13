@@ -11,8 +11,8 @@ test("Phase 4.1 play mode remains integrated in the Phase 4.3 build", () => {
   assert.match(html, /whos-that-pokemon\.js/);
   assert.ok(html.indexOf("whos-that-pokemon.js") < html.indexOf("app.js"));
   assert.match(app, /const PUBLIC_VERSION = "Beta 1\.3"/);
-  assert.match(app, /const BUILD_VERSION = "4\.3-sprint3-v6"/);
-  assert.match(app, /const DATA_SCHEMA = 22/);
+  assert.match(app, /const BUILD_VERSION = "4\.3-sprint5-v1"/);
+  assert.match(app, /const DATA_SCHEMA = 23/);
   assert.match(app, /state\.route === "play"\) renderPlay\(\)/);
   assert.match(app, /state\.route === "pokeidle"\) renderPokeidle\(\)/);
   assert.match(app, /function renderWhosSetup/);

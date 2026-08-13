@@ -146,7 +146,8 @@ test("campaign UI keeps approved icons visible and adds separate state badges", 
     currentNodeId: "rival-one",
     selectedNodeId: "pallet-town",
     completedNodeIds: ["pallet-town"],
-    unlockedNodeIds: ["pallet-town", "rival-one"]
+    unlockedNodeIds: ["pallet-town", "rival-one"],
+    missionResults:{ "pallet-town":{ lastFirstRunCorrect:9, bestFirstRunCorrect:9, masteredMistakes:1, attempts:1 } }
   });
   harness.controller.render();
   const markup = harness.view.innerHTML;
@@ -155,6 +156,10 @@ test("campaign UI keeps approved icons visible and adds separate state badges", 
   assert.match(markup, /data-campaign-node="route-one"[^>]*><img[^>]+data-campaign-icon="route"[^>]*><span class="campaign-node-state-badge is-locked"/);
   assert.match(markup, /data-campaign-node="pewter-gym"[^>]*><img[^>]+data-campaign-icon="arena"/);
   assert.match(markup, /data-campaign-node="chapter-reward"[^>]*><img[^>]+data-campaign-icon="reward"/);
+  const palletNode = markup.match(/<div class="campaign-node complete[\s\S]*?<\/div>/)?.[0] || "";
+  assert.ok(palletNode.indexOf("campaign-node-stars") < palletNode.indexOf("data-campaign-node=\"pallet-town\""), "Stars must sit before and above the node button");
+  assert.equal((palletNode.match(/class="earned"/g) || []).length, 2);
+  assert.doesNotMatch(markup, /campaign-node-label[^>]*>[^\n]*<small>/, "Map nodes must not show descriptive subtitles");
   assert.equal((markup.match(/campaign-node-badge/g) || []).length, 1, "Only the Route 22 branch entry should carry the optional badge");
   const currentButton = markup.match(/<button[^>]+data-campaign-node="rival-one"[\s\S]*?<\/button>/)?.[0] || "";
   assert.doesNotMatch(currentButton, /campaign-node-state-badge/);

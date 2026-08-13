@@ -48,6 +48,7 @@
       t,
       escapeHtml,
       saveState,
+      addXp = () => {},
       haptic,
       motionEnabled,
       setModalMarkup,
@@ -65,6 +66,8 @@
     let tutorialStep = 0;
     let detailOpen = false;
     let activeMission = null;
+    let chapterCelebration = null;
+    let returnNotice = null;
     let removeTutorialPositionListeners = null;
     let removeTutorialScrollLock = null;
 
@@ -150,21 +153,27 @@
       return t(`campaign.status.${status}`);
     }
 
-    function nodeMarkup(node) {
-      const currentState = state();
-      const status = campaign.nodeStatus(currentState.campaign, node.id);
+    function starsMarkup(count, className = "") {
+      const safeCount = Math.max(0, Math.min(3, Math.floor(Number(count) || 0)));
+      return `<span class="campaign-stars ${className}" role="img" aria-label="${escapeHtml(t("campaign.starsLabel", { count:safeCount }))}">${[1,2,3].map(star => `<i class="${star <= safeCount ? "earned" : ""}" aria-hidden="true">★</i>`).join("")}</span>`;
+    }
+
+    function nodeMarkup(node, currentState = state(), status = campaign.nodeStatus(currentState.campaign, node.id)) {
       const title = t(node.titleKey);
-      const subtitle = t(node.subtitleKey);
+      const result = currentState.campaign.missionResults[node.id];
       const specialClass = ["rival", "reward", "arena"].includes(node.type) ? node.type : "";
       const branchClass = node.branch ? "branch" : "";
-      return `<div class="campaign-node ${status} ${specialClass} ${branchClass}" style="--node-x:${node.x}%;--node-y:${node.y}px" data-campaign-tutorial-target="${node.id === currentState.campaign.currentNodeId ? "current" : node.id === "route-one" ? "locked" : node.id === "rival-one" ? "special" : ""}">
-        <button type="button" class="campaign-node-button" data-campaign-node="${escapeHtml(node.id)}" aria-label="${escapeHtml(`${title}: ${nodeStateLabel(status)}`)}" ${status === "current" ? 'aria-current="step"' : ""}>${icon(node.icon)}${stateBadge(status)}${node.optionalEntry ? `<i class="campaign-node-badge">${t("campaign.optionalShort")}</i>` : ""}</button>
-        <span class="campaign-node-label"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span>
+      const returningClass = returnNotice?.nodeId === node.id ? `is-return-target ${returnNotice.kind === "unlocked" && returnNotice.animate !== false ? "just-unlocked" : ""}` : "";
+      const starLabel = result ? ` · ${t("campaign.starsLabel", { count:result.bestStars })}` : "";
+      return `<div class="campaign-node ${status} ${specialClass} ${branchClass} ${returningClass}" style="--node-x:${node.x}%;--node-y:${node.y}px" data-campaign-tutorial-target="${node.id === currentState.campaign.currentNodeId ? "current" : node.id === "route-one" ? "locked" : node.id === "rival-one" ? "special" : ""}">
+        ${result ? starsMarkup(result.bestStars, "campaign-node-stars") : ""}
+        <button type="button" class="campaign-node-button" data-campaign-node="${escapeHtml(node.id)}" aria-label="${escapeHtml(`${title}: ${nodeStateLabel(status)}${starLabel}`)}" ${status === "current" ? 'aria-current="step"' : ""}>${icon(node.icon)}${stateBadge(status)}${node.optionalEntry ? `<i class="campaign-node-badge">${t("campaign.optionalShort")}</i>` : ""}</button>
+        <span class="campaign-node-label"><strong>${escapeHtml(title)}</strong></span>
       </div>`;
     }
 
     function landscapeMarkup() {
-      return '<div class="campaign-map-landscape" aria-hidden="true"><img src="assets/campaign-kanto-chapter-1-background.png" alt="" draggable="false"></div>';
+      return '<div class="campaign-map-landscape" aria-hidden="true"><img src="assets/campaign-kanto-chapter-1-background.png" alt="" draggable="false" loading="eager" decoding="async" fetchpriority="high"></div>';
     }
 
     function pathMarkup() {
@@ -179,20 +188,30 @@
       </svg>`;
     }
 
-    function detailMarkup(node) {
-      const currentState = state();
-      const status = campaign.nodeStatus(currentState.campaign, node.id);
-      const reward = node.rewardKey ? t(node.rewardKey) : node.reward || (node.type === "reward" ? t("campaign.detail.chapterUnlock") : t("campaign.detail.standardReward"));
+    function detailMarkup(node, currentState = state(), status = campaign.nodeStatus(currentState.campaign, node.id)) {
+      const result = currentState.campaign.missionResults[node.id];
+      const preview = campaign.missionRewardPreview(currentState.campaign, node.id);
+      const canClaim = node.type === "reward" && campaign.canClaimChapterReward(currentState.campaign);
+      const reward = node.type === "reward"
+        ? t(status === "complete" ? "campaign.reward.chapterClaimed" : "campaign.reward.chapterPreview", { xp:campaign.CHAPTER_REWARD_XP })
+        : preview ? t(preview.completed ? "campaign.reward.repeatPreview" : "campaign.reward.firstPreview", { xp:preview.xp, stars:preview.maxStarXp }) : "";
       const canStart = Boolean(missions.MISSION_SPECS[node.id]) && campaign.canStartNode(currentState.campaign, node.id);
-      const actionKey = node.type === "reward" ? "campaign.mission.rewardLater" : status === "locked" ? "campaign.preview.locked" : status === "complete" ? "campaign.mission.repeat" : "campaign.mission.start";
+      const canAct = canStart || canClaim;
+      const actionKey = node.type === "reward" ? status === "complete" ? "campaign.reward.claimed" : canClaim ? "campaign.reward.claim" : "campaign.preview.locked" : status === "locked" ? "campaign.preview.locked" : status === "complete" ? "campaign.mission.repeat" : "campaign.mission.start";
+      const resultMarkup = result ? `<div class="campaign-detail-result">${starsMarkup(result.bestStars)}<span><small>${t("campaign.bestResult")}</small><strong>${result.bestFirstRunCorrect}/${result.total}</strong></span><span><small>${t("campaign.attempts")}</small><strong>${result.attempts}</strong></span></div>` : "";
       return `<aside class="campaign-mission-panel ${detailOpen ? "is-open" : ""}" aria-labelledby="campaignDetailTitle">
         <button type="button" id="campaignDetailClose" class="campaign-detail-close" aria-label="${escapeHtml(t("common.close"))}">×</button>
-        <header class="campaign-detail-heading"><small>${t("campaign.detail.kicker")}</small><h2 id="campaignDetailTitle">${escapeHtml(t(node.titleKey))}</h2><p>${escapeHtml(t(node.subtitleKey))}</p></header>
+        <header class="campaign-detail-heading"><small>${t("campaign.detail.kicker")}</small><h2 id="campaignDetailTitle" tabindex="-1">${escapeHtml(t(node.titleKey))}</h2><p>${escapeHtml(t(node.subtitleKey))}</p></header>
         <div class="campaign-detail-visual" aria-hidden="true"><span>${icon(node.icon)}</span></div>
         <div class="campaign-detail-copy">${escapeHtml(t(node.descriptionKey))}</div>
-        <div class="campaign-detail-meta"><span><b aria-hidden="true">◎</b><span><small>${t("campaign.detail.state")}</small><strong>${escapeHtml(nodeStateLabel(status))}</strong></span></span><span><b aria-hidden="true">★</b><span><small>${t("campaign.detail.reward")}</small><strong>${escapeHtml(reward)}</strong></span></span></div>
-        <button type="button" id="campaignMissionStart" class="campaign-preview-action ${canStart ? "current" : ""}" ${canStart ? "" : "disabled"}>${t(actionKey)}</button>
+        ${resultMarkup}<div class="campaign-detail-meta"><span><b aria-hidden="true">◎</b><span><small>${t("campaign.detail.state")}</small><strong>${escapeHtml(nodeStateLabel(status))}</strong></span></span><span><b aria-hidden="true">★</b><span><small>${t("campaign.detail.reward")}</small><strong>${escapeHtml(reward)}</strong></span></span></div>
+        <button type="button" id="${node.type === "reward" ? "campaignRewardClaim" : "campaignMissionStart"}" class="campaign-preview-action ${canAct ? "current" : ""}" ${canAct ? "" : "disabled"}>${t(actionKey)}</button>
       </aside>`;
+    }
+
+    function nextSectionMarkup(progress) {
+      if (!progress.nextSectionUnlocked) return "";
+      return `<section class="campaign-next-section" aria-labelledby="campaignNextSectionTitle"><span aria-hidden="true">✓</span><div><small>${t("campaign.nextSectionKicker")}</small><h3 id="campaignNextSectionTitle">${t("campaign.nextSectionTitle")}</h3><p>${t("campaign.nextSectionText")}</p></div><b>${t("campaign.nextSectionUnlocked")}</b></section>`;
     }
 
     function scrollToNode(nodeId = state().campaign.currentNodeId, behavior = "smooth") {
@@ -200,35 +219,54 @@
       target?.scrollIntoView({ behavior: motionEnabled() ? behavior : "auto", block: "center" });
     }
 
+    function restoreSavedMapPosition(nodeId = state().campaign.selectedNodeId, focusNode = false) {
+      win.requestAnimationFrame?.(() => {
+        const top = Math.max(0, Math.floor(Number(state().campaign.lastMapScroll) || 0));
+        if (top) win.scrollTo?.({ top, left:0, behavior:"auto" });
+        else scrollToNode(nodeId, "auto");
+        if (focusNode) view.querySelector(`[data-campaign-node="${nodeId}"]`)?.focus?.({ preventScroll:true });
+      });
+    }
+
     function renderMap() {
       const currentState = state();
       currentState.campaign = campaign.sanitizeProgress(currentState.campaign);
       const progress = campaign.chapterProgress(currentState.campaign);
       const selected = campaign.nodeById(currentState.campaign.selectedNodeId);
+      const completedNodeIds = new Set(currentState.campaign.completedNodeIds);
+      const unlockedNodeIds = new Set(currentState.campaign.unlockedNodeIds);
+      const statusForNode = nodeId => completedNodeIds.has(nodeId) ? "complete" : currentState.campaign.currentNodeId === nodeId ? "current" : unlockedNodeIds.has(nodeId) ? "available" : "locked";
+      const animateReturn = Boolean(returnNotice?.animate && motionEnabled());
       view.innerHTML = `<section class="campaign-page" aria-labelledby="campaignTitle">
+        ${returnNotice ? `<div class="campaign-map-return ${returnNotice.kind} ${animateReturn ? "is-celebrating" : ""}" role="status" aria-live="polite" aria-atomic="true"><span aria-hidden="true">${returnNotice.kind === "unlocked" ? "✦" : "↻"}</span><strong>${t(returnNotice.kind === "unlocked" ? "campaign.return.unlocked" : "campaign.return.position")}</strong></div>` : ""}
         <header class="campaign-topline"><div class="campaign-region-copy"><small>${t("campaign.regionKicker")}</small><h1 id="campaignTitle">${t("campaign.regionKanto")}</h1><p>${t("campaign.regionText")}</p></div><div class="campaign-top-actions"><button type="button" id="campaignCurrent" class="campaign-current-button" aria-label="${escapeHtml(t("campaign.toCurrent"))}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg><span>${t("campaign.toCurrent")}</span></button></div></header>
         <div class="campaign-layout"><section class="campaign-map-card" aria-labelledby="campaignChapterTitle" data-campaign-tutorial-target="map">
-          <header class="campaign-chapter-header"><div class="campaign-chapter-title"><small>${t("campaign.chapterKicker")}</small><h2 id="campaignChapterTitle">${t("campaign.chapterTitle")}</h2></div><div class="campaign-progress" aria-label="${escapeHtml(t("campaign.progressLabel", { completed: progress.completed, total: progress.total }))}"><span class="campaign-progress-track"><i style="width:${progress.percent}%"></i></span><strong>${progress.completed}/${progress.total}</strong></div></header>
-          <div class="campaign-map-stage">${landscapeMarkup()}${pathMarkup()}${campaign.NODES.map(nodeMarkup).join("")}</div>
-        </section>${detailMarkup(selected)}</div>
+          <header class="campaign-chapter-header"><div class="campaign-chapter-title"><small>${t("campaign.chapterKicker")}</small><h2 id="campaignChapterTitle">${t("campaign.chapterTitle")}</h2></div><div class="campaign-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${progress.total}" aria-valuenow="${progress.completed}" aria-valuetext="${escapeHtml(t("campaign.progressLabel", { completed: progress.completed, total: progress.total }))}"><span class="campaign-progress-track"><i style="width:${progress.percent}%"></i></span><strong aria-hidden="true">${progress.completed}/${progress.total}</strong></div></header>
+          <div class="campaign-map-stage">${landscapeMarkup()}${pathMarkup()}${campaign.NODES.map(node => nodeMarkup(node, currentState, statusForNode(node.id))).join("")}</div>${nextSectionMarkup(currentState.campaign)}
+        </section>${detailMarkup(selected, currentState, statusForNode(selected.id))}</div>
       </section>`;
+      if (returnNotice) returnNotice.animate = false;
 
       view.querySelectorAll("[data-campaign-node]").forEach(button => button.addEventListener("click", () => {
+        const top = Math.max(0, Math.floor(Number(win.scrollY) || 0));
         state().campaign.selectedNodeId = button.dataset.campaignNode;
+        state().campaign.lastMapScroll = top;
         detailOpen = true;
         saveState();
-        const top = win.scrollY;
         renderMap();
         win.scrollTo({ top, behavior: "auto" });
         haptic("selection");
+        win.requestAnimationFrame?.(() => view.querySelector("#campaignDetailTitle")?.focus?.({ preventScroll:true }));
       }));
       view.querySelector("#campaignCurrent")?.addEventListener("click", () => scrollToNode());
       view.querySelector("#campaignMissionStart")?.addEventListener("click", () => startMission(selected.id));
+      view.querySelector("#campaignRewardClaim")?.addEventListener("click", claimChapterReward);
       view.querySelector("#campaignDetailClose")?.addEventListener("click", () => {
         detailOpen = false;
         const top = win.scrollY;
         renderMap();
         win.scrollTo({ top, behavior: "auto" });
+        win.requestAnimationFrame?.(() => view.querySelector(`[data-campaign-node="${selected.id}"]`)?.focus?.({ preventScroll:true }));
       });
 
       if (currentState.onboardingComplete && !currentState.campaign.tutorialComplete && !tutorialOpen) {
@@ -330,20 +368,26 @@
     function missionProgressMarkup(mission) {
       if (mission.phase === "mastery") {
         const current = Math.min(mission.reviewTotal, mission.mastered + 1);
-        return `<div class="campaign-mission-progress mastery" aria-label="${escapeHtml(t("campaign.mission.masteryProgress", { current, total:mission.reviewTotal }))}"><span><i style="width:${mission.reviewTotal ? mission.mastered / mission.reviewTotal * 100 : 100}%"></i></span><strong>${current}/${mission.reviewTotal}</strong></div>`;
+        return `<div class="campaign-mission-progress mastery" role="progressbar" aria-valuemin="0" aria-valuemax="${mission.reviewTotal}" aria-valuenow="${mission.mastered}" aria-valuetext="${escapeHtml(t("campaign.mission.masteryProgress", { current, total:mission.reviewTotal }))}"><span><i style="width:${mission.reviewTotal ? mission.mastered / mission.reviewTotal * 100 : 100}%"></i></span><strong aria-hidden="true">${current}/${mission.reviewTotal}</strong></div>`;
       }
       const current = Math.min(mission.length, mission.index + 1);
-      return `<div class="campaign-mission-progress" aria-label="${escapeHtml(t("campaign.mission.progress", { current, total:mission.length }))}"><span><i style="width:${current / mission.length * 100}%"></i></span><strong>${current}/${mission.length}</strong></div>`;
+      return `<div class="campaign-mission-progress" role="progressbar" aria-valuemin="1" aria-valuemax="${mission.length}" aria-valuenow="${current}" aria-valuetext="${escapeHtml(t("campaign.mission.progress", { current, total:mission.length }))}"><span><i style="width:${current / mission.length * 100}%"></i></span><strong aria-hidden="true">${current}/${mission.length}</strong></div>`;
     }
 
     function startMission(nodeId) {
       if (!campaign.canStartNode(state().campaign, nodeId) || !missions.MISSION_SPECS[nodeId]) return;
       const built = missions.buildMission(nodeId, getMissionContext());
+      state().campaign.lastMapScroll = Math.max(0, Math.floor(Number(win.scrollY) || 0));
+      const previousResult = state().campaign.missionResults[nodeId];
       activeMission = {
         ...built, index:0, correct:0, selectedOptionId:null, checked:false, answers:[], phase:"question", passed:false,
-        reviewQueue:[], reviewQuestion:null, reviewAttempts:{}, reviewAnswers:[], reviewTotal:0, mastered:0, directGoalMet:false
+        reviewQueue:[], reviewQuestion:null, reviewAttempts:{}, reviewAnswers:[], reviewTotal:0, mastered:0, directGoalMet:false,
+        previouslyCompleted:state().campaign.completedNodeIds.includes(nodeId), previousBest:previousResult?.bestFirstRunCorrect || 0, rewardOutcome:null, newlyUnlockedNodeId:null,
+        animateMissionIntro:true, animateQuestion:true, animateSummary:false, focusAfterRender:"question"
       };
       detailOpen = false;
+      returnNotice = null;
+      saveState();
       haptic("selection");
       renderMission();
       win.scrollTo?.({ top:0, left:0, behavior:"auto" });
@@ -360,26 +404,41 @@
       const missionContext = getMissionContext();
       const selected = activeMission.selectedOptionId;
       const correct = activeMission.checked && missions.isCorrect(currentQuestion, selected);
+      const animateMissionIntro = Boolean(activeMission.animateMissionIntro && motionEnabled());
+      const animateQuestion = Boolean(activeMission.animateQuestion && motionEnabled());
+      const focusAfterRender = activeMission.focusAfterRender;
+      activeMission.animateMissionIntro = false;
+      activeMission.animateQuestion = false;
+      activeMission.focusAfterRender = null;
       const answerMarkup = currentQuestion.options.map(candidate => {
         const chosen = selected === candidate.id;
         const correctChoice = activeMission.checked && candidate.id === currentQuestion.correctOptionId;
         const wrongChoice = activeMission.checked && chosen && !correctChoice;
         const presentation = answerPresentation(candidate, missionContext);
-        return `<button type="button" class="campaign-answer answer-kind-${presentation.kind} ${chosen ? "is-selected" : ""} ${correctChoice ? "is-correct" : ""} ${wrongChoice ? "is-wrong" : ""}" data-campaign-answer="${escapeHtml(candidate.id)}" aria-pressed="${chosen}" ${activeMission.checked ? "disabled" : ""}>${presentation.html}</button>`;
+        return `<button type="button" class="campaign-answer answer-kind-${presentation.kind} ${chosen ? "is-selected" : ""} ${correctChoice ? "is-correct" : ""} ${wrongChoice ? "is-wrong" : ""}" data-campaign-answer="${escapeHtml(candidate.id)}" aria-pressed="${chosen}" ${activeMission.checked ? 'aria-disabled="true"' : ""} ${activeMission.checked && (chosen || correctChoice) ? 'aria-describedby="campaignMissionFeedback"' : ""}>${presentation.html}</button>`;
       }).join("");
-      const feedback = activeMission.checked ? `<section class="campaign-mission-feedback ${correct ? "success" : "error"}" role="status"><div><span aria-hidden="true">${correct ? "✓" : "!"}</span><strong>${t(correct ? "campaign.mission.correct" : "campaign.mission.wrong")}</strong></div><p>${escapeHtml(missionText(currentQuestion.explanation))}</p></section>` : "";
+      const feedback = activeMission.checked ? `<section id="campaignMissionFeedback" class="campaign-mission-feedback ${correct ? "success" : "error"}" role="status" aria-live="polite" aria-atomic="true"><div><span aria-hidden="true">${correct ? "✓" : "!"}</span><strong>${t(correct ? "campaign.mission.correct" : "campaign.mission.wrong")}</strong></div><p>${escapeHtml(missionText(currentQuestion.explanation))}</p></section>` : "";
       const finalQuestion = !inMastery && activeMission.index === activeMission.length - 1;
       const questionShowcase = questionShowcaseMarkup(currentQuestion, missionContext);
-      view.innerHTML = `<section class="campaign-mission-shell mission-kind-${escapeHtml(activeMission.kind)}" aria-labelledby="campaignMissionTitle">
+      view.innerHTML = `<section class="campaign-mission-shell mission-kind-${escapeHtml(activeMission.kind)} ${animateMissionIntro ? "is-launching" : ""} ${animateQuestion ? "is-question-entering" : ""}" aria-labelledby="campaignMissionTitle" aria-describedby="campaignMissionRule">
         <header class="campaign-mission-top"><button type="button" id="campaignMissionExit" class="campaign-mission-exit" aria-label="${escapeHtml(t("campaign.mission.exit"))}">×</button><div><small>${t(`campaign.mission.kind.${activeMission.kind}`)}</small><h1 id="campaignMissionTitle">${escapeHtml(t(node.titleKey))}</h1></div>${missionProgressMarkup(activeMission)}</header>
-        <main class="campaign-mission-card"><div class="campaign-mission-rule ${inMastery ? "is-mastery" : ""}"><span aria-hidden="true">${inMastery ? "↻" : "◎"}</span><p>${t(inMastery && currentQuestion.guided ? "campaign.mission.masteryGuided" : inMastery ? "campaign.mission.masteryProgress" : "campaign.mission.passRule", inMastery ? { current:activeMission.mastered + 1, total:activeMission.reviewTotal } : { correct:activeMission.requiredCorrect, total:activeMission.length })}</p></div><section class="campaign-question-stage ${questionShowcase ? "has-showcase" : ""}">${questionShowcase}<div class="campaign-question-copy"><p class="campaign-mission-kicker">${t(inMastery ? "campaign.mission.masteryQuestion" : "campaign.mission.question", { current:activeMission.index + 1 })}</p><h2>${escapeHtml(missionText(currentQuestion.prompt))}</h2></div></section><div class="campaign-answer-grid">${answerMarkup}</div>${feedback}<div class="campaign-mission-actions"><button type="button" id="campaignMissionPrimary" class="primary-button" ${selected ? "" : "disabled"}>${t(activeMission.checked ? finalQuestion ? "campaign.mission.evaluate" : "common.next" : "common.check")}</button></div></main>
+        <main class="campaign-mission-card"><div id="campaignMissionRule" class="campaign-mission-rule ${inMastery ? "is-mastery" : ""}"><span aria-hidden="true">${inMastery ? "↻" : "◎"}</span><p>${t(inMastery && currentQuestion.guided ? "campaign.mission.masteryGuided" : inMastery ? "campaign.mission.masteryProgress" : "campaign.mission.passRule", inMastery ? { current:activeMission.mastered + 1, total:activeMission.reviewTotal } : { correct:activeMission.requiredCorrect, total:activeMission.length })}</p></div><section class="campaign-question-stage ${questionShowcase ? "has-showcase" : ""}" aria-labelledby="campaignQuestionTitle">${questionShowcase}<div class="campaign-question-copy"><p class="campaign-mission-kicker">${t(inMastery ? "campaign.mission.masteryQuestion" : "campaign.mission.question", { current:activeMission.index + 1 })}</p><h2 id="campaignQuestionTitle" tabindex="-1">${escapeHtml(missionText(currentQuestion.prompt))}</h2></div></section><div class="campaign-answer-grid" role="group" aria-labelledby="campaignQuestionTitle">${answerMarkup}</div>${feedback}<div class="campaign-mission-actions"><button type="button" id="campaignMissionPrimary" class="primary-button" ${selected ? "" : "disabled"}>${t(activeMission.checked ? finalQuestion ? "campaign.mission.evaluate" : "common.next" : "common.check")}</button></div></main>
       </section>`;
-      view.querySelectorAll("[data-campaign-answer]").forEach(button => button.addEventListener("click", () => {
+      const answerButtons = [...view.querySelectorAll("[data-campaign-answer]")];
+      answerButtons.forEach((button, index) => {
+        button.addEventListener("keydown", event => {
+          if (!['ArrowDown','ArrowRight','ArrowUp','ArrowLeft'].includes(event.key)) return;
+          event.preventDefault();
+          const direction = ['ArrowDown','ArrowRight'].includes(event.key) ? 1 : -1;
+          answerButtons[(index + direction + answerButtons.length) % answerButtons.length]?.focus();
+        });
+        button.addEventListener("click", () => {
         if (activeMission.checked) return;
         activeMission.selectedOptionId = button.dataset.campaignAnswer;
         renderMission();
         win.requestAnimationFrame?.(() => view.querySelector(`[data-campaign-answer="${activeMission.selectedOptionId}"]`)?.focus?.({ preventScroll:true }));
-      }));
+        });
+      });
       view.querySelector("#campaignMissionExit")?.addEventListener("click", () => requestExit());
       view.querySelector("#campaignMissionPrimary")?.addEventListener("click", () => {
         if (!activeMission.selectedOptionId) return;
@@ -393,6 +452,7 @@
             activeMission.answers.push({ questionId:currentQuestion.id, selectedOptionId:activeMission.selectedOptionId, correct:wasCorrect });
           }
           haptic(wasCorrect ? "success" : "error");
+          activeMission.focusAfterRender = "primary";
           renderMission();
           return;
         }
@@ -402,9 +462,15 @@
           activeMission.index += 1;
           activeMission.selectedOptionId = null;
           activeMission.checked = false;
+          activeMission.animateQuestion = true;
+          activeMission.focusAfterRender = "question";
           renderMission();
           win.scrollTo?.({ top:0, left:0, behavior:"auto" });
         }
+      });
+      if (focusAfterRender) win.requestAnimationFrame?.(() => {
+        const target = focusAfterRender === "primary" ? view.querySelector("#campaignMissionPrimary") : view.querySelector("#campaignQuestionTitle");
+        target?.focus?.({ preventScroll:true });
       });
     }
 
@@ -426,15 +492,18 @@
 
     function renderMasteryIntro() {
       const node = campaign.nodeById(activeMission.nodeId);
-      view.innerHTML = `<section class="campaign-mission-shell mission-kind-${escapeHtml(activeMission.kind)}" aria-labelledby="campaignMasteryTitle"><header class="campaign-mission-top"><button type="button" id="campaignMissionExit" class="campaign-mission-exit" aria-label="${escapeHtml(t("campaign.mission.exit"))}">×</button><div><small>${t(`campaign.mission.kind.${activeMission.kind}`)}</small><h1>${escapeHtml(t(node.titleKey))}</h1></div><div class="campaign-mastery-count" aria-label="${escapeHtml(t("campaign.mission.masteredScore"))}">${activeMission.reviewTotal}</div></header><main class="campaign-mastery-intro"><div class="campaign-mastery-symbol" aria-hidden="true">↻</div><small>${t("campaign.mission.masteryReadyKicker")}</small><h2 id="campaignMasteryTitle">${t("campaign.mission.masteryReadyTitle")}</h2><p>${escapeHtml(t("campaign.mission.masteryReadyText", { count:activeMission.reviewTotal }))}</p><button type="button" id="campaignMasteryStart" class="primary-button">${t("campaign.mission.masteryStart")}</button></main></section>`;
+      view.innerHTML = `<section class="campaign-mission-shell mission-kind-${escapeHtml(activeMission.kind)}" aria-labelledby="campaignMasteryTitle"><header class="campaign-mission-top"><button type="button" id="campaignMissionExit" class="campaign-mission-exit" aria-label="${escapeHtml(t("campaign.mission.exit"))}">×</button><div><small>${t(`campaign.mission.kind.${activeMission.kind}`)}</small><h1>${escapeHtml(t(node.titleKey))}</h1></div><div class="campaign-mastery-count" aria-label="${escapeHtml(t("campaign.mission.masteredScore"))}">${activeMission.reviewTotal}</div></header><main class="campaign-mastery-intro" role="region" aria-live="polite"><div class="campaign-mastery-symbol" aria-hidden="true">↻</div><small>${t("campaign.mission.masteryReadyKicker")}</small><h2 id="campaignMasteryTitle" tabindex="-1">${t("campaign.mission.masteryReadyTitle")}</h2><p>${escapeHtml(t("campaign.mission.masteryReadyText", { count:activeMission.reviewTotal }))}</p><button type="button" id="campaignMasteryStart" class="primary-button">${t("campaign.mission.masteryStart")}</button></main></section>`;
       view.querySelector("#campaignMissionExit")?.addEventListener("click", () => requestExit());
       view.querySelector("#campaignMasteryStart")?.addEventListener("click", startMastery);
+      win.requestAnimationFrame?.(() => view.querySelector("#campaignMasteryTitle")?.focus?.({ preventScroll:true }));
     }
 
     function startMastery() {
       activeMission.phase = "mastery";
       activeMission.selectedOptionId = null;
       activeMission.checked = false;
+      activeMission.animateQuestion = true;
+      activeMission.focusAfterRender = "question";
       const source = activeMission.reviewQueue[0];
       activeMission.reviewQuestion = missions.buildReviewQuestion(source, activeMission.reviewAttempts[source.id] || 0);
       haptic("selection");
@@ -459,6 +528,8 @@
       }
       const next = activeMission.reviewQueue[0];
       activeMission.reviewQuestion = missions.buildReviewQuestion(next, activeMission.reviewAttempts[next.id] || 0);
+      activeMission.animateQuestion = true;
+      activeMission.focusAfterRender = "question";
       renderMission();
       win.scrollTo?.({ top:0, left:0, behavior:"auto" });
     }
@@ -466,11 +537,19 @@
     function completeMission() {
       activeMission.passed = true;
       activeMission.phase = "summary";
-      state().campaign = campaign.recordMissionResult(state().campaign, activeMission.nodeId, {
+      activeMission.animateSummary = true;
+      const before = campaign.sanitizeProgress(state().campaign);
+      const result = {
         firstRunCorrect:activeMission.correct,
-        masteredMistakes:activeMission.mastered
-      });
+        masteredMistakes:activeMission.mastered,
+        completedAt:new Date().toISOString()
+      };
+      activeMission.rewardOutcome = campaign.missionReward(before, activeMission.nodeId, result);
+      state().campaign = campaign.recordMissionResult(before, activeMission.nodeId, result);
       state().campaign = campaign.completeNode(state().campaign, activeMission.nodeId);
+      const newlyUnlocked = state().campaign.unlockedNodeIds.filter(id => !before.unlockedNodeIds.includes(id));
+      activeMission.newlyUnlockedNodeId = newlyUnlocked.includes(state().campaign.currentNodeId) ? state().campaign.currentNodeId : newlyUnlocked[0] || null;
+      addXp(activeMission.rewardOutcome.totalXp);
       saveState();
       haptic("unlock");
       renderMissionSummary();
@@ -482,30 +561,80 @@
       const rate = Math.round(activeMission.correct / activeMission.length * 100);
       const masteryValue = activeMission.reviewTotal ? `${activeMission.mastered}/${activeMission.reviewTotal}` : "✓";
       const masteryDetail = activeMission.reviewTotal ? "100%" : t("campaign.mission.noMistakes");
-      view.innerHTML = `<section class="campaign-mission-summary passed" aria-labelledby="campaignMissionSummaryTitle"><div class="campaign-mission-summary-icon" aria-hidden="true">✓</div><small>${t("campaign.mission.resultKicker")}</small><h1 id="campaignMissionSummaryTitle">${t(activeMission.reviewTotal ? "campaign.mission.masteryComplete" : "campaign.mission.passed")}</h1><p>${escapeHtml(t("campaign.mission.passedText", { mission:t(node.titleKey) }))}</p><div class="campaign-mission-score-grid"><article><span>${t("campaign.mission.firstRunScore")}</span><strong>${activeMission.correct}/${activeMission.length}</strong><em>${rate}%</em></article><article><span>${t("campaign.mission.masteredScore")}</span><strong>${masteryValue}</strong><em>${masteryDetail}</em></article></div><div class="campaign-mission-summary-actions"><button type="button" id="campaignMissionMap" class="primary-button">${t("campaign.mission.toMap")}</button><button type="button" id="campaignMissionRetry" class="secondary-button">${t("campaign.mission.retry")}</button></div></section>`;
+      const outcome = activeMission.rewardOutcome || campaign.missionReward(state().campaign, activeMission.nodeId, { firstRunCorrect:activeMission.correct });
+      const stored = state().campaign.missionResults[activeMission.nodeId];
+      const rewardParts = [
+        outcome.completionXp ? t("campaign.reward.completionXp", { xp:outcome.completionXp }) : "",
+        outcome.newStars.length ? t("campaign.reward.starXp", { count:outcome.newStars.length, xp:outcome.starXp }) : "",
+        outcome.repeatXp ? t("campaign.reward.trainingXp", { xp:outcome.repeatXp }) : "",
+        outcome.improvementXp ? t("campaign.reward.bestXp", { xp:outcome.improvementXp }) : ""
+      ].filter(Boolean);
+      const unlocked = activeMission.newlyUnlockedNodeId ? campaign.nodeById(activeMission.newlyUnlockedNodeId) : null;
+      const celebrate = Boolean(activeMission.animateSummary && motionEnabled());
+      activeMission.animateSummary = false;
+      view.innerHTML = `<section class="campaign-mission-summary campaign-result-animated passed ${outcome.newStars.length ? "has-new-stars" : ""} ${celebrate ? "is-celebrating" : ""}" role="region" aria-live="polite" aria-atomic="true" aria-labelledby="campaignMissionSummaryTitle"><div class="campaign-mission-summary-icon" aria-hidden="true">${outcome.stars === 3 ? "★" : "✓"}</div><small>${t("campaign.mission.resultKicker")}</small><h1 id="campaignMissionSummaryTitle" tabindex="-1">${t(outcome.stars === 3 ? "campaign.mission.perfect" : activeMission.reviewTotal ? "campaign.mission.masteryComplete" : "campaign.mission.passed")}</h1><p>${escapeHtml(t("campaign.mission.passedText", { mission:t(node.titleKey) }))}</p>${starsMarkup(outcome.stars, "campaign-summary-stars")}<span class="campaign-best-stars">${t("campaign.bestStars", { count:stored?.bestStars || outcome.stars })}</span><div class="campaign-mission-score-grid"><article><span>${t("campaign.mission.firstRunScore")}</span><strong>${activeMission.correct}/${activeMission.length}</strong><em>${rate}%</em></article><article><span>${t("campaign.mission.masteredScore")}</span><strong>${masteryValue}</strong><em>${masteryDetail}</em></article><article class="xp"><span>${t("campaign.reward.earnedXp")}</span><strong>+${outcome.totalXp}</strong><em>XP</em></article></div>${rewardParts.length ? `<div class="campaign-reward-breakdown">${rewardParts.map(part => `<span>✓ ${escapeHtml(part)}</span>`).join("")}</div>` : ""}${unlocked ? `<div class="campaign-unlock-result"><span aria-hidden="true">✦</span><div><small>${t("campaign.return.unlocked")}</small><strong>${escapeHtml(t(unlocked.titleKey))}</strong></div></div>` : ""}<div class="campaign-mission-summary-actions"><button type="button" id="campaignMissionMap" class="primary-button">${t("campaign.mission.toMap")}</button><button type="button" id="campaignMissionRetry" class="secondary-button">${t("campaign.mission.retry")}</button></div></section>`;
       view.querySelector("#campaignMissionMap")?.addEventListener("click", returnToMap);
       view.querySelector("#campaignMissionRetry")?.addEventListener("click", () => startMission(activeMission.nodeId));
+      win.requestAnimationFrame?.(() => view.querySelector("#campaignMissionSummaryTitle")?.focus?.({ preventScroll:true }));
     }
 
     function returnToMap() {
-      const completedNode = campaign.nodeById(activeMission.nodeId);
-      const targetId = activeMission.passed && completedNode.required ? state().campaign.currentNodeId : activeMission.nodeId;
+      const targetId = activeMission.newlyUnlockedNodeId || activeMission.nodeId;
+      returnNotice = { nodeId:targetId, kind:activeMission.newlyUnlockedNodeId ? "unlocked" : "position", animate:true };
       activeMission = null;
       state().campaign.selectedNodeId = targetId;
       detailOpen = true;
       saveState();
       renderMap();
-      win.requestAnimationFrame?.(() => scrollToNode(targetId, "smooth"));
+      win.requestAnimationFrame?.(() => { scrollToNode(targetId, "smooth"); view.querySelector(`[data-campaign-node="${targetId}"]`)?.focus?.({ preventScroll:true }); });
+    }
+
+    function claimChapterReward() {
+      const before = campaign.sanitizeProgress(state().campaign);
+      if (!campaign.canClaimChapterReward(before)) return;
+      state().campaign = campaign.claimChapterReward(before, new Date().toISOString());
+      addXp(campaign.CHAPTER_REWARD_XP);
+      chapterCelebration = { xp:campaign.CHAPTER_REWARD_XP, animate:true };
+      detailOpen = false;
+      returnNotice = null;
+      saveState();
+      haptic("unlock");
+      renderChapterCompletion();
+      win.scrollTo?.({ top:0, left:0, behavior:"auto" });
+    }
+
+    function renderChapterCompletion() {
+      const celebrate = Boolean(chapterCelebration?.animate && motionEnabled());
+      if (chapterCelebration) chapterCelebration.animate = false;
+      view.innerHTML = `<section class="campaign-mission-summary campaign-chapter-complete campaign-result-animated ${celebrate ? "is-celebrating" : ""}" role="region" aria-live="polite" aria-atomic="true" aria-labelledby="campaignChapterCompleteTitle"><div class="campaign-chapter-badge" aria-hidden="true"><span>◆</span></div><small>${t("campaign.chapter.completeKicker")}</small><h1 id="campaignChapterCompleteTitle" tabindex="-1">${t("campaign.chapter.completeTitle")}</h1><p>${t("campaign.chapter.completeText")}</p><div class="campaign-chapter-rewards"><article><span aria-hidden="true">◆</span><small>${t("campaign.chapter.badge")}</small><strong>${t("campaign.reward.claimed")}</strong></article><article><span aria-hidden="true">✦</span><small>${t("campaign.reward.earnedXp")}</small><strong>+${chapterCelebration?.xp || campaign.CHAPTER_REWARD_XP} XP</strong></article></div><div class="campaign-unlock-result chapter"><span aria-hidden="true">✓</span><div><small>${t("campaign.chapter.nextUnlocked")}</small><strong>${t("campaign.nextSectionTitle")}</strong></div></div><button type="button" id="campaignChapterMap" class="primary-button">${t("campaign.mission.toMap")}</button></section>`;
+      view.querySelector("#campaignChapterMap")?.addEventListener("click", returnFromChapter);
+      win.requestAnimationFrame?.(() => view.querySelector("#campaignChapterCompleteTitle")?.focus?.({ preventScroll:true }));
+    }
+
+    function returnFromChapter() {
+      chapterCelebration = null;
+      returnNotice = { nodeId:"chapter-reward", kind:"position" };
+      state().campaign.selectedNodeId = "chapter-reward";
+      detailOpen = true;
+      saveState();
+      renderMap();
+      win.requestAnimationFrame?.(() => scrollToNode("chapter-reward", "smooth"));
     }
 
     function requestExit(onExit) {
-      if (!activeMission) return false;
+      if (!activeMission && !chapterCelebration) return false;
       const leave = () => {
+        const targetId = activeMission?.nodeId || state().campaign.selectedNodeId;
         activeMission = null;
+        chapterCelebration = null;
         detailOpen = false;
         if (typeof onExit === "function") onExit();
-        else renderMap();
+        else { renderMap(); restoreSavedMapPosition(targetId, true); }
       };
+      if (chapterCelebration) {
+        leave();
+        return true;
+      }
       if (activeMission.phase === "summary" || (!activeMission.answers.length && !activeMission.selectedOptionId) || typeof showConfirmDialog !== "function") {
         leave();
         return true;
@@ -514,11 +643,15 @@
       return true;
     }
 
-    function isMissionActive() { return Boolean(activeMission); }
+    function isMissionActive() { return Boolean(activeMission || chapterCelebration); }
 
     function render() {
-      if (activeMission) renderMission();
-      else renderMap();
+      if (chapterCelebration) renderChapterCompletion();
+      else if (activeMission) renderMission();
+      else {
+        renderMap();
+        if (state().campaign.tutorialComplete) restoreSavedMapPosition(state().campaign.selectedNodeId);
+      }
     }
 
     function tutorialTarget(step) {

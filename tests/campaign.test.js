@@ -79,7 +79,7 @@ test("campaign progress repairs imported data without unlocking future nodes", (
   assert.deepEqual(clean.completedNodeIds, ["pallet-town"]);
   assert.deepEqual(clean.unlockedNodeIds, ["pallet-town", "rival-one"]);
   assert.deepEqual(clean.missionResults, {
-    "pallet-town":{ lastFirstRunCorrect:9, bestFirstRunCorrect:10, total:10, requiredCorrect:8, lastDirectGoalMet:true, masteredMistakes:1, attempts:2 }
+    "pallet-town":{ lastFirstRunCorrect:9, bestFirstRunCorrect:10, lastStars:2, bestStars:3, total:10, requiredCorrect:8, lastDirectGoalMet:true, masteredMistakes:1, attempts:2, firstCompletedAt:null, lastCompletedAt:null }
   });
   assert.equal(clean.lastMapScroll, 0);
   assert.equal(campaign.nodeStatus(clean, "pallet-town"), "complete");
@@ -88,13 +88,13 @@ test("campaign progress repairs imported data without unlocking future nodes", (
 });
 
 test("campaign retains first-run scores separately from mastered mistakes", () => {
-  let progress = campaign.recordMissionResult(campaign.blankProgress(), "pallet-town", { firstRunCorrect:7, masteredMistakes:3 });
+  let progress = campaign.recordMissionResult(campaign.blankProgress(), "pallet-town", { firstRunCorrect:7, masteredMistakes:3, completedAt:"2026-08-13T12:00:00.000Z" });
   assert.deepEqual(progress.missionResults["pallet-town"], {
-    lastFirstRunCorrect:7, bestFirstRunCorrect:7, total:10, requiredCorrect:8, lastDirectGoalMet:false, masteredMistakes:3, attempts:1
+    lastFirstRunCorrect:7, bestFirstRunCorrect:7, lastStars:1, bestStars:1, total:10, requiredCorrect:8, lastDirectGoalMet:false, masteredMistakes:3, attempts:1, firstCompletedAt:"2026-08-13T12:00:00.000Z", lastCompletedAt:"2026-08-13T12:00:00.000Z"
   });
-  progress = campaign.recordMissionResult(progress, "pallet-town", { firstRunCorrect:9, masteredMistakes:1 });
+  progress = campaign.recordMissionResult(progress, "pallet-town", { firstRunCorrect:9, masteredMistakes:1, completedAt:"2026-08-13T12:05:00.000Z" });
   assert.deepEqual(progress.missionResults["pallet-town"], {
-    lastFirstRunCorrect:9, bestFirstRunCorrect:9, total:10, requiredCorrect:8, lastDirectGoalMet:true, masteredMistakes:1, attempts:2
+    lastFirstRunCorrect:9, bestFirstRunCorrect:9, lastStars:2, bestStars:2, total:10, requiredCorrect:8, lastDirectGoalMet:true, masteredMistakes:1, attempts:2, firstCompletedAt:"2026-08-13T12:00:00.000Z", lastCompletedAt:"2026-08-13T12:05:00.000Z"
   });
   progress = campaign.recordMissionResult(progress, "pallet-town", { firstRunCorrect:8, masteredMistakes:2 });
   assert.equal(progress.missionResults["pallet-town"].lastFirstRunCorrect, 8);
@@ -165,6 +165,32 @@ test("campaign map exposes distinct current, locked, special and responsive stat
   assert.match(css, /box-shadow:[^;]*9999px/);
   assert.match(css, /@media \(max-width:760px\)/);
   assert.match(css, /min-height:44px/);
+});
+
+test("Sprint 4 UI connects stars, rewards, return position and chapter completion", () => {
+  const app = read("app.js");
+  const ui = read("campaign-ui.js");
+  const css = read("styles-campaign.css");
+  assert.match(app, /addXp, haptic/);
+  assert.match(app, /sanitizeProgress\(candidate\?\.campaign \?\? repaired\.campaign\)/);
+  assert.match(app, /consumePendingRewards/);
+  assert.match(ui, /function starsMarkup/);
+  assert.match(ui, /function claimChapterReward/);
+  assert.match(ui, /function renderChapterCompletion/);
+  assert.match(ui, /function returnFromChapter/);
+  assert.match(ui, /newlyUnlockedNodeId/);
+  assert.match(ui, /campaignRewardClaim/);
+  assert.match(ui, /campaignChapterMap/);
+  assert.match(css, /\.campaign-summary-stars/);
+  assert.match(css, /\.campaign-reward-breakdown/);
+  assert.match(css, /\.campaign-map-return/);
+  assert.match(css, /\.campaign-next-section/);
+  assert.match(css, /\.campaign-chapter-complete/);
+  assert.match(ui, /\$\{result \? starsMarkup\(result\.bestStars, "campaign-node-stars"\) : ""\}\s*<button/);
+  assert.match(ui, /campaign-node-label"><strong>\$\{escapeHtml\(title\)\}<\/strong><\/span>/);
+  assert.doesNotMatch(ui, /campaign-node-label"><strong>[^\n]*?<small>/);
+  assert.match(css, /\.campaign-node-stars \{[^}]*position:absolute[^}]*top:-69px/);
+  assert.match(css, /\.campaign-node-stars i \{[^}]*font-size:30px/);
 });
 
 test("campaign tutorial targets real node buttons and keeps the dialog raised", () => {

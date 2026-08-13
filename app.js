@@ -2,9 +2,9 @@
   "use strict";
 
   const STORAGE_KEY = "quizmon.beta1";
-  const BUILD_VERSION = "4.3-sprint3-v6";
+  const BUILD_VERSION = "4.3-sprint5-v1";
   const PUBLIC_VERSION = "Beta 1.3";
-  const DATA_SCHEMA = 22;
+  const DATA_SCHEMA = 23;
   const LEARNING_EVENT_LIMIT = 800;
   const ERROR_EVENT_LIMIT = 600;
   const HISTORY_LIMIT = 30;
@@ -16,7 +16,7 @@
   const LEARNING_EVENT_MODES = Object.freeze([...PLAYABLE_MODES, "weak", "daily", "review", "problem", "path"]);
   const ADAPTIVE_SESSION_MODES = Object.freeze(["weak", "problem"]);
   const SUPPORTED_CURRENT_VERSIONS = Object.freeze([
-    "4.3-sprint3-v6", "4.3-sprint3-v5", "4.3-sprint3-v4", "4.3-sprint3-v3", "4.3-sprint3-v2", "4.3-sprint3-v1", "4.3-sprint1-v7", "4.3-sprint1-v6", "4.3-sprint1-v5", "4.3-sprint1-v4", "4.3-sprint1-v3", "4.3-sprint1-v2", "4.3-sprint1-v1", "4.2-sprint1-v1", "4.1-sprint3-v8", "4.1-sprint3-v7", "4.1-sprint3-v6", "4.1-sprint3-v5", "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
+    "4.3-sprint4-v4", "4.3-sprint4-v3", "4.3-sprint4-v2", "4.3-sprint4-v1", "4.3-sprint3-v6", "4.3-sprint3-v5", "4.3-sprint3-v4", "4.3-sprint3-v3", "4.3-sprint3-v2", "4.3-sprint3-v1", "4.3-sprint1-v7", "4.3-sprint1-v6", "4.3-sprint1-v5", "4.3-sprint1-v4", "4.3-sprint1-v3", "4.3-sprint1-v2", "4.3-sprint1-v1", "4.2-sprint1-v1", "4.1-sprint3-v8", "4.1-sprint3-v7", "4.1-sprint3-v6", "4.1-sprint3-v5", "4.1-sprint3-v4", "4.1-sprint3-v3", "4.1-sprint3-v2", "4.1-sprint3-v1", "4.1-sprint2-v1",
     "4.1-sprint1-v1", "phase3-cleanup-v1", "3.5-sprint2-v2", "3.5-sprint2-v1", "3.5-sprint1-v2", "3.5-sprint1-v1", "3.4-sprint2-v1", "3.4-sprint1-v1", "3.3-sprint1-v3", "3.3-sprint1-v2", "3.3-sprint1-v1", "3.2-sprint2-v1", "3.2-sprint1-v2", "3.2-sprint1-v1", "3.1-sprint3-v3", "3.1-sprint3-v2", "3.1-sprint3-v1", "3.1-sprint2-v3", "3.1-sprint2-v2", "3.1-sprint2-v1", "3.1-sprint1-v2", "3.1-sprint1-v1", "phase2-finalization-sprint-v1", "phase2-cleanup-sprint3-v1", "phase2-cleanup-sprint2-v1", "phase2-cleanup-sprint1-v2", "phase2-cleanup-sprint1-v1",
     "2.5-sprint3-v1", "2.5-sprint2-v1", "2.5-sprint1-v1", "2.4-sprint2-v1", "2.4-sprint1-v1",
     "2.3-sprint2-v3", "2.3-sprint2-v2", "2.3-sprint2-v1", "2.3-sprint1-v1",
@@ -235,7 +235,7 @@
   });
   const campaignUI = QuizmonCampaignUI.createController({
     campaign: QuizmonCampaign, missions: QuizmonCampaignMissions, view, modalRoot, getState: () => state,
-    getMissionContext:()=>({pokemonById:QuizmonKnowledgeData.BY_ID,itemById:QuizmonKnowledgeContent.ITEM_BY_ID,typeChart:TYPE_CHART}), renderTypeChip:typeChip, pokemonArtwork:id=>artworkUrl(id), itemArtwork:knowledgeItemArtwork, t, escapeHtml, saveState, haptic, motionEnabled, setModalMarkup, closeModal, showConfirmDialog
+    getMissionContext:()=>({pokemonById:QuizmonKnowledgeData.BY_ID,itemById:QuizmonKnowledgeContent.ITEM_BY_ID,typeChart:TYPE_CHART}), renderTypeChip:typeChip, pokemonArtwork:id=>artworkUrl(id), itemArtwork:knowledgeItemArtwork, t, escapeHtml, saveState, addXp, haptic, motionEnabled, setModalMarkup, closeModal, showConfirmDialog
   });
 
   function clone(value) { return QuizmonCore.clone(value); }
@@ -564,7 +564,7 @@
     repaired.whosThat.statistics = QuizmonWhosThatPokemon.sanitizeStatistics(repaired.whosThat.statistics);
     repaired.speedrun = repaired.speedrun && typeof repaired.speedrun === "object" ? repaired.speedrun : clone(defaults.speedrun);
     repaired.speedrun.statistics = QuizmonSpeedrun.sanitizeStatistics(repaired.speedrun.statistics);
-    repaired.campaign = QuizmonCampaign.sanitizeProgress(repaired.campaign);
+    repaired.campaign = QuizmonCampaign.sanitizeProgress(candidate?.campaign ?? repaired.campaign); const campaignRewards=QuizmonCampaign.consumePendingRewards(repaired.campaign); repaired.campaign=campaignRewards.progress; repaired.stats.xp+=campaignRewards.xp; if(campaignRewards.xp)fixes.push("campaign.pendingRewardXp");
 
     const oldLevel = getLevelInfo(repaired.stats.xp).current.level;
     const oldMastered = TYPES.filter(type => repaired.stats.types[type].total >= 5 && percent(repaired.stats.types[type].correct, repaired.stats.types[type].total) >= 80).length;
@@ -681,17 +681,19 @@
   function loadState() {
     try {
       const current = localStorage.getItem(STORAGE_KEY);
-      if (current) {
+      if (current) try {
         const loaded = repairState(JSON.parse(current));
-        if (["session", "summary"].includes(loaded.route) || loaded.route.startsWith("setup-")) loaded.route = "home";
+        if (["session","summary"].includes(loaded.route) || loaded.route.startsWith("setup-")) loaded.route = "home";
         return loaded;
-      }
+      } catch (error) { console.warn("Invalid current save",error); logError(error,"loadState.current"); }
       for (const key of OLD_KEYS) {
         const raw = localStorage.getItem(key);
-        if (raw) return repairState(migrateLegacy(JSON.parse(raw)));
+        if (!raw) continue;
+        try { return repairState(migrateLegacy(JSON.parse(raw))); }
+        catch (error) { logError(error,"loadState.legacy"); }
       }
     } catch (error) {
-      console.warn("Could not load save data", error); logError(error, "loadState");
+      logError(error,"loadState.storage");
     }
     return clone(defaults);
   }
@@ -2497,18 +2499,13 @@
   }
   function renderCampaign() { campaignUI.render(); }
 
-  function renderFutureArea(kind) {
-    const isPlay=kind==="play";
-    const icon=isPlay?iconSvg("play"):iconSvg("support");
-    const title=t(isPlay?"placeholder.playTitle":"placeholder.supportTitle");
-    const textValue=t(isPlay?"placeholder.playText":"placeholder.supportText");
-    const detail=t(isPlay?"placeholder.playDetail":"placeholder.supportDetail");
-    view.innerHTML=`<section class="future-area-page ${kind}" aria-labelledby="futureAreaTitle">
+  function renderFutureArea() {
+    view.innerHTML=`<section class="future-area-page support" aria-labelledby="futureAreaTitle">
       <section class="future-area-card">
-        <span class="future-area-icon" aria-hidden="true">${icon}</span>
-        <div class="future-area-copy"><p class="quiz-kicker">${t("placeholder.kicker")}</p><h1 id="futureAreaTitle">${escapeHtml(title)}</h1><p>${escapeHtml(textValue)}</p></div>
-        <section class="future-area-note"><strong>${t("placeholder.noteTitle")}</strong><p>${escapeHtml(detail)}</p></section>
-        <div class="future-area-actions"><button class="primary-button" data-future-destination="${isPlay?"train":"home"}">${t(isPlay?"placeholder.openTraining":"placeholder.backHome")}</button>${isPlay?`<button class="secondary-button" data-future-destination="home">${t("placeholder.backHome")}</button>`:""}</div>
+        <span class="future-area-icon" aria-hidden="true">${iconSvg("support")}</span>
+        <div class="future-area-copy"><p class="quiz-kicker">${t("placeholder.kicker")}</p><h1 id="futureAreaTitle">${t("placeholder.supportTitle")}</h1><p>${t("placeholder.supportText")}</p></div>
+        <section class="future-area-note"><strong>${t("placeholder.noteTitle")}</strong><p>${t("placeholder.supportDetail")}</p></section>
+        <div class="future-area-actions"><button class="primary-button" data-future-destination="home">${t("placeholder.backHome")}</button></div>
       </section>
     </section>`;
     document.querySelectorAll("[data-future-destination]").forEach(button=>button.addEventListener("click",()=>setRoute(button.dataset.futureDestination)));
@@ -8363,7 +8360,7 @@
 
     addEventListener("load",async()=>{
       try{
-        const registration=await navigator.serviceWorker.register("./service-worker.js?build=4.3-sprint3-v6",{updateViaCache:"none"});
+        const registration=await navigator.serviceWorker.register("./service-worker.js?build=4.3-sprint5-v1",{updateViaCache:"none"});
         if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
         registration.update().catch(()=>{});
         registration.addEventListener("updatefound",()=>{
